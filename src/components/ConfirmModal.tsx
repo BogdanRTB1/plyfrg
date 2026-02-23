@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable */
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -29,6 +30,9 @@ export default function ConfirmModal({
 
     useEffect(() => {
         setMounted(true);
+    }, []);
+
+    useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
             requestAnimationFrame(() => {

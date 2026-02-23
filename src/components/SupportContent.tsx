@@ -374,7 +374,7 @@ export default function SupportContent() {
                                 </div>
                                 <h3 className="text-2xl font-bold text-white mb-2">No Active Tickets</h3>
                                 <p className="text-slate-500 max-w-md">
-                                    You don't have any open support tickets at the moment. If you need assistance, you can start a chat or create a new ticket.
+                                    You don&apos;t have any open support tickets at the moment. If you need assistance, you can start a chat or create a new ticket.
                                 </p>
                             </div>
                         </motion.div>
