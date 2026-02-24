@@ -66,7 +66,7 @@ export default function HomeContent() {
                         src="/images/hero-banner.png"
                         alt="Hero Background"
                         fill
-                        className="object-cover object-center scale-[1.6] md:scale-100 opacity-100 transition-transform duration-700 md:group-hover:scale-105"
+                        className="object-cover object-center opacity-100 transition-transform duration-700 group-hover:scale-105"
                         priority
                     />
                     {/* Gradient overlay to ensure text readability while keeping image visible */}

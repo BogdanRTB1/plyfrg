@@ -236,7 +236,7 @@ export default function Header() {
                                 onClick={() => setIsAuthOpen('signup')}
                             >
                                 <span className="hidden sm:inline">Register</span>
-                                <span className="sm:hidden">Join</span>
+                                <span className="sm:hidden whitespace-nowrap">Join Now</span>
                             </button>
                         </div>
                     )}
