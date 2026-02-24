@@ -98,9 +98,9 @@ export default function Header() {
                 </div>
 
                 <div className="flex items-center gap-2 md:gap-4 shrink-0">
-                    <div className="bg-[#0f212e] border border-white/5 rounded-full p-1 pl-3 md:pl-4 flex items-center gap-2 md:gap-3">
+                    <div className={`bg-[#0f212e] border border-white/5 rounded-full p-1 pl-3 md:pl-4 items-center gap-2 md:gap-3 ${!user ? 'hidden md:flex' : 'flex'}`}>
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Balance:</span>
-                        <span className="text-sm font-bold text-white">$0.00</span>
+                        <span className="text-sm font-bold text-white">${balance.toFixed(2)}</span>
                         <button
                             className="bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] px-3 md:px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-[0_0_15px_rgba(0,185,240,0.3)] hover:shadow-[0_0_20px_rgba(0,185,240,0.5)] flex items-center justify-center min-w-[32px] md:min-w-0"
                             onClick={() => setIsWalletOpen(true)}
@@ -235,7 +235,8 @@ export default function Header() {
                                 className="bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] px-3 md:px-5 py-2 rounded-lg font-bold text-xs md:text-sm transition-all shadow-[0_0_20px_rgba(0,185,240,0.2)] hover:shadow-[0_0_25px_rgba(0,185,240,0.4)] hover:-translate-y-0.5"
                                 onClick={() => setIsAuthOpen('signup')}
                             >
-                                Register
+                                <span className="hidden sm:inline">Register</span>
+                                <span className="sm:hidden">Join</span>
                             </button>
                         </div>
                     )}
