@@ -57,10 +57,10 @@ export default function HomeContent() {
             initial="hidden"
             animate="show"
             variants={container}
-            className="flex-1 h-full overflow-y-auto custom-scrollbar p-8 pb-8"
+            className="flex-1 h-full overflow-y-auto custom-scrollbar p-4 md:p-8 pb-8"
         >
             {/* Hero Section */}
-            <motion.section variants={item} className="relative h-[400px] rounded-3xl overflow-hidden flex items-center p-12 mb-12 shadow-2xl border border-white/5 group">
+            <motion.section variants={item} className="relative min-h-[400px] h-auto md:h-[400px] rounded-3xl overflow-hidden flex items-center p-6 sm:p-8 md:p-12 mb-12 shadow-2xl border border-white/5 group">
                 <div className="absolute inset-0 bg-[#0f172a]">
                     <Image
                         src="/images/hero-banner.png"
@@ -88,7 +88,7 @@ export default function HomeContent() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3 }}
-                        className="text-5xl md:text-6xl font-extrabold mb-6 text-white leading-[1.1] tracking-tight drop-shadow-2xl"
+                        className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6 text-white leading-[1.1] tracking-tight drop-shadow-2xl"
                     >
                         Create. Play.<br />
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00b9f0] to-white drop-shadow-sm">Win Together.</span>
@@ -106,12 +106,12 @@ export default function HomeContent() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 }}
-                        className="flex gap-4"
+                        className="flex flex-col sm:flex-row gap-3 md:gap-4"
                     >
-                        <button className="bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] px-8 py-3.5 rounded-full font-bold transition-all shadow-[0_0_20px_rgba(0,185,240,0.3)] hover:shadow-[0_0_30px_rgba(0,185,240,0.5)] hover:-translate-y-1">
+                        <button className="bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] px-8 py-3.5 rounded-full font-bold transition-all shadow-[0_0_20px_rgba(0,185,240,0.3)] hover:shadow-[0_0_30px_rgba(0,185,240,0.5)] hover:-translate-y-1 w-full sm:w-auto text-center">
                             Start Playing
                         </button>
-                        <Link href="/creators" className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm px-8 py-3.5 rounded-full font-bold border border-white/10 transition-all hover:-translate-y-1">
+                        <Link href="/creators" className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm px-8 py-3.5 rounded-full font-bold border border-white/10 transition-all hover:-translate-y-1 w-full sm:w-auto text-center flex items-center justify-center">
                             View Creators
                         </Link>
                     </motion.div>
@@ -256,27 +256,29 @@ export default function HomeContent() {
                         LIVE FEED
                     </div>
                 </div>
-                <div className="bg-[#0f212e] rounded-2xl border border-white/5 overflow-hidden shadow-2xl">
-                    <div className="grid grid-cols-4 p-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-white/5 bg-[#1a2c38]/50">
-                        <div className="pl-2">Game</div>
-                        <div>Player</div>
-                        <div className="text-right">Multiplier</div>
-                        <div className="text-right pr-2">Payout</div>
-                    </div>
-                    <div className="divide-y divide-white/5">
-                        {recentWins.map((win, i) => (
-                            <div key={i} className="grid grid-cols-4 p-4 hover:bg-white/[0.02] text-sm items-center transition-colors group">
-                                <div className="font-bold text-white flex items-center gap-3 pl-2">
-                                    <div className="w-8 h-8 rounded-lg bg-[#1a2c38] p-1 border border-white/5 group-hover:border-[#00b9f0]/30 transition-colors">
-                                        <Image src={win.icon} alt={win.game} width={32} height={32} className="w-full h-full object-contain" />
+                <div className="bg-[#0f212e] rounded-2xl border border-white/5 overflow-hidden shadow-2xl overflow-x-auto">
+                    <div className="min-w-[500px]">
+                        <div className="grid grid-cols-4 p-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-white/5 bg-[#1a2c38]/50">
+                            <div className="pl-2">Game</div>
+                            <div>Player</div>
+                            <div className="text-right">Multiplier</div>
+                            <div className="text-right pr-2">Payout</div>
+                        </div>
+                        <div className="divide-y divide-white/5">
+                            {recentWins.map((win, i) => (
+                                <div key={i} className="grid grid-cols-4 p-4 hover:bg-white/[0.02] text-sm items-center transition-colors group">
+                                    <div className="font-bold text-white flex items-center gap-3 pl-2">
+                                        <div className="w-8 h-8 rounded-lg bg-[#1a2c38] p-1 border border-white/5 group-hover:border-[#00b9f0]/30 transition-colors shrink-0">
+                                            <Image src={win.icon} alt={win.game} width={32} height={32} className="w-full h-full object-contain" />
+                                        </div>
+                                        <span className="hidden sm:inline">{win.game}</span>
                                     </div>
-                                    <span className="hidden sm:inline">{win.game}</span>
+                                    <div className="text-slate-300 font-medium truncate">{win.user}</div>
+                                    <div className="text-right font-bold text-[#00b9f0]">{win.multiplier}x</div>
+                                    <div className="text-right font-black text-green-400 pr-2 shadow-green-500/10 drop-shadow-sm">{win.payout}</div>
                                 </div>
-                                <div className="text-slate-300 font-medium">{win.user}</div>
-                                <div className="text-right font-bold text-[#00b9f0]">{win.multiplier}x</div>
-                                <div className="text-right font-black text-green-400 pr-2 shadow-green-500/10 drop-shadow-sm">{win.payout}</div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 </div>
             </motion.div>

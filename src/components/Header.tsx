@@ -4,12 +4,13 @@
 import { toast } from "sonner";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, Bell, LogOut, User as UserIcon, Settings, ChevronDown, Wallet, History } from "lucide-react";
+import { Search, Bell, LogOut, User as UserIcon, Settings, ChevronDown, Wallet, History, Menu } from "lucide-react";
 import Link from "next/link";
 import AuthModal from "./AuthModal";
 import ConfirmModal from "./ConfirmModal";
 import WalletModal from "./WalletModal";
 import { createClient } from "@/utils/supabase/client";
+import { useMobileNav } from "@/components/MobileNavProvider";
 
 export default function Header() {
     const [isAuthOpen, setIsAuthOpen] = useState<'login' | 'signup' | null>(null);
@@ -24,6 +25,7 @@ export default function Header() {
     const userDropdownRef = useRef<HTMLDivElement>(null);
 
     const supabase = createClient();
+    const { toggle } = useMobileNav();
 
     useEffect(() => {
         const getUser = async () => {
@@ -78,27 +80,33 @@ export default function Header() {
 
     return (
         <>
-            <header className="h-20 px-8 flex items-center justify-between bg-[#071d2a]/95 backdrop-blur-xl sticky top-0 z-40 border-b border-white/5 animate-in fade-in slide-in-from-top-8 duration-1000 ease-out fill-mode-both delay-[1500ms]">
-                <div className="relative group w-[400px]">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors pointer-events-none">
-                        <Search size={18} />
+            <header className="h-20 px-4 md:px-8 flex items-center justify-between gap-2 md:gap-4 bg-[#071d2a]/95 backdrop-blur-xl sticky top-0 z-40 border-b border-white/5 animate-in fade-in slide-in-from-top-8 duration-1000 ease-out fill-mode-both delay-[1500ms]">
+                <div className="flex items-center gap-3 flex-1 md:flex-none md:w-[400px]">
+                    <button className="md:hidden text-slate-400 hover:text-white shrink-0" onClick={toggle}>
+                        <Menu size={24} />
+                    </button>
+                    <div className="relative group w-full">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors pointer-events-none">
+                            <Search size={18} />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search for games, creators..."
+                            className="w-full bg-[#0f212e] border border-white/5 rounded-full py-2.5 pl-12 pr-6 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all font-medium"
+                        />
                     </div>
-                    <input
-                        type="text"
-                        placeholder="Search for games, creators..."
-                        className="w-full bg-[#0f212e] border border-white/5 rounded-full py-2.5 pl-12 pr-6 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all font-medium"
-                    />
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="bg-[#0f212e] border border-white/5 rounded-full p-1 pl-4 flex items-center gap-3">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Balance:</span>
+                <div className="flex items-center gap-2 md:gap-4 shrink-0">
+                    <div className="bg-[#0f212e] border border-white/5 rounded-full p-1 pl-3 md:pl-4 flex items-center gap-2 md:gap-3">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Balance:</span>
                         <span className="text-sm font-bold text-white">$0.00</span>
                         <button
-                            className="bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-[0_0_15px_rgba(0,185,240,0.3)] hover:shadow-[0_0_20px_rgba(0,185,240,0.5)]"
+                            className="bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] px-3 md:px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-[0_0_15px_rgba(0,185,240,0.3)] hover:shadow-[0_0_20px_rgba(0,185,240,0.5)] flex items-center justify-center min-w-[32px] md:min-w-0"
                             onClick={() => setIsWalletOpen(true)}
                         >
-                            Wallet
+                            <span className="hidden sm:inline">Wallet</span>
+                            <Wallet size={14} className="sm:hidden" />
                         </button>
                     </div>
 
@@ -112,7 +120,7 @@ export default function Header() {
                         </button>
 
                         {activeDropdown === 'notifications' && (
-                            <div className="absolute right-0 top-full mt-2 w-80 bg-[#0f212e] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-2 animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+                            <div className="absolute right-0 md:right-0 -right-20 top-full mt-2 w-[calc(100vw-32px)] md:w-80 max-w-sm bg-[#0f212e] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-2 animate-in fade-in slide-in-from-top-2 duration-200 z-50">
                                 <div className="px-4 py-3 border-b border-white/5 mb-1 flex justify-between items-center">
                                     <p className="text-sm font-bold text-white">Notifications</p>
                                     <button className="text-xs text-[#00b9f0] hover:text-[#38bdf8] font-medium transition-colors">Mark all read</button>
@@ -218,13 +226,13 @@ export default function Header() {
                     ) : (
                         <div className="flex items-center gap-2">
                             <button
-                                className="text-white hover:text-[#00b9f0] font-bold text-sm px-4 py-2 transition-colors"
+                                className="text-white hover:text-[#00b9f0] font-bold text-xs md:text-sm px-2 md:px-4 py-2 transition-colors hidden sm:block"
                                 onClick={() => setIsAuthOpen('login')}
                             >
                                 Log In
                             </button>
                             <button
-                                className="bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] px-5 py-2 rounded-lg font-bold text-sm transition-all shadow-[0_0_20px_rgba(0,185,240,0.2)] hover:shadow-[0_0_25px_rgba(0,185,240,0.4)] hover:-translate-y-0.5"
+                                className="bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] px-3 md:px-5 py-2 rounded-lg font-bold text-xs md:text-sm transition-all shadow-[0_0_20px_rgba(0,185,240,0.2)] hover:shadow-[0_0_25px_rgba(0,185,240,0.4)] hover:-translate-y-0.5"
                                 onClick={() => setIsAuthOpen('signup')}
                             >
                                 Register
