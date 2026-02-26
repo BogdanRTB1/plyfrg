@@ -118,16 +118,17 @@ export default function Header() {
                         />
                     </div>
 
+                </div>
+
+                <div className="flex items-center gap-2 md:gap-4 shrink-0">
                     {/* Mobile Search Icon */}
                     <button
-                        className="md:hidden p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-full transition-colors shrink-0 ml-1"
+                        className="md:hidden p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-full transition-colors shrink-0"
                         onClick={() => setIsMobileSearchOpen(true)}
                     >
                         <Search size={22} />
                     </button>
-                </div>
 
-                <div className="flex items-center gap-2 md:gap-4 shrink-0">
                     <div className={`bg-[#0f212e] border border-white/5 rounded-full p-1 pl-3 md:pl-4 items-center gap-2 md:gap-3 ${!user ? 'hidden md:flex' : 'flex'}`}>
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Balance:</span>
                         <span className="text-sm font-bold text-white">${balance.toFixed(2)}</span>
