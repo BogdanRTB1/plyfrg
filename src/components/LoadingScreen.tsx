@@ -31,13 +31,13 @@ export default function LoadingScreen() {
                         alt="PlayForges"
                         width={120}
                         height={120}
-                        className="relative z-10 animate-bounce-slow drop-shadow-[0_0_25px_rgba(0,185,240,0.4)]"
+                        className="relative z-10 animate-bounce-slow drop-shadow-[0_0_25px_rgba(0,185,240,0.4)] w-20 h-20 md:w-[120px] md:h-[120px]"
                         priority
                     />
                 </div>
 
                 {/* Text Logo */}
-                <h1 className="text-4xl font-extrabold text-white tracking-tight animate-in fade-in slide-in-from-bottom-2 duration-700 delay-100">
+                <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight animate-in fade-in slide-in-from-bottom-2 duration-700 delay-100">
                     Play<span className="text-[#00b9f0]">Forges</span>
                 </h1>
 

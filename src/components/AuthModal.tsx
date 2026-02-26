@@ -240,11 +240,11 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
     return createPortal(
         <div className={`fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-300 ${show ? "opacity-100 visible" : "opacity-0 invisible"}`}>
             <div
-                className={`bg-[#0f212e]/90 backdrop-blur-xl rounded-2xl w-full max-w-md p-8 relative shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-white/10 transform transition-all duration-300 ${show ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-4"}`}
+                className={`bg-[#0f212e]/90 backdrop-blur-xl rounded-none md:rounded-2xl w-full h-full md:h-auto max-w-md p-6 md:p-8 flex flex-col justify-center relative md:shadow-[0_0_50px_rgba(0,0,0,0.5)] border-0 md:border md:border-white/10 transform transition-all duration-300 ${show ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-4"}`}
                 onClick={(e) => e.stopPropagation()}
             >
-                <button onClick={handleClose} type="button" className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors hover:rotate-90 duration-300">
-                    <X size={20} />
+                <button onClick={handleClose} type="button" className="absolute top-6 right-6 md:top-4 md:right-4 p-2 bg-white/10 md:bg-transparent rounded-full md:rounded-none text-slate-400 hover:text-white transition-colors hover:rotate-90 md:hover:rotate-90 duration-300 z-50">
+                    <X className="w-6 h-6 md:w-5 md:h-5" />
                 </button>
 
                 <div className="flex flex-col items-center mb-6">
