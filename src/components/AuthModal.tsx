@@ -238,17 +238,20 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
     if (typeof document === "undefined") return null;
 
     return createPortal(
-        <div className={`fixed inset-0 z-[60] flex items-center justify-center bg-[#050505] md:bg-black/80 md:backdrop-blur-sm transition-all duration-300 ${show ? "opacity-100 visible" : "opacity-0 invisible"}`}>
-            <div
-                className={`bg-[#050505] md:bg-[#0f212e]/90 md:backdrop-blur-xl rounded-none md:rounded-2xl w-full h-[100dvh] md:h-auto max-w-md overflow-y-auto md:overflow-visible p-6 md:p-8 flex flex-col relative md:shadow-[0_0_50px_rgba(0,0,0,0.5)] border-0 md:border md:border-white/10 transform transition-all duration-300 ${show ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-4"}`}
-                onClick={(e) => e.stopPropagation()}
-            >
-                <button onClick={handleClose} type="button" className="absolute top-6 right-6 md:top-4 md:right-4 p-2 bg-white/10 md:bg-transparent rounded-full md:rounded-none text-slate-400 hover:text-white transition-colors hover:rotate-90 md:hover:rotate-90 duration-300 z-50">
-                    <X className="w-6 h-6 md:w-5 md:h-5" />
-                </button>
+        <div className={`fixed inset-0 z-[60] overflow-y-auto overscroll-contain transition-all duration-300 ${show ? "opacity-100 visible" : "opacity-0 invisible"}`}>
+            {/* Infinite Background layer to block overscroll bounce */}
+            <div className="fixed inset-[-100vh] bg-[#050505] md:bg-black/80 md:backdrop-blur-md pointer-events-none" />
 
-                <div className="flex flex-col justify-center min-h-full py-8 md:py-0 w-full">
-                    <div className="flex flex-col items-center mb-6 mt-4 md:mt-0">
+            <div className="min-h-full flex items-center justify-center p-4 relative z-10 w-full">
+                <div
+                    className={`bg-[#0f212e]/90 backdrop-blur-xl rounded-2xl w-full max-w-md p-8 relative shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-white/10 transform transition-all duration-300 ${show ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-4"}`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button onClick={handleClose} type="button" className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors hover:rotate-90 duration-300 z-50">
+                        <X size={20} />
+                    </button>
+
+                    <div className="flex flex-col items-center mb-6">
                         <div className="relative mb-4 group">
                             <div className="absolute inset-0 bg-[#00b9f0] rounded-full blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500"></div>
                             <Image
