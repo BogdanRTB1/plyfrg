@@ -72,23 +72,23 @@ export default function HistoryContent() {
                         <p className="text-slate-400">View and analyze your past gameplay sessions.</p>
                     </div>
 
-                    <div className="flex gap-4">
-                        <div className="bg-[#0f212e] border border-white/5 rounded-xl p-4 flex items-center gap-4 min-w-[200px]">
-                            <div className="p-3 bg-green-500/10 rounded-lg text-green-500">
-                                <TrendingUp size={24} />
+                    <div className="w-full grid grid-cols-2 md:flex gap-3 md:gap-4 md:w-auto">
+                        <div className="bg-[#0f212e] border border-white/5 rounded-xl p-3 md:p-4 flex items-center gap-2 md:gap-4 md:min-w-[200px] overflow-hidden">
+                            <div className="p-2 md:p-3 bg-green-500/10 rounded-lg text-green-500 shrink-0">
+                                <TrendingUp className="w-5 h-5 md:w-6 md:h-6" />
                             </div>
-                            <div>
-                                <p className="text-xs text-slate-500 font-bold uppercase">Total Profit</p>
-                                <p className="text-xl font-bold text-white">+$4,250.50</p>
+                            <div className="min-w-0">
+                                <p className="text-[10px] md:text-xs text-slate-500 font-bold uppercase truncate">Total Profit</p>
+                                <p className="text-sm md:text-xl font-bold text-white truncate">+$4,250.50</p>
                             </div>
                         </div>
-                        <div className="bg-[#0f212e] border border-white/5 rounded-xl p-4 flex items-center gap-4 min-w-[200px]">
-                            <div className="p-3 bg-amber-500/10 rounded-lg text-amber-500">
-                                <Coins size={24} />
+                        <div className="bg-[#0f212e] border border-white/5 rounded-xl p-3 md:p-4 flex items-center gap-2 md:gap-4 md:min-w-[200px] overflow-hidden">
+                            <div className="p-2 md:p-3 bg-amber-500/10 rounded-lg text-amber-500 shrink-0">
+                                <Coins className="w-5 h-5 md:w-6 md:h-6" />
                             </div>
-                            <div>
-                                <p className="text-xs text-slate-500 font-bold uppercase">Wagered</p>
-                                <p className="text-xl font-bold text-white">$12,450.00</p>
+                            <div className="min-w-0">
+                                <p className="text-[10px] md:text-xs text-slate-500 font-bold uppercase truncate">Wagered</p>
+                                <p className="text-sm md:text-xl font-bold text-white truncate">$12,450.00</p>
                             </div>
                         </div>
                     </div>
