@@ -106,8 +106,8 @@ export default function Header() {
                     <button className="md:hidden text-slate-400 hover:text-white shrink-0" onClick={toggle}>
                         <Menu size={24} />
                     </button>
-                    {/* Desktop Search */}
-                    <div className="relative group w-full hidden md:block">
+                    {/* Desktop Search / Full Mobile Search (when logged out) */}
+                    <div className={`relative group w-full ${user ? 'hidden md:block' : ''}`}>
                         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors pointer-events-none">
                             <Search size={18} />
                         </div>
@@ -123,7 +123,7 @@ export default function Header() {
                 <div className="flex items-center gap-2 md:gap-4 shrink-0">
                     {/* Mobile Search Icon */}
                     <button
-                        className="md:hidden p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-full transition-colors shrink-0"
+                        className={`md:hidden p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-full transition-colors shrink-0 ${!user ? 'hidden' : ''}`}
                         onClick={() => setIsMobileSearchOpen(true)}
                     >
                         <Search size={22} />
