@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import { Toaster } from "sonner";
 import LoadingScreen from "@/components/LoadingScreen";
 import ScrollReset from "@/components/ScrollReset";
+import CookieConsent from "@/components/CookieConsent";
 import { MobileNavProvider } from "@/components/MobileNavProvider";
 
 const outfit = Outfit({
@@ -29,6 +30,7 @@ export default function RootLayout({
       <body className={`${outfit.variable} bg-[#050505] text-white overflow-hidden h-screen font-sans`}>
         <LoadingScreen />
         <ScrollReset />
+        <CookieConsent />
         <MobileNavProvider>
           {/* Sidebar (Fixed Left) */}
           <Sidebar />

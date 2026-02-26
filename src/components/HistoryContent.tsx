@@ -57,7 +57,7 @@ export default function HistoryContent() {
                 <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[100px] mix-blend-screen"></div>
             </div>
 
-            <div className="max-w-7xl mx-auto p-6 md:p-12 relative z-10">
+            <div className="max-w-7xl mx-auto p-6 md:p-12 pb-32 min-h-[100dvh] md:min-h-0 relative z-10">
                 {/* Header Section */}
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
