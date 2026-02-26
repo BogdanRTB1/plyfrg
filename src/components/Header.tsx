@@ -85,7 +85,8 @@ export default function Header() {
                     <button className="md:hidden text-slate-400 hover:text-white shrink-0" onClick={toggle}>
                         <Menu size={24} />
                     </button>
-                    <div className="relative group w-full">
+                    {/* Desktop Search */}
+                    <div className="relative group w-full hidden md:block">
                         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors pointer-events-none">
                             <Search size={18} />
                         </div>
@@ -95,6 +96,11 @@ export default function Header() {
                             className="w-full bg-[#0f212e] border border-white/5 rounded-full py-2.5 pl-12 pr-6 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all font-medium"
                         />
                     </div>
+
+                    {/* Mobile Search Icon */}
+                    <button className="md:hidden p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-full transition-colors shrink-0 ml-1">
+                        <Search size={22} />
+                    </button>
                 </div>
 
                 <div className="flex items-center gap-2 md:gap-4 shrink-0">
