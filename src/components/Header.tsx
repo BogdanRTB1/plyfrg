@@ -4,7 +4,7 @@
 import { toast } from "sonner";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, Bell, LogOut, User as UserIcon, Settings, ChevronDown, Wallet, History, Menu } from "lucide-react";
+import { Search, Bell, LogOut, User as UserIcon, Settings, ChevronDown, Wallet, History, Menu, X } from "lucide-react";
 import Link from "next/link";
 import AuthModal from "./AuthModal";
 import ConfirmModal from "./ConfirmModal";
@@ -14,6 +14,7 @@ import { useMobileNav } from "@/components/MobileNavProvider";
 
 export default function Header() {
     const [isAuthOpen, setIsAuthOpen] = useState<'login' | 'signup' | null>(null);
+    const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
     const [user, setUser] = useState<any>(null);
     const [activeDropdown, setActiveDropdown] = useState<'user' | 'notifications' | null>(null);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -81,6 +82,26 @@ export default function Header() {
     return (
         <>
             <header className="h-20 px-4 md:px-8 flex items-center justify-between gap-2 md:gap-4 bg-[#071d2a]/95 backdrop-blur-xl sticky top-0 z-40 border-b border-white/5 animate-in fade-in slide-in-from-top-8 duration-1000 ease-out fill-mode-both delay-[1500ms]">
+                {/* Mobile Expanded Search Overlay */}
+                <div className={`absolute inset-0 px-4 flex items-center gap-3 bg-[#071d2a] md:hidden z-50 transition-all duration-300 ${isMobileSearchOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-2 pointer-events-none'}`}>
+                    <div className="relative group w-full flex-1">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors pointer-events-none">
+                            <Search size={18} />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search games..."
+                            className="w-full bg-[#0f212e] border border-[#00b9f0]/30 rounded-full py-2.5 pl-12 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all font-medium shadow-[0_0_15px_rgba(0,185,240,0.1)]"
+                        />
+                    </div>
+                    <button
+                        className="p-2 text-slate-400 hover:text-white bg-[#0f212e] border border-white/5 rounded-full transition-colors shrink-0"
+                        onClick={() => setIsMobileSearchOpen(false)}
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+
                 <div className="flex items-center gap-3 flex-1 md:flex-none md:w-[400px]">
                     <button className="md:hidden text-slate-400 hover:text-white shrink-0" onClick={toggle}>
                         <Menu size={24} />
@@ -98,7 +119,10 @@ export default function Header() {
                     </div>
 
                     {/* Mobile Search Icon */}
-                    <button className="md:hidden p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-full transition-colors shrink-0 ml-1">
+                    <button
+                        className="md:hidden p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-full transition-colors shrink-0 ml-1"
+                        onClick={() => setIsMobileSearchOpen(true)}
+                    >
                         <Search size={22} />
                     </button>
                 </div>
