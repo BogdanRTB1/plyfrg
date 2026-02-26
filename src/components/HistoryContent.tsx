@@ -50,7 +50,7 @@ export default function HistoryContent() {
     };
 
     return (
-        <div className="flex-1 h-full overflow-y-auto custom-scrollbar bg-[#050505] relative">
+        <div className="flex-1 h-full overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#050505] relative">
             {/* Ambient Background */}
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] mix-blend-screen"></div>

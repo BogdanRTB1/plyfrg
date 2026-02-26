@@ -238,228 +238,230 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
     if (typeof document === "undefined") return null;
 
     return createPortal(
-        <div className={`fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-300 ${show ? "opacity-100 visible" : "opacity-0 invisible"}`}>
+        <div className={`fixed inset-0 z-[60] flex items-center justify-center bg-[#050505] md:bg-black/80 md:backdrop-blur-sm transition-all duration-300 ${show ? "opacity-100 visible" : "opacity-0 invisible"}`}>
             <div
-                className={`bg-[#0f212e]/90 backdrop-blur-xl rounded-none md:rounded-2xl w-full h-full md:h-auto max-w-md p-6 md:p-8 flex flex-col justify-center relative md:shadow-[0_0_50px_rgba(0,0,0,0.5)] border-0 md:border md:border-white/10 transform transition-all duration-300 ${show ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-4"}`}
+                className={`bg-[#050505] md:bg-[#0f212e]/90 md:backdrop-blur-xl rounded-none md:rounded-2xl w-full h-[100dvh] md:h-auto max-w-md overflow-y-auto md:overflow-visible p-6 md:p-8 flex flex-col relative md:shadow-[0_0_50px_rgba(0,0,0,0.5)] border-0 md:border md:border-white/10 transform transition-all duration-300 ${show ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-4"}`}
                 onClick={(e) => e.stopPropagation()}
             >
                 <button onClick={handleClose} type="button" className="absolute top-6 right-6 md:top-4 md:right-4 p-2 bg-white/10 md:bg-transparent rounded-full md:rounded-none text-slate-400 hover:text-white transition-colors hover:rotate-90 md:hover:rotate-90 duration-300 z-50">
                     <X className="w-6 h-6 md:w-5 md:h-5" />
                 </button>
 
-                <div className="flex flex-col items-center mb-6">
-                    <div className="relative mb-4 group">
-                        <div className="absolute inset-0 bg-[#00b9f0] rounded-full blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500"></div>
-                        <Image
-                            src="/logo_transparent.png"
-                            width={60}
-                            height={60}
-                            alt="Logo"
-                            className="relative z-10 drop-shadow-[0_0_15px_rgba(0,185,240,0.3)]"
-                            priority
-                        />
+                <div className="flex flex-col justify-center min-h-full py-8 md:py-0 w-full">
+                    <div className="flex flex-col items-center mb-6 mt-4 md:mt-0">
+                        <div className="relative mb-4 group">
+                            <div className="absolute inset-0 bg-[#00b9f0] rounded-full blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500"></div>
+                            <Image
+                                src="/logo_transparent.png"
+                                width={60}
+                                height={60}
+                                alt="Logo"
+                                className="relative z-10 drop-shadow-[0_0_15px_rgba(0,185,240,0.3)]"
+                                priority
+                            />
+                        </div>
+                        <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">
+                            {requiresMFA ? "Two-Factor Auth" : isForgotPassword ? "Reset Password" : isLogin ? "Welcome Back" : "Join PlayForges"}
+                        </h2>
+                        <p className="text-slate-400 text-sm text-center font-medium">
+                            {requiresMFA
+                                ? "Enter your authenticator code"
+                                : isForgotPassword
+                                    ? "Enter your email to receive a reset link"
+                                    : isLogin
+                                        ? "Login to access your account"
+                                        : "Create an account to start playing"}
+                        </p>
                     </div>
-                    <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">
-                        {requiresMFA ? "Two-Factor Auth" : isForgotPassword ? "Reset Password" : isLogin ? "Welcome Back" : "Join PlayForges"}
-                    </h2>
-                    <p className="text-slate-400 text-sm text-center font-medium">
-                        {requiresMFA
-                            ? "Enter your authenticator code"
-                            : isForgotPassword
-                                ? "Enter your email to receive a reset link"
-                                : isLogin
-                                    ? "Login to access your account"
-                                    : "Create an account to start playing"}
-                    </p>
-                </div>
 
-                {/* Content Container */}
-                <div className="relative">
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={requiresMFA ? "mfa" : isForgotPassword ? "forgot" : isLogin ? "login" : "register"}
-                            initial={{ opacity: 0, y: 15 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -15 }}
-                            transition={{ duration: 0.2, ease: "easeInOut" }}
-                            className="space-y-4"
-                        >
-                            <form className="space-y-4" onSubmit={isForgotPassword ? handleForgotPasswordSubmit : handleEmailAuth}>
-                                {error && (
-                                    <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center animate-pulse">
-                                        {error}
-                                    </div>
-                                )}
+                    {/* Content Container */}
+                    <div className="relative">
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={requiresMFA ? "mfa" : isForgotPassword ? "forgot" : isLogin ? "login" : "register"}
+                                initial={{ opacity: 0, y: 15 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -15 }}
+                                transition={{ duration: 0.2, ease: "easeInOut" }}
+                                className="space-y-4"
+                            >
+                                <form className="space-y-4" onSubmit={isForgotPassword ? handleForgotPasswordSubmit : handleEmailAuth}>
+                                    {error && (
+                                        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center animate-pulse">
+                                            {error}
+                                        </div>
+                                    )}
 
-                                {!isLogin && !isForgotPassword && (
+                                    {!isLogin && !isForgotPassword && (
+                                        <div className="relative group">
+                                            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
+                                            <input
+                                                type="text"
+                                                placeholder="Username"
+                                                className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
+                                                value={username}
+                                                onChange={(e) => setUsername(e.target.value)}
+                                                disabled={loading}
+                                                required={!isLogin}
+                                            />
+                                        </div>
+                                    )}
+
                                     <div className="relative group">
-                                        <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
+                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
                                         <input
-                                            type="text"
-                                            placeholder="Username"
+                                            type="email"
+                                            placeholder="Email address"
                                             className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
-                                            value={username}
-                                            onChange={(e) => setUsername(e.target.value)}
-                                            disabled={loading}
-                                            required={!isLogin}
-                                        />
-                                    </div>
-                                )}
-
-                                <div className="relative group">
-                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
-                                    <input
-                                        type="email"
-                                        placeholder="Email address"
-                                        className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        disabled={loading}
-                                        required
-                                    />
-                                </div>
-
-                                {!isForgotPassword && (
-                                    <div className="relative group">
-                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
-                                        <input
-                                            type={showPassword ? "text" : "password"}
-                                            placeholder="Password"
-                                            className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            disabled={loading}
-                                            required={!isForgotPassword}
-                                        />
-                                        <button
-                                            type="button"
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            disabled={loading}
-                                        >
-                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                        </button>
-                                    </div>
-                                )}
-
-                                {requiresMFA && (
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Authenticator Code</label>
-                                        <input
-                                            type="text"
-                                            placeholder="000000"
-                                            className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 px-4 text-white placeholder-slate-500 text-center tracking-[0.5em] focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all font-mono font-bold text-lg"
-                                            value={mfaCode}
-                                            onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').substring(0, 6))}
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
                                             disabled={loading}
                                             required
-                                            autoComplete="off"
                                         />
                                     </div>
-                                )}
 
-                                {!isLogin && !isForgotPassword && (
-                                    <div className="relative group">
-                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
-                                        <input
-                                            type={showConfirmPassword ? "text" : "password"}
-                                            placeholder="Confirm Password"
-                                            className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
-                                            value={confirmPassword}
-                                            onChange={(e) => setConfirmPassword(e.target.value)}
-                                            disabled={loading}
-                                            required={!isLogin && !isForgotPassword}
-                                        />
-                                        <button
-                                            type="button"
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
-                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                            disabled={loading}
-                                        >
-                                            {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                        </button>
-                                    </div>
-                                )}
-
-                                {requiresMFA ? (
-                                    <div className="flex justify-start">
-                                        <button type="button" onClick={() => setRequiresMFA(false)} className="text-xs font-bold text-slate-400 hover:text-white transition-colors hover:underline" disabled={loading}>&larr; Back to login</button>
-                                    </div>
-                                ) : isForgotPassword ? (
-                                    <div className="flex justify-start">
-                                        <button type="button" onClick={() => setIsForgotPassword(false)} className="text-xs font-bold text-slate-400 hover:text-white transition-colors hover:underline" disabled={loading}>&larr; Back to login</button>
-                                    </div>
-                                ) : isLogin ? (
-                                    <div className="flex justify-end">
-                                        <button type="button" onClick={() => setIsForgotPassword(true)} className="text-xs font-bold text-[#00b9f0] hover:text-[#38bdf8] transition-colors hover:underline" disabled={loading}>Forgot password?</button>
-                                    </div>
-                                ) : (
-                                    <p className="text-xs text-slate-500 text-center">
-                                        By joining, you agree to our <a href="#" className="text-[#00b9f0] hover:underline transition-colors">Terms of Service</a> and <a href="#" className="text-[#00b9f0] hover:underline transition-colors">Privacy Policy</a>.
-                                    </p>
-                                )}
-
-                                <button
-                                    type="submit"
-                                    className="w-full h-12 bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(0,185,240,0.2)] hover:shadow-[0_0_25px_rgba(0,185,240,0.4)] hover:-translate-y-0.5 flex items-center justify-center gap-2 active:scale-95 duration-200"
-                                    disabled={loading}
-                                >
-                                    {loading ? (
-                                        <>
-                                            <Loader2 className="animate-spin" size={20} />
-                                            Processing...
-                                        </>
-                                    ) : (
-                                        requiresMFA ? "Verify Code" : isForgotPassword ? "Send Reset Link" : isLogin ? "Log In" : "Create Account"
-                                    )}
-                                </button>
-                            </form>
-
-                            {!isForgotPassword && !requiresMFA && (
-                                <>
-                                    <div className="relative flex items-center justify-center my-6">
-                                        <div className="absolute inset-0 flex items-center">
-                                            <div className="w-full border-t border-white/10"></div>
+                                    {!isForgotPassword && (
+                                        <div className="relative group">
+                                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
+                                            <input
+                                                type={showPassword ? "text" : "password"}
+                                                placeholder="Password"
+                                                className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                disabled={loading}
+                                                required={!isForgotPassword}
+                                            />
+                                            <button
+                                                type="button"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                disabled={loading}
+                                            >
+                                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                            </button>
                                         </div>
-                                        <span className="relative bg-transparent px-4 text-xs text-slate-500 uppercase tracking-widest font-bold bg-[#0f212e]/50 backdrop-blur-sm rounded">Or continue with</span>
-                                    </div>
+                                    )}
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <button
-                                            type="button"
-                                            className="flex items-center justify-center h-12 bg-[#0a161f] hover:bg-[#1a2c38] border border-white/10 rounded-xl transition-all hover:border-white/20 text-white font-bold text-sm hover:-translate-y-0.5"
-                                            onClick={() => handleSocialLogin('google')}
-                                            disabled={loading}
-                                        >
-                                            <GoogleLogo /> <span>Google</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="flex items-center justify-center h-12 bg-[#0a161f] hover:bg-[#1a2c38] border border-white/10 rounded-xl transition-all hover:border-white/20 text-white font-bold text-sm hover:-translate-y-0.5"
-                                            onClick={() => handleSocialLogin('discord')}
-                                            disabled={loading}
-                                        >
-                                            <DiscordLogo /> <span>Discord</span>
-                                        </button>
-                                    </div>
-                                </>
-                            )}
-                        </motion.div>
-                    </AnimatePresence>
-                </div>
+                                    {requiresMFA && (
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Authenticator Code</label>
+                                            <input
+                                                type="text"
+                                                placeholder="000000"
+                                                className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 px-4 text-white placeholder-slate-500 text-center tracking-[0.5em] focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all font-mono font-bold text-lg"
+                                                value={mfaCode}
+                                                onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').substring(0, 6))}
+                                                disabled={loading}
+                                                required
+                                                autoComplete="off"
+                                            />
+                                        </div>
+                                    )}
 
-                {!isForgotPassword && !requiresMFA && (
-                    <div className="mt-6 pt-6 border-t border-white/10 text-center text-sm text-slate-400">
-                        {isLogin ? "Don't have an account? " : "Already have an account? "}
-                        <button
-                            type="button"
-                            onClick={() => setIsLogin(!isLogin)}
-                            className="font-bold text-white hover:text-[#00b9f0] transition-all hover:underline active:scale-90 inline-block"
-                        >
-                            {isLogin ? "Sign up" : "Log in"}
-                        </button>
+                                    {!isLogin && !isForgotPassword && (
+                                        <div className="relative group">
+                                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
+                                            <input
+                                                type={showConfirmPassword ? "text" : "password"}
+                                                placeholder="Confirm Password"
+                                                className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                disabled={loading}
+                                                required={!isLogin && !isForgotPassword}
+                                            />
+                                            <button
+                                                type="button"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                disabled={loading}
+                                            >
+                                                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {requiresMFA ? (
+                                        <div className="flex justify-start">
+                                            <button type="button" onClick={() => setRequiresMFA(false)} className="text-xs font-bold text-slate-400 hover:text-white transition-colors hover:underline" disabled={loading}>&larr; Back to login</button>
+                                        </div>
+                                    ) : isForgotPassword ? (
+                                        <div className="flex justify-start">
+                                            <button type="button" onClick={() => setIsForgotPassword(false)} className="text-xs font-bold text-slate-400 hover:text-white transition-colors hover:underline" disabled={loading}>&larr; Back to login</button>
+                                        </div>
+                                    ) : isLogin ? (
+                                        <div className="flex justify-end">
+                                            <button type="button" onClick={() => setIsForgotPassword(true)} className="text-xs font-bold text-[#00b9f0] hover:text-[#38bdf8] transition-colors hover:underline" disabled={loading}>Forgot password?</button>
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-slate-500 text-center">
+                                            By joining, you agree to our <a href="#" className="text-[#00b9f0] hover:underline transition-colors">Terms of Service</a> and <a href="#" className="text-[#00b9f0] hover:underline transition-colors">Privacy Policy</a>.
+                                        </p>
+                                    )}
+
+                                    <button
+                                        type="submit"
+                                        className="w-full h-12 bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(0,185,240,0.2)] hover:shadow-[0_0_25px_rgba(0,185,240,0.4)] hover:-translate-y-0.5 flex items-center justify-center gap-2 active:scale-95 duration-200"
+                                        disabled={loading}
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <Loader2 className="animate-spin" size={20} />
+                                                Processing...
+                                            </>
+                                        ) : (
+                                            requiresMFA ? "Verify Code" : isForgotPassword ? "Send Reset Link" : isLogin ? "Log In" : "Create Account"
+                                        )}
+                                    </button>
+                                </form>
+
+                                {!isForgotPassword && !requiresMFA && (
+                                    <>
+                                        <div className="relative flex items-center justify-center my-6">
+                                            <div className="absolute inset-0 flex items-center">
+                                                <div className="w-full border-t border-white/10"></div>
+                                            </div>
+                                            <span className="relative bg-transparent px-4 text-xs text-slate-500 uppercase tracking-widest font-bold bg-[#0f212e]/50 backdrop-blur-sm rounded">Or continue with</span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <button
+                                                type="button"
+                                                className="flex items-center justify-center h-12 bg-[#0a161f] hover:bg-[#1a2c38] border border-white/10 rounded-xl transition-all hover:border-white/20 text-white font-bold text-sm hover:-translate-y-0.5"
+                                                onClick={() => handleSocialLogin('google')}
+                                                disabled={loading}
+                                            >
+                                                <GoogleLogo /> <span>Google</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="flex items-center justify-center h-12 bg-[#0a161f] hover:bg-[#1a2c38] border border-white/10 rounded-xl transition-all hover:border-white/20 text-white font-bold text-sm hover:-translate-y-0.5"
+                                                onClick={() => handleSocialLogin('discord')}
+                                                disabled={loading}
+                                            >
+                                                <DiscordLogo /> <span>Discord</span>
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </motion.div>
+                        </AnimatePresence>
                     </div>
-                )}
+
+                    {!isForgotPassword && !requiresMFA && (
+                        <div className="mt-6 pt-6 border-t border-white/10 text-center text-sm text-slate-400">
+                            {isLogin ? "Don't have an account? " : "Already have an account? "}
+                            <button
+                                type="button"
+                                onClick={() => setIsLogin(!isLogin)}
+                                className="font-bold text-white hover:text-[#00b9f0] transition-all hover:underline active:scale-90 inline-block"
+                            >
+                                {isLogin ? "Sign up" : "Log in"}
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>,
         document.body
