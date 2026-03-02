@@ -8,6 +8,7 @@ import LoadingScreen from "@/components/LoadingScreen";
 import ScrollReset from "@/components/ScrollReset";
 import CookieConsent from "@/components/CookieConsent";
 import { MobileNavProvider } from "@/components/MobileNavProvider";
+import KYCEnforcer from "@/components/KYCEnforcer";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -31,6 +32,7 @@ export default function RootLayout({
         <LoadingScreen />
         <ScrollReset />
         <CookieConsent />
+        <KYCEnforcer />
         <MobileNavProvider>
           {/* Sidebar (Fixed Left) */}
           <Sidebar />

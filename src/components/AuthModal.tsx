@@ -10,7 +10,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import KYCVerification from "./KYCVerification";
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -43,7 +42,6 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
     const [shouldRender, setShouldRender] = useState(false);
     const [show, setShow] = useState(false);
     const [isForgotPassword, setIsForgotPassword] = useState(false);
-    const [isKYC, setIsKYC] = useState(false);
 
     // ... form states remain same ...
     const [email, setEmail] = useState("");
@@ -83,7 +81,6 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
             setUsername("");
             setConfirmPassword("");
             setIsForgotPassword(false);
-            setIsKYC(false);
         } else {
             setShow(false);
         }
@@ -208,8 +205,9 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                     },
                 });
                 if (error) throw error;
-                toast.success("Account created successfully! Please verify your age.");
-                setIsKYC(true);
+                toast.success("Account created successfully!");
+                handleClose();
+                router.refresh();
             }
         } catch (err: any) {
             setError(err.message);
@@ -268,18 +266,16 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                                 />
                             </div>
                             <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">
-                                {isKYC ? "Verify Age" : requiresMFA ? "Two-Factor Auth" : isForgotPassword ? "Reset Password" : isLogin ? "Welcome Back" : "Join PlayForges"}
+                                {requiresMFA ? "Two-Factor Auth" : isForgotPassword ? "Reset Password" : isLogin ? "Welcome Back" : "Join PlayForges"}
                             </h2>
                             <p className="text-slate-400 text-sm text-center font-medium">
-                                {isKYC
-                                    ? "We need to verify that you are 18 or older"
-                                    : requiresMFA
-                                        ? "Enter your authenticator code"
-                                        : isForgotPassword
-                                            ? "Enter your email to receive a reset link"
-                                            : isLogin
-                                                ? "Login to access your account"
-                                                : "Create an account to start playing"}
+                                {requiresMFA
+                                    ? "Enter your authenticator code"
+                                    : isForgotPassword
+                                        ? "Enter your email to receive a reset link"
+                                        : isLogin
+                                            ? "Login to access your account"
+                                            : "Create an account to start playing"}
                             </p>
                         </div>
 
@@ -287,159 +283,145 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                         <div className="relative">
                             <AnimatePresence mode="wait">
                                 <motion.div
-                                    key={isKYC ? "kyc" : requiresMFA ? "mfa" : isForgotPassword ? "forgot" : isLogin ? "login" : "register"}
+                                    key={requiresMFA ? "mfa" : isForgotPassword ? "forgot" : isLogin ? "login" : "register"}
                                     initial={{ opacity: 0, y: 15 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -15 }}
                                     transition={{ duration: 0.2, ease: "easeInOut" }}
                                     className="space-y-4"
                                 >
-                                    {isKYC ? (
-                                        <KYCVerification
-                                            onSuccess={() => {
-                                                handleClose();
-                                                toast.success("Age verified successfully!");
-                                                router.refresh();
-                                            }}
-                                            onCancel={() => {
-                                                handleClose();
-                                                toast.error("Verification cancelled. You must verify to play.");
-                                            }}
-                                        />
-                                    ) : (
-                                        <form className="space-y-4" onSubmit={isForgotPassword ? handleForgotPasswordSubmit : handleEmailAuth}>
-                                            {error && (
-                                                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center animate-pulse">
-                                                    {error}
-                                                </div>
-                                            )}
+                                    <form className="space-y-4" onSubmit={isForgotPassword ? handleForgotPasswordSubmit : handleEmailAuth}>
+                                        {error && (
+                                            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center animate-pulse">
+                                                {error}
+                                            </div>
+                                        )}
 
-                                            {!isLogin && !isForgotPassword && (
-                                                <div className="relative group">
-                                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Username"
-                                                        className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
-                                                        value={username}
-                                                        onChange={(e) => setUsername(e.target.value)}
-                                                        disabled={loading}
-                                                        required={!isLogin}
-                                                    />
-                                                </div>
-                                            )}
-
+                                        {!isLogin && !isForgotPassword && (
                                             <div className="relative group">
-                                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
+                                                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
                                                 <input
-                                                    type="email"
-                                                    placeholder="Email address"
+                                                    type="text"
+                                                    placeholder="Username"
                                                     className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
-                                                    value={email}
-                                                    onChange={(e) => setEmail(e.target.value)}
+                                                    value={username}
+                                                    onChange={(e) => setUsername(e.target.value)}
                                                     disabled={loading}
-                                                    required
+                                                    required={!isLogin}
                                                 />
                                             </div>
+                                        )}
 
-                                            {!isForgotPassword && (
-                                                <div className="relative group">
-                                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
-                                                    <input
-                                                        type={showPassword ? "text" : "password"}
-                                                        placeholder="Password"
-                                                        className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
-                                                        value={password}
-                                                        onChange={(e) => setPassword(e.target.value)}
-                                                        disabled={loading}
-                                                        required={!isForgotPassword}
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
-                                                        onClick={() => setShowPassword(!showPassword)}
-                                                        disabled={loading}
-                                                    >
-                                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                                    </button>
-                                                </div>
-                                            )}
-
-                                            {requiresMFA && (
-                                                <div className="space-y-2">
-                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Authenticator Code</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="000000"
-                                                        className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 px-4 text-white placeholder-slate-500 text-center tracking-[0.5em] focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all font-mono font-bold text-lg"
-                                                        value={mfaCode}
-                                                        onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').substring(0, 6))}
-                                                        disabled={loading}
-                                                        required
-                                                        autoComplete="off"
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {!isLogin && !isForgotPassword && (
-                                                <div className="relative group">
-                                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
-                                                    <input
-                                                        type={showConfirmPassword ? "text" : "password"}
-                                                        placeholder="Confirm Password"
-                                                        className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
-                                                        value={confirmPassword}
-                                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                                        disabled={loading}
-                                                        required={!isLogin && !isForgotPassword}
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
-                                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                                        disabled={loading}
-                                                    >
-                                                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                                    </button>
-                                                </div>
-                                            )}
-
-                                            {requiresMFA ? (
-                                                <div className="flex justify-start">
-                                                    <button type="button" onClick={() => setRequiresMFA(false)} className="text-xs font-bold text-slate-400 hover:text-white transition-colors hover:underline" disabled={loading}>&larr; Back to login</button>
-                                                </div>
-                                            ) : isForgotPassword ? (
-                                                <div className="flex justify-start">
-                                                    <button type="button" onClick={() => setIsForgotPassword(false)} className="text-xs font-bold text-slate-400 hover:text-white transition-colors hover:underline" disabled={loading}>&larr; Back to login</button>
-                                                </div>
-                                            ) : isLogin ? (
-                                                <div className="flex justify-end">
-                                                    <button type="button" onClick={() => setIsForgotPassword(true)} className="text-xs font-bold text-[#00b9f0] hover:text-[#38bdf8] transition-colors hover:underline" disabled={loading}>Forgot password?</button>
-                                                </div>
-                                            ) : (
-                                                <p className="text-xs text-slate-500 text-center">
-                                                    By joining, you agree to our <a href="#" className="text-[#00b9f0] hover:underline transition-colors">Terms of Service</a> and <a href="#" className="text-[#00b9f0] hover:underline transition-colors">Privacy Policy</a>.
-                                                </p>
-                                            )}
-
-                                            <button
-                                                type="submit"
-                                                className="w-full h-12 bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(0,185,240,0.2)] hover:shadow-[0_0_25px_rgba(0,185,240,0.4)] hover:-translate-y-0.5 flex items-center justify-center gap-2 active:scale-95 duration-200"
+                                        <div className="relative group">
+                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
+                                            <input
+                                                type="email"
+                                                placeholder="Email address"
+                                                className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
                                                 disabled={loading}
-                                            >
-                                                {loading ? (
-                                                    <>
-                                                        <Loader2 className="animate-spin" size={20} />
-                                                        Processing...
-                                                    </>
-                                                ) : (
-                                                    requiresMFA ? "Verify Code" : isForgotPassword ? "Send Reset Link" : isLogin ? "Log In" : "Create Account"
-                                                )}
-                                            </button>
-                                        </form>
-                                    )}
+                                                required
+                                            />
+                                        </div>
 
-                                    {!isForgotPassword && !requiresMFA && !isKYC && (
+                                        {!isForgotPassword && (
+                                            <div className="relative group">
+                                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
+                                                <input
+                                                    type={showPassword ? "text" : "password"}
+                                                    placeholder="Password"
+                                                    className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
+                                                    value={password}
+                                                    onChange={(e) => setPassword(e.target.value)}
+                                                    disabled={loading}
+                                                    required={!isForgotPassword}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                                                    onClick={() => setShowPassword(!showPassword)}
+                                                    disabled={loading}
+                                                >
+                                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {requiresMFA && (
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Authenticator Code</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="000000"
+                                                    className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 px-4 text-white placeholder-slate-500 text-center tracking-[0.5em] focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all font-mono font-bold text-lg"
+                                                    value={mfaCode}
+                                                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').substring(0, 6))}
+                                                    disabled={loading}
+                                                    required
+                                                    autoComplete="off"
+                                                />
+                                            </div>
+                                        )}
+
+                                        {!isLogin && !isForgotPassword && (
+                                            <div className="relative group">
+                                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
+                                                <input
+                                                    type={showConfirmPassword ? "text" : "password"}
+                                                    placeholder="Confirm Password"
+                                                    className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all"
+                                                    value={confirmPassword}
+                                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                                    disabled={loading}
+                                                    required={!isLogin && !isForgotPassword}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                    disabled={loading}
+                                                >
+                                                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {requiresMFA ? (
+                                            <div className="flex justify-start">
+                                                <button type="button" onClick={() => setRequiresMFA(false)} className="text-xs font-bold text-slate-400 hover:text-white transition-colors hover:underline" disabled={loading}>&larr; Back to login</button>
+                                            </div>
+                                        ) : isForgotPassword ? (
+                                            <div className="flex justify-start">
+                                                <button type="button" onClick={() => setIsForgotPassword(false)} className="text-xs font-bold text-slate-400 hover:text-white transition-colors hover:underline" disabled={loading}>&larr; Back to login</button>
+                                            </div>
+                                        ) : isLogin ? (
+                                            <div className="flex justify-end">
+                                                <button type="button" onClick={() => setIsForgotPassword(true)} className="text-xs font-bold text-[#00b9f0] hover:text-[#38bdf8] transition-colors hover:underline" disabled={loading}>Forgot password?</button>
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-slate-500 text-center">
+                                                By joining, you agree to our <a href="#" className="text-[#00b9f0] hover:underline transition-colors">Terms of Service</a> and <a href="#" className="text-[#00b9f0] hover:underline transition-colors">Privacy Policy</a>.
+                                            </p>
+                                        )}
+
+                                        <button
+                                            type="submit"
+                                            className="w-full h-12 bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(0,185,240,0.2)] hover:shadow-[0_0_25px_rgba(0,185,240,0.4)] hover:-translate-y-0.5 flex items-center justify-center gap-2 active:scale-95 duration-200"
+                                            disabled={loading}
+                                        >
+                                            {loading ? (
+                                                <>
+                                                    <Loader2 className="animate-spin" size={20} />
+                                                    Processing...
+                                                </>
+                                            ) : (
+                                                requiresMFA ? "Verify Code" : isForgotPassword ? "Send Reset Link" : isLogin ? "Log In" : "Create Account"
+                                            )}
+                                        </button>
+                                    </form>
+
+                                    {!isForgotPassword && !requiresMFA && (
                                         <>
                                             <div className="relative flex items-center justify-center my-6">
                                                 <div className="absolute inset-0 flex items-center">
@@ -472,7 +454,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                             </AnimatePresence>
                         </div>
 
-                        {!isForgotPassword && !requiresMFA && !isKYC && (
+                        {!isForgotPassword && !requiresMFA && (
                             <div className="mt-6 pt-6 border-t border-white/10 text-center text-sm text-slate-400">
                                 {isLogin ? "Don't have an account? " : "Already have an account? "}
                                 <button
