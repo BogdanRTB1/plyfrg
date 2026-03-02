@@ -7,9 +7,10 @@ import { Camera, RefreshCw, Loader2, CheckCircle2, AlertCircle, Zap, ZapOff } fr
 interface KYCVerificationProps {
     onSuccess: () => void;
     onCancel: () => void;
+    onUnderage?: () => void;
 }
 
-export default function KYCVerification({ onSuccess, onCancel }: KYCVerificationProps) {
+export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYCVerificationProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
@@ -142,7 +143,10 @@ export default function KYCVerification({ onSuccess, onCancel }: KYCVerification
                 }, 2000);
             } else {
                 setStatus('failed');
-                setErrorMsg("We could not verify that you are 18 or older based on the document provided. Please ensure the date of birth is clearly visible and try again.");
+                setErrorMsg("We could not verify that you are 21 or older based on the document provided. Please ensure the date of birth is clearly visible and try again.");
+                if (onUnderage) {
+                    onUnderage();
+                }
             }
         } catch (err) {
             console.error("OCR Error:", err);
@@ -165,10 +169,10 @@ export default function KYCVerification({ onSuccess, onCancel }: KYCVerification
         let foundValidDOB = false;
 
         const currentYear = new Date().getFullYear(); // 2026
-        // To be 18 in 2026, you must be born in 2008 or earlier.
+        // To be 21 in 2026, you must be born in 2005 or earlier.
         // Even better, accurate calculation using exact dates, but OCR can be messy, 
         // so checking the year is a solid heuristic for MVP.
-        const maxBirthYear = currentYear - 18;
+        const maxBirthYear = currentYear - 21;
 
         // Collect all possible years from matches
         const possibleYears: number[] = [];
@@ -198,8 +202,8 @@ export default function KYCVerification({ onSuccess, onCancel }: KYCVerification
             possibleYears.push(year);
         }
 
-        // Often OCR misses some punctuation, we can just look for freestanding 4-digit years between 1900 and 2008
-        const yearRegex = /\b(19\d{2}|200[0-8])\b/g;
+        // Often OCR misses some punctuation, we can just look for freestanding 4-digit years between 1900 and maxBirthYear
+        const yearRegex = new RegExp(`\\b(19\\d{2}|20[0-${maxBirthYear - 2000}])\\b`, 'g');
         let yearMatch;
         while ((yearMatch = yearRegex.exec(text)) !== null) {
             possibleYears.push(parseInt(yearMatch[1], 10));
@@ -229,7 +233,7 @@ export default function KYCVerification({ onSuccess, onCancel }: KYCVerification
             <div className="text-center w-full">
                 <h3 className="text-xl font-bold text-white mb-2">Age Verification Required</h3>
                 <p className="text-sm text-slate-400">
-                    To start playing, please take a clear photo of your ID Card, Driver&apos;s License, or Passport to verify you are 18+.
+                    To start playing, please take a clear photo of your ID Card, Driver&apos;s License, or Passport to verify you are 21+.
                 </p>
             </div>
 

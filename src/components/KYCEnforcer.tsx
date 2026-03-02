@@ -93,7 +93,7 @@ export default function KYCEnforcer() {
                                 <div>
                                     <h2 className="text-2xl font-bold text-white mb-2">Verification Required</h2>
                                     <p className="text-slate-400 text-sm">
-                                        You cannot use your account until you verify your age to confirm you are 18 or older.
+                                        You cannot use your account until you verify your age to confirm you are 21 or older.
                                     </p>
                                 </div>
 
@@ -118,6 +118,23 @@ export default function KYCEnforcer() {
                             <KYCVerification
                                 onSuccess={handleVerifySuccess}
                                 onCancel={() => setIsVerifying(false)}
+                                onUnderage={async () => {
+                                    // Schedule deletion for 3 days from now
+                                    const deletionDate = new Date();
+                                    deletionDate.setDate(deletionDate.getDate() + 3);
+
+                                    await supabase.auth.updateUser({
+                                        data: { deletion_scheduled_at: deletionDate.toISOString() }
+                                    });
+
+                                    toast.error("You are under 21. Your account will be deleted in 3 days.");
+
+                                    setTimeout(async () => {
+                                        await supabase.auth.signOut();
+                                        setNeedsKYC(false);
+                                        router.refresh();
+                                    }, 4000);
+                                }}
                             />
                         )}
                     </div>
