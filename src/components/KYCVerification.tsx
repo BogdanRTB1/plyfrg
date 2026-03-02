@@ -21,7 +21,7 @@ export default function KYCVerification({ onSuccess, onCancel }: KYCVerification
     const startCamera = async () => {
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment" } // Prefer back camera on mobile
+                video: { facingMode: { ideal: "environment" } } // Prefer back camera, but allow any
             });
             setStream(mediaStream);
             if (videoRef.current) {
@@ -194,15 +194,13 @@ export default function KYCVerification({ onSuccess, onCancel }: KYCVerification
             </div>
 
             <div className="relative w-full aspect-video bg-[#0a161f] rounded-xl overflow-hidden border border-white/10 flex items-center justify-center">
-                {status === 'capturing' && (
-                    <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full h-full object-cover"
-                    />
-                )}
+                <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`w-full h-full object-cover ${status === 'capturing' ? 'block' : 'hidden'}`}
+                />
 
                 {capturedImage && (
                     <img src={capturedImage} alt="Captured ID" className={`w-full h-full object-cover ${status === 'processing' ? 'opacity-50 blur-sm' : ''}`} />
