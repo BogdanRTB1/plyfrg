@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Tesseract from "tesseract.js";
-import { Camera, RefreshCw, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Camera, RefreshCw, Loader2, CheckCircle2, AlertCircle, Zap, ZapOff } from "lucide-react";
 
 interface KYCVerificationProps {
     onSuccess: () => void;
@@ -17,6 +17,8 @@ export default function KYCVerification({ onSuccess, onCancel }: KYCVerification
     const [errorMsg, setErrorMsg] = useState("");
     const [progress, setProgress] = useState(0);
     const [capturedImage, setCapturedImage] = useState<string | null>(null);
+    const [hasTorch, setHasTorch] = useState(false);
+    const [isTorchOn, setIsTorchOn] = useState(false);
 
     const startCamera = async () => {
         try {
@@ -27,12 +29,43 @@ export default function KYCVerification({ onSuccess, onCancel }: KYCVerification
             if (videoRef.current) {
                 videoRef.current.srcObject = mediaStream;
             }
+
+            // Check if device has torch
+            const track = mediaStream.getVideoTracks()[0];
+            if (track) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const capabilities = track.getCapabilities?.() as any;
+                if (capabilities && capabilities.torch) {
+                    setHasTorch(true);
+                } else {
+                    setHasTorch(false);
+                }
+            }
+            setIsTorchOn(false);
+
             setStatus('capturing');
             setErrorMsg("");
         } catch (err) {
             console.error("Error accessing camera:", err);
             setStatus('failed');
             setErrorMsg("Camera access denied or unavailable. Please allow access to verify your identity.");
+        }
+    };
+
+    const toggleTorch = async () => {
+        if (!stream) return;
+        const track = stream.getVideoTracks()[0];
+        if (track) {
+            try {
+                const newTorchState = !isTorchOn;
+                await track.applyConstraints({
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    advanced: [{ torch: newTorchState }] as any
+                });
+                setIsTorchOn(newTorchState);
+            } catch (err) {
+                console.error("Error toggling torch:", err);
+            }
         }
     };
 
@@ -45,12 +78,11 @@ export default function KYCVerification({ onSuccess, onCancel }: KYCVerification
 
     // Initial load, start camera automatically
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
         startCamera();
         return () => {
-            // eslint-disable-next-line react-hooks/exhaustive-deps
             stopCamera();
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const captureAndVerify = async () => {
@@ -231,6 +263,17 @@ export default function KYCVerification({ onSuccess, onCancel }: KYCVerification
                         <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-[#00b9f0] -mb-0.5 -ml-0.5 rounded-bl-lg"></div>
                         <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-[#00b9f0] -mb-0.5 -mr-0.5 rounded-br-lg"></div>
                     </div>
+                )}
+
+                {/* Torch Toggle Button */}
+                {status === 'capturing' && hasTorch && (
+                    <button
+                        onClick={toggleTorch}
+                        className="absolute bottom-4 right-4 bg-black/50 hover:bg-black/70 backdrop-blur border border-white/20 p-3 rounded-full text-white transition-all active:scale-95"
+                        aria-label="Toggle Flashlight"
+                    >
+                        {isTorchOn ? <Zap className="text-yellow-400" size={24} /> : <ZapOff size={24} />}
+                    </button>
                 )}
 
                 {/* Hidden canvas for taking snapshot */}
