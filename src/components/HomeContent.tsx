@@ -97,15 +97,10 @@ export default function HomeContent() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.4 }}
-                        className="text-base sm:text-lg text-slate-200 mb-8 leading-relaxed max-w-lg drop-shadow-md font-medium"
+                        className="hidden sm:block text-base sm:text-lg text-slate-200 mb-8 leading-relaxed max-w-lg drop-shadow-md font-medium"
                     >
-                        <span className="sm:hidden">
-                            The first social gaming platform. Join the revolution.
-                        </span>
-                        <span className="hidden sm:inline">
-                            The first social gaming platform where creators build the
-                            odds and fans share the victory. Join the revolution.
-                        </span>
+                        The first social gaming platform where creators build the
+                        odds and fans share the victory. Join the revolution.
                     </motion.p>
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
