@@ -14,7 +14,7 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
-    const [status, setStatus] = useState<'idle' | 'capturing' | 'processing' | 'success' | 'failed'>('idle');
+    const [status, setStatus] = useState<'idle' | 'capturing' | 'processing' | 'success' | 'failed' | 'rejected'>('idle');
     const [errorMsg, setErrorMsg] = useState("");
     const [progress, setProgress] = useState(0);
     const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -133,20 +133,23 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
             const text = result.data.text;
             console.log("Extracted text:", text);
 
-            // Parse text to find date of birth and check if 18+
-            const is18Plus = verifyAge(text);
+            // Parse text to find date of birth and check if 21+
+            const ageStatus = verifyAge(text);
 
-            if (is18Plus) {
+            if (ageStatus === 'verified') {
                 setStatus('success');
                 setTimeout(() => {
                     onSuccess();
                 }, 2000);
-            } else {
-                setStatus('failed');
-                setErrorMsg("We could not verify that you are 21 or older based on the document provided. Please ensure the date of birth is clearly visible and try again.");
+            } else if (ageStatus === 'underage') {
+                setStatus('rejected');
+                setErrorMsg("This document indicates you are under 21 years old.");
                 if (onUnderage) {
                     onUnderage();
                 }
+            } else {
+                setStatus('failed');
+                setErrorMsg("We could not find a clear date of birth on the document provided. Please ensure it is clearly visible and try again.");
             }
         } catch (err) {
             console.error("OCR Error:", err);
@@ -155,7 +158,7 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
         }
     };
 
-    const verifyAge = (text: string): boolean => {
+    const verifyAge = (text: string): 'verified' | 'underage' | 'not_found' => {
         // Look for common date formats:
         // DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
         // YYYY.MM.DD, YYYY/MM/DD, YYYY-MM-DD
@@ -167,6 +170,7 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
         ];
 
         let foundValidDOB = false;
+        let foundUnderageDOB = false;
 
         const currentYear = new Date().getFullYear(); // 2026
         // To be 21 in 2026, you must be born in 2005 or earlier.
@@ -202,8 +206,8 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
             possibleYears.push(year);
         }
 
-        // Often OCR misses some punctuation, we can just look for freestanding 4-digit years between 1900 and maxBirthYear
-        const yearRegex = new RegExp(`\\b(19\\d{2}|20[0-${maxBirthYear - 2000}])\\b`, 'g');
+        // Often OCR misses some punctuation, we can just look for freestanding 4-digit years between 1900 and currentYear
+        const yearRegex = new RegExp(`\\b(19\\d{2}|20[0-${currentYear - 2000}])\\b`, 'g');
         let yearMatch;
         while ((yearMatch = yearRegex.exec(text)) !== null) {
             possibleYears.push(parseInt(yearMatch[1], 10));
@@ -213,14 +217,16 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
 
         // Analyze found years
         for (const year of possibleYears) {
-            // If we found a year that qualifies as a valid DOB (e.g. 1920-2008)
             if (year >= 1900 && year <= maxBirthYear) {
                 foundValidDOB = true;
-                break;
+            } else if (year > maxBirthYear && year <= currentYear) {
+                foundUnderageDOB = true;
             }
         }
 
-        return foundValidDOB;
+        if (foundValidDOB) return 'verified';
+        if (foundUnderageDOB) return 'underage';
+        return 'not_found';
     };
 
     const handleRetry = () => {
@@ -267,6 +273,14 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
                     </div>
                 )}
 
+                {status === 'rejected' && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/20 z-10 backdrop-blur-sm p-4 text-center">
+                        <AlertCircle className="w-16 h-16 text-red-500 mb-2 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]" />
+                        <span className="text-white font-bold text-lg drop-shadow-md">Underage Detected</span>
+                        <span className="text-white/80 font-medium text-sm mt-1 drop-shadow-md">Account scheduled for deletion.</span>
+                    </div>
+                )}
+
                 {/* Focus Guides */}
                 {(status === 'capturing' || status === 'idle') && (
                     <div className="absolute inset-4 border-2 border-white/20 rounded-lg pointer-events-none">
@@ -307,7 +321,7 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
                     >
                         <Camera size={20} /> Capture ID
                     </button>
-                ) : (status === 'failed' || errorMsg !== "") ? (
+                ) : (status === 'failed' || errorMsg !== "") && status !== 'rejected' ? (
                     <button
                         onClick={handleRetry}
                         className="flex-1 h-12 bg-white/10 hover:bg-white/20 text-white font-bold border border-white/10 rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95"
@@ -322,7 +336,7 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
                     stopCamera();
                     onCancel();
                 }}
-                disabled={status === 'processing' || status === 'success'}
+                disabled={status === 'processing' || status === 'success' || status === 'rejected'}
                 className="text-xs font-bold text-slate-400 hover:text-white transition-colors underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 Cancel verification
