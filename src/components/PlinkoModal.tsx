@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Play, RotateCw } from "lucide-react";
+import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import confetti from "canvas-confetti";
 import { createPortal } from "react-dom";
 
@@ -176,14 +177,14 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                             className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'
                                 }`}
                         >
-                            <span>♦</span> GC
+                            <DiamondIcon className="w-4 h-4" /> Diamonds
                         </button>
                         <button
                             onClick={() => { setCurrencyType('FC'); setBetAmount(1); }}
                             className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'
                                 }`}
                         >
-                            <span>FC</span> SC
+                            <ForgesCoinIcon className="w-4 h-4" /> Forges Coins
                         </button>
                     </div>
 
@@ -192,8 +193,8 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                         <div className="relative">
                             <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
                                 {currencyType === 'GC' ?
-                                    <span className="text-blue-400 font-bold">♦</span> :
-                                    <span className="text-amber-500 font-bold text-xs">FC</span>}
+                                    <DiamondIcon className="w-4 h-4 text-blue-400" /> :
+                                    <ForgesCoinIcon className="w-4 h-4" />}
                             </div>
                             <input
                                 type="number"
@@ -213,8 +214,8 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                         onClick={dropBall}
                         disabled={dropping || balance < betAmount}
                         className={`w-full md:mt-auto text-[#0f212e] h-14 rounded-xl font-black text-lg active:shadow-none active:translate-y-1 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${currencyType === 'GC'
-                                ? 'bg-blue-500 hover:bg-blue-400 shadow-[0_4px_0_#1d4ed8]'
-                                : 'bg-amber-500 hover:bg-amber-400 shadow-[0_4px_0_#b45309]'
+                            ? 'bg-blue-500 hover:bg-blue-400 shadow-[0_4px_0_#1d4ed8]'
+                            : 'bg-amber-500 hover:bg-amber-400 shadow-[0_4px_0_#b45309]'
                             }`}
                     >
                         {dropping ? <RotateCw className="animate-spin" /> : 'BET'}
@@ -225,7 +226,7 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                         <p className="text-slate-500 text-xs font-bold uppercase mb-1">Balance</p>
                         <p className={`text-xl font-mono flex items-center gap-2 ${currencyType === 'GC' ? 'text-blue-400' : 'text-amber-500'
                             }`}>
-                            {currencyType === 'GC' ? '♦' : 'FC'}
+                            {currencyType === 'GC' ? <DiamondIcon className="w-5 h-5 flex-shrink-0" /> : <ForgesCoinIcon className="w-5 h-5 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)] flex-shrink-0" />}
                             {currencyType === 'GC' ? balance.toLocaleString() : balance.toFixed(2)}
                         </p>
                     </div>

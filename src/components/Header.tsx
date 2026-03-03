@@ -3,6 +3,8 @@
 // @ts-nocheck
 import { toast } from "sonner";
 
+import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
+
 import { useState, useEffect, useRef } from "react";
 import { Search, Bell, LogOut, User as UserIcon, Settings, ChevronDown, Wallet, History, Menu, X } from "lucide-react";
 import Link from "next/link";
@@ -230,9 +232,9 @@ export default function Header() {
 
                     <div className={`bg-[#0f212e] border border-white/5 rounded-full p-1 pl-3 md:pl-4 items-center gap-2 md:gap-3 ${!user ? 'hidden md:flex' : 'flex'}`}>
                         {/* Diamonds (GC) */}
-                        <div className="flex items-center gap-1.5" title="Diamonds (Play for Fun)">
-                            <div className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
-                                <span className="text-[10px] text-blue-400">♦</span>
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-5 h-5 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                                <DiamondIcon className="w-3.5 h-3.5" />
                             </div>
                             <span className="text-sm font-bold text-white">{diamonds.toLocaleString()}</span>
                         </div>
@@ -240,10 +242,8 @@ export default function Header() {
                         <div className="w-px h-4 bg-white/10 mx-1"></div>
 
                         {/* Forges Coins (SC) */}
-                        <div className="flex items-center gap-1.5 mr-2" title="Forges Coins (Redeemable)">
-                            <div className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-500/30">
-                                <span className="text-[10px] font-bold text-amber-500">FC</span>
-                            </div>
+                        <div className="flex items-center gap-1.5 mr-2">
+                            <ForgesCoinIcon className="w-5 h-5 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]" />
                             <span className="text-sm font-bold text-white">{forgesCoins.toFixed(2)}</span>
                         </div>
 

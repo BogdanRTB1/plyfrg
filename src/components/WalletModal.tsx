@@ -7,6 +7,7 @@ import { X, Wallet, ArrowDownCircle, ArrowUpCircle, Gift, CreditCard, Bitcoin, C
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
+import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 
 interface WalletModalProps {
     isOpen: boolean;
@@ -52,6 +53,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
         { id: 3, price: 20, diamonds: 20000, forgesCoins: 21 }, // Value offer
         { id: 4, price: 50, diamonds: 50000, forgesCoins: 55 },
         { id: 5, price: 100, diamonds: 100000, forgesCoins: 115 },
+        { id: 6, price: 250, diamonds: 250000, forgesCoins: 290 },
     ];
 
     // Bonus state
@@ -129,7 +131,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
         setTransactions(prev => [newTx, ...prev]);
 
         setSelectedBundle(null);
-        toast.success(`Purchased ${bundle.diamonds.toLocaleString()} Diamonds + ${bundle.forgesCoins} FC Bonus!`);
+        toast.success(`Purchased ${bundle.diamonds.toLocaleString()} Diamonds + ${bundle.forgesCoins} Forges Coins Bonus!`);
         setLoading(false);
     };
 
@@ -157,7 +159,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
         setRedeemAmount("");
         setRedeemAddress("");
-        toast.success(`Redemption request for ${redeemAmount} FC submitted`);
+        toast.success(`Redemption request for ${redeemAmount} Forges Coins submitted`);
         setLoading(false);
     };
 
@@ -182,7 +184,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
         setBonusClaimed(true);
         updateTimer(new Date());
 
-        toast.success(`You claimed your daily bonus: ${bonusAmount} FC`);
+        toast.success(`You claimed your daily bonus: ${bonusAmount} Forges Coins`);
         setLoading(false);
     };
 
@@ -215,11 +217,11 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Balances</p>
                             <div className="flex items-center justify-end gap-3 mt-0.5">
                                 <div className="flex items-center gap-1.5" title="Diamonds">
-                                    <span className="text-[10px] text-blue-400">♦</span>
+                                    <DiamondIcon className="w-4 h-4" />
                                     <span className="text-sm font-bold text-white">{diamonds.toLocaleString()}</span>
                                 </div>
                                 <div className="flex items-center gap-1.5" title="Forges Coins">
-                                    <span className="text-[10px] font-bold text-amber-500">FC</span>
+                                    <ForgesCoinIcon className="w-4 h-4" />
                                     <span className="text-sm font-bold text-white">{forgesCoins.toFixed(2)}</span>
                                 </div>
                             </div>
@@ -233,7 +235,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                     </div>
                 </div>
 
-                <div className="flex flex-col md:flex-row h-[500px]">
+                <div className="flex flex-col md:flex-row h-[500px] md:h-[650px]">
                     {/* Sidebar Tabs */}
                     <div className="w-full md:w-48 bg-[#0a161f]/30 border-b md:border-b-0 md:border-r border-white/5 p-4 space-y-2">
                         <button
@@ -298,7 +300,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                 className="h-full"
                             >
                                 {activeTab === 'deposit' && (
-                                    <div className="space-y-6">
+                                    <div className="space-y-6 pb-4">
                                         <div className="grid grid-cols-2 gap-4">
                                             <button
                                                 onClick={() => setDepositMethod('card')}
@@ -337,10 +339,11 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                                                 }`}
                                                         >
                                                             <div className="flex items-center gap-1 text-blue-400 font-bold mb-1 border-b border-white/5 pb-1 w-full justify-center">
-                                                                <span className="text-xs">♦</span> <span>{bundle.diamonds.toLocaleString()} GC</span>
+                                                                <DiamondIcon className="w-3.5 h-3.5" /> <span>{bundle.diamonds.toLocaleString()}</span>
                                                             </div>
-                                                            <div className="text-xs text-amber-500 font-bold mb-1">
-                                                                + {bundle.forgesCoins} FC FREE
+                                                            <div className="flex items-center gap-1.5 text-xs text-amber-500 font-bold mb-1">
+                                                                <ForgesCoinIcon className="w-3 h-3" />
+                                                                + {bundle.forgesCoins} FREE
                                                             </div>
                                                             <div className="text-white font-black text-lg pt-1">
                                                                 ${bundle.price.toFixed(2)}
@@ -369,24 +372,26 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                                 Redemptions are processed within 24 hours.
                                             </p>
                                             <p className="text-amber-500/70 text-[10px] text-center font-medium">
-                                                Note: Forges Coins (FC) must be played through at least 3 times before they can be redeemed.
+                                                Note: Forges Coins must be played through at least 3 times before they can be redeemed.
                                             </p>
                                         </div>
 
                                         <form onSubmit={handleRedeem} className="space-y-6">
                                             <div className="space-y-2">
                                                 <div className="flex justify-between">
-                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Amount (FC)</label>
-                                                    <span className="text-xs text-slate-400">Available: <span className="text-white font-bold">{forgesCoins.toFixed(2)} FC</span></span>
+                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Amount</label>
+                                                    <span className="text-xs text-slate-400">Available: <span className="text-white font-bold">{forgesCoins.toFixed(2)}</span></span>
                                                 </div>
                                                 <div className="relative group">
-                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-amber-500 group-focus-within:text-amber-400 transition-colors">FC</span>
+                                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:brightness-110 transition-all">
+                                                        <ForgesCoinIcon className="w-5 h-5 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]" />
+                                                    </div>
                                                     <input
                                                         type="number"
                                                         value={redeemAmount}
                                                         onChange={(e) => setRedeemAmount(e.target.value)}
                                                         placeholder="0.00"
-                                                        className="w-full bg-[#0a161f] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 font-bold"
+                                                        className="w-full bg-[#0a161f] border border-white/10 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 font-bold"
                                                         min="10"
                                                         max={forgesCoins}
                                                         required
@@ -483,7 +488,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                                             <p className={`font-bold ${tx.type === 'redeem' ? 'text-white' : 'text-green-500'
                                                                 }`}>
                                                                 {tx.type === 'redeem' ? '-' : '+'}
-                                                                {tx.type === 'purchase' ? `$${tx.amount.toFixed(2)}` : `${tx.amount.toFixed(2)} FC`}
+                                                                {tx.type === 'purchase' ? `$${tx.amount.toFixed(2)}` : tx.amount.toFixed(2)}
                                                             </p>
                                                             <p className={`text-[10px] font-bold uppercase tracking-wider ${tx.status === 'completed' ? 'text-green-500' : 'text-amber-500'
                                                                 }`}>
