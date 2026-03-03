@@ -71,6 +71,15 @@ export default function KYCEnforcer() {
                 toast.error("Failed to update status. Please try again.");
                 return;
             }
+            const { data: userData } = await supabase.auth.getUser();
+            if (userData?.user?.id) {
+                await supabase.from('notifications').insert({
+                    user_id: userData.user.id,
+                    title: "Account Verified",
+                    message: "Your identity has been successfully verified. You now have full access to your account.",
+                    is_read: false
+                });
+            }
 
             toast.success("Age verified successfully!");
             setNeedsKYC(false);
@@ -82,12 +91,12 @@ export default function KYCEnforcer() {
     if (loading || !needsKYC) return null;
 
     return (
-        <div className={`transition-opacity duration-500 ease-in-out ${isClosing ? 'opacity-0' : 'opacity-100'}`}>
+        <>
             {/* Extended Background Overlay to block overscroll bounce */}
-            <div className="fixed inset-[-50vh] z-[90] bg-[#050505] md:bg-black/95 md:backdrop-blur-md pointer-events-none" />
+            <div className={`fixed inset-[-50vh] z-[90] bg-[#050505] md:bg-black/95 md:backdrop-blur-md pointer-events-none transition-opacity duration-500 ease-in-out ${isClosing ? 'opacity-0' : 'opacity-100'}`} />
 
             {/* Interactive Scrollable Container */}
-            <div className="fixed inset-0 z-[100] overflow-y-auto overscroll-contain flex items-center justify-center p-4">
+            <div className={`fixed inset-0 z-[100] overflow-y-auto overscroll-contain flex items-center justify-center p-4 transition-opacity duration-500 ease-in-out ${isClosing ? 'opacity-0' : 'opacity-100'}`}>
                 <div className="min-h-full flex items-center justify-center relative w-full">
                     <div className="bg-[#0f212e] border border-white/10 rounded-2xl w-full max-w-md p-8 shadow-2xl relative overflow-hidden">
                         {!isVerifying ? (
@@ -148,6 +157,6 @@ export default function KYCEnforcer() {
                     </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 }

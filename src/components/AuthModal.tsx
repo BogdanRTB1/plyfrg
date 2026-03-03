@@ -151,6 +151,17 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
 
                     if (verifyError) throw verifyError;
 
+                    // Send login notification for verified users
+                    const { data: userData } = await supabase.auth.getUser();
+                    if (userData?.user?.user_metadata?.is_kyc_verified) {
+                        await supabase.from('notifications').insert({
+                            user_id: userData.user.id,
+                            title: "Login Successful",
+                            message: "A new login was detected on your verified account.",
+                            is_read: false
+                        });
+                    }
+
                     toast.success("Successfully authenticated");
                     handleClose();
                     router.refresh();
@@ -187,6 +198,16 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                     }
                 } else {
                     toast.success("Logged in successfully");
+
+                    // Send login notification for verified users (only on normal login success)
+                    if (data.user?.user_metadata?.is_kyc_verified) {
+                        await supabase.from('notifications').insert({
+                            user_id: data.user.id,
+                            title: "Login Successful",
+                            message: "A new login was detected on your verified account.",
+                            is_read: false
+                        });
+                    }
                 }
 
                 handleClose();

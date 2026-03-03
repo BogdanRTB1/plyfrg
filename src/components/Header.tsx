@@ -20,6 +20,44 @@ export default function Header() {
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [balance, setBalance] = useState(0.00);
+    const [notifications, setNotifications] = useState<any[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    const fetchNotifications = async (userId: string) => {
+        const { data } = await supabase.from('notifications')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (data) {
+            setNotifications(data);
+            setUnreadCount(data.filter((n: any) => !n.is_read).length);
+        }
+    };
+
+    const markAllAsRead = async () => {
+        if (!user) return;
+        await supabase.from('notifications')
+            .update({ is_read: true })
+            .eq('user_id', user.id)
+            .eq('is_read', false);
+
+        setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+        setUnreadCount(0);
+    };
+
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleString("en-US", {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+    };
 
     // Ref for detecting clicks outside dropdown
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -32,11 +70,20 @@ export default function Header() {
         const getUser = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             setUser(user);
+            if (user) {
+                fetchNotifications(user.id);
+            }
         };
         getUser();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setUser(session?.user ?? null);
+            if (session?.user) {
+                fetchNotifications(session.user.id);
+            } else {
+                setNotifications([]);
+                setUnreadCount(0);
+            }
             // Close dropdowns on auth change
             setActiveDropdown(null);
             setShowLogoutConfirm(false);
@@ -147,35 +194,35 @@ export default function Header() {
                             onClick={() => setActiveDropdown(activeDropdown === 'notifications' ? null : 'notifications')}
                         >
                             <Bell size={20} />
-                            <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#071d2a]"></span>
+                            {unreadCount > 0 && (
+                                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#071d2a]"></span>
+                            )}
                         </button>
 
                         {activeDropdown === 'notifications' && (
                             <div className="absolute right-0 md:right-0 -right-20 top-full mt-2 w-[calc(100vw-32px)] md:w-80 max-w-sm bg-[#0f212e] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-2 animate-in fade-in slide-in-from-top-2 duration-200 z-50">
                                 <div className="px-4 py-3 border-b border-white/5 mb-1 flex justify-between items-center">
                                     <p className="text-sm font-bold text-white">Notifications</p>
-                                    <button className="text-xs text-[#00b9f0] hover:text-[#38bdf8] font-medium transition-colors">Mark all read</button>
+                                    <button onClick={markAllAsRead} className="text-xs text-[#00b9f0] hover:text-[#38bdf8] font-medium transition-colors">Mark all read</button>
                                 </div>
                                 <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
-                                    {[1, 2, 3].map((_, i) => (
-                                        <div key={i} className="px-4 py-3 hover:bg-white/[0.02] cursor-pointer transition-colors border-b last:border-0 border-white/5 relative group">
-                                            <div className="absolute left-2 top-4 w-1.5 h-1.5 bg-[#00b9f0] rounded-full"></div>
+                                    {notifications.length > 0 ? notifications.map((n, i) => (
+                                        <div key={i} className={`px-4 py-3 hover:bg-white/[0.02] cursor-pointer transition-colors border-b last:border-0 border-white/5 relative group ${!n.is_read ? 'bg-white/[0.01]' : ''}`}>
+                                            {!n.is_read && <div className="absolute left-2 top-4 w-1.5 h-1.5 bg-[#00b9f0] rounded-full"></div>}
                                             <div className="pl-3">
+                                                <p className="text-xs font-bold text-white mb-0.5">{n.title}</p>
                                                 <p className="text-sm text-slate-300 font-medium leading-snug mb-1 group-hover:text-white transition-colors">
-                                                    Your deposit of <span className="text-white font-bold">$50.00</span> has been successfully processed.
+                                                    {n.message}
                                                 </p>
-                                                <p className="text-[10px] text-slate-500 font-medium">2 hours ago</p>
+                                                <p className="text-[10px] text-[#00b9f0] font-bold">{formatDate(n.created_at)}</p>
                                             </div>
                                         </div>
-                                    ))}
-                                    <div className="px-4 py-3 hover:bg-white/[0.02] cursor-pointer transition-colors">
-                                        <div className="pl-3 opacity-60">
-                                            <p className="text-sm text-slate-300 font-medium leading-snug mb-1">
-                                                Welcome to PlayForges! confirm your email to claim 50 free spins.
-                                            </p>
-                                            <p className="text-[10px] text-slate-500 font-medium">1 day ago</p>
+                                    )) : (
+                                        <div className="px-4 py-6 text-center text-slate-500">
+                                            <Bell className="mx-auto mb-2 opacity-20" size={24} />
+                                            <p className="text-sm">No notifications yet.</p>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         )}
