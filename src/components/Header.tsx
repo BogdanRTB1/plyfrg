@@ -56,7 +56,8 @@ export default function Header() {
     const [activeDropdown, setActiveDropdown] = useState<'user' | 'notifications' | null>(null);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const [isWalletOpen, setIsWalletOpen] = useState(false);
-    const [balance, setBalance] = useState(0.00);
+    const [diamonds, setDiamonds] = useState(0);
+    const [forgesCoins, setForgesCoins] = useState(0.00);
     const [notifications, setNotifications] = useState<any[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
 
@@ -228,8 +229,24 @@ export default function Header() {
                     </button>
 
                     <div className={`bg-[#0f212e] border border-white/5 rounded-full p-1 pl-3 md:pl-4 items-center gap-2 md:gap-3 ${!user ? 'hidden md:flex' : 'flex'}`}>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Balance:</span>
-                        <span className="text-sm font-bold text-white">${balance.toFixed(2)}</span>
+                        {/* Diamonds (GC) */}
+                        <div className="flex items-center gap-1.5" title="Diamonds (Play for Fun)">
+                            <div className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
+                                <span className="text-[10px] text-blue-400">♦</span>
+                            </div>
+                            <span className="text-sm font-bold text-white">{diamonds.toLocaleString()}</span>
+                        </div>
+
+                        <div className="w-px h-4 bg-white/10 mx-1"></div>
+
+                        {/* Forges Coins (SC) */}
+                        <div className="flex items-center gap-1.5 mr-2" title="Forges Coins (Redeemable)">
+                            <div className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-500/30">
+                                <span className="text-[10px] font-bold text-amber-500">FC</span>
+                            </div>
+                            <span className="text-sm font-bold text-white">{forgesCoins.toFixed(2)}</span>
+                        </div>
+
                         <button
                             className="bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] px-3 md:px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-[0_0_15px_rgba(0,185,240,0.3)] hover:shadow-[0_0_20px_rgba(0,185,240,0.5)] flex items-center justify-center min-w-[32px] md:min-w-0"
                             onClick={() => setIsWalletOpen(true)}
@@ -384,8 +401,10 @@ export default function Header() {
             <WalletModal
                 isOpen={isWalletOpen}
                 onClose={() => setIsWalletOpen(false)}
-                balance={balance}
-                setBalance={setBalance}
+                diamonds={diamonds}
+                setDiamonds={setDiamonds}
+                forgesCoins={forgesCoins}
+                setForgesCoins={setForgesCoins}
             />
         </>
     );

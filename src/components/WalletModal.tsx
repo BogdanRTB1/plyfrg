@@ -11,38 +11,48 @@ import { createClient } from "@/utils/supabase/client";
 interface WalletModalProps {
     isOpen: boolean;
     onClose: () => void;
-    balance: number;
-    setBalance: React.Dispatch<React.SetStateAction<number>>;
+    diamonds: number;
+    setDiamonds: React.Dispatch<React.SetStateAction<number>>;
+    forgesCoins: number;
+    setForgesCoins: React.Dispatch<React.SetStateAction<number>>;
 }
 
-type TabType = 'deposit' | 'withdraw' | 'bonus' | 'history';
+type TabType = 'deposit' | 'redeem' | 'bonus' | 'history';
 
 interface Transaction {
     id: string;
-    type: 'deposit' | 'withdraw' | 'bonus';
+    type: 'purchase' | 'redeem' | 'bonus';
     amount: number;
     date: Date;
     status: 'completed' | 'pending';
     method?: string;
 }
 
-export default function WalletModal({ isOpen, onClose, balance, setBalance }: WalletModalProps) {
+export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, forgesCoins, setForgesCoins }: WalletModalProps) {
     const [activeTab, setActiveTab] = useState<TabType>('deposit');
     const [show, setShow] = useState(false);
     const [shouldRender, setShouldRender] = useState(false);
     const [loading, setLoading] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>(() => [
-        { id: '1', type: 'deposit', amount: 50.00, date: new Date(Date.now() - 86400000), status: 'completed', method: 'Credit Card' },
+        { id: '1', type: 'purchase', amount: 50.00, date: new Date(Date.now() - 86400000), status: 'completed', method: 'Credit Card' },
         { id: '2', type: 'bonus', amount: 2.50, date: new Date(Date.now() - 172800000), status: 'completed' }
     ]);
 
-    // Deposit state
-    const [depositAmount, setDepositAmount] = useState("");
+    // Deposit/Purchase state
+    const [selectedBundle, setSelectedBundle] = useState<number | null>(null);
     const [depositMethod, setDepositMethod] = useState<'card' | 'crypto'>('card');
 
-    // Withdraw state
-    const [withdrawAmount, setWithdrawAmount] = useState("");
-    const [withdrawAddress, setWithdrawAddress] = useState("");
+    // Redeem state
+    const [redeemAmount, setRedeemAmount] = useState("");
+    const [redeemAddress, setRedeemAddress] = useState("");
+
+    const bundles = [
+        { id: 1, price: 5, diamonds: 5000, forgesCoins: 5 },
+        { id: 2, price: 10, diamonds: 10000, forgesCoins: 10 },
+        { id: 3, price: 20, diamonds: 20000, forgesCoins: 21 }, // Value offer
+        { id: 4, price: 50, diamonds: 50000, forgesCoins: 55 },
+        { id: 5, price: 100, diamonds: 100000, forgesCoins: 115 },
+    ];
 
     // Bonus state
     const [bonusClaimed, setBonusClaimed] = useState(false);
@@ -95,52 +105,59 @@ export default function WalletModal({ isOpen, onClose, balance, setBalance }: Wa
 
     const handleDeposit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (selectedBundle === null) return;
+
+        const bundle = bundles.find(b => b.id === selectedBundle);
+        if (!bundle) return;
+
         setLoading(true);
         // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 1500));
-        setBalance(prev => prev + Number(depositAmount));
+
+        setDiamonds(prev => prev + bundle.diamonds);
+        setForgesCoins(prev => prev + bundle.forgesCoins);
 
         // Add transaction
         const newTx: Transaction = {
             id: Math.random().toString(36).substr(2, 9),
-            type: 'deposit',
-            amount: Number(depositAmount),
+            type: 'purchase',
+            amount: bundle.price,
             date: new Date(),
             status: 'completed',
             method: depositMethod === 'card' ? 'Credit Card' : 'Crypto'
         };
         setTransactions(prev => [newTx, ...prev]);
 
-        setDepositAmount("");
-        toast.success(`Successfully deposited $${depositAmount}`);
+        setSelectedBundle(null);
+        toast.success(`Purchased ${bundle.diamonds.toLocaleString()} Diamonds + ${bundle.forgesCoins} FC Bonus!`);
         setLoading(false);
     };
 
-    const handleWithdraw = async (e: React.FormEvent) => {
+    const handleRedeem = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        if (Number(withdrawAmount) > balance) {
-            toast.error("Insufficient funds");
+        if (Number(redeemAmount) > forgesCoins) {
+            toast.error("Insufficient Forges Coins");
             setLoading(false);
             return;
         }
         await new Promise(resolve => setTimeout(resolve, 1500));
-        setBalance(prev => prev - Number(withdrawAmount));
+        setForgesCoins(prev => prev - Number(redeemAmount));
 
         // Add transaction
         const newTx: Transaction = {
             id: Math.random().toString(36).substr(2, 9),
-            type: 'withdraw',
-            amount: Number(withdrawAmount),
+            type: 'redeem',
+            amount: Number(redeemAmount),
             date: new Date(),
             status: 'pending',
-            method: 'USDT'
+            method: 'Crypto'
         };
         setTransactions(prev => [newTx, ...prev]);
 
-        setWithdrawAmount("");
-        setWithdrawAddress("");
-        toast.success(`Withdrawal request for $${withdrawAmount} submitted`);
+        setRedeemAmount("");
+        setRedeemAddress("");
+        toast.success(`Redemption request for ${redeemAmount} FC submitted`);
         setLoading(false);
     };
 
@@ -148,8 +165,8 @@ export default function WalletModal({ isOpen, onClose, balance, setBalance }: Wa
         setLoading(true);
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        const bonusAmount = (Math.random() * 5 + 1).toFixed(2);
-        setBalance(prev => prev + Number(bonusAmount));
+        const bonusAmount = (Math.random() * 2 + 1).toFixed(2);
+        setForgesCoins(prev => prev + Number(bonusAmount));
 
         // Add transaction
         const newTx: Transaction = {
@@ -165,7 +182,7 @@ export default function WalletModal({ isOpen, onClose, balance, setBalance }: Wa
         setBonusClaimed(true);
         updateTimer(new Date());
 
-        toast.success(`You claimed your daily bonus: $${bonusAmount}`);
+        toast.success(`You claimed your daily bonus: ${bonusAmount} FC`);
         setLoading(false);
     };
 
@@ -195,8 +212,17 @@ export default function WalletModal({ isOpen, onClose, balance, setBalance }: Wa
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="bg-[#0a161f] border border-white/5 px-4 py-2 rounded-lg text-right hidden sm:block">
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Total Balance</p>
-                            <p className="text-lg font-bold text-white">${balance.toFixed(2)}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Balances</p>
+                            <div className="flex items-center justify-end gap-3 mt-0.5">
+                                <div className="flex items-center gap-1.5" title="Diamonds">
+                                    <span className="text-[10px] text-blue-400">♦</span>
+                                    <span className="text-sm font-bold text-white">{diamonds.toLocaleString()}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5" title="Forges Coins">
+                                    <span className="text-[10px] font-bold text-amber-500">FC</span>
+                                    <span className="text-sm font-bold text-white">{forgesCoins.toFixed(2)}</span>
+                                </div>
+                            </div>
                         </div>
                         <button
                             onClick={onClose}
@@ -229,14 +255,14 @@ export default function WalletModal({ isOpen, onClose, balance, setBalance }: Wa
                             <span className="relative z-10">Deposit</span>
                         </button>
                         <button
-                            onClick={() => setActiveTab('withdraw')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'withdraw'
+                            onClick={() => setActiveTab('redeem')}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'redeem'
                                 ? 'bg-[#00b9f0]/10 text-[#00b9f0] shadow-[0_0_15px_rgba(0,185,240,0.1)]'
                                 : 'text-slate-400 hover:text-white hover:bg-white/5'
                                 }`}
                         >
                             <ArrowUpCircle size={18} />
-                            Withdraw
+                            Redeem
                         </button>
                         <button
                             onClick={() => setActiveTab('history')}
@@ -297,29 +323,28 @@ export default function WalletModal({ isOpen, onClose, balance, setBalance }: Wa
                                         </div>
 
                                         <form onSubmit={handleDeposit} className="space-y-6">
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Amount</label>
-                                                <div className="relative group">
-                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#00b9f0] transition-colors">$</span>
-                                                    <input
-                                                        type="number"
-                                                        value={depositAmount}
-                                                        onChange={(e) => setDepositAmount(e.target.value)}
-                                                        placeholder="0.00"
-                                                        className="w-full bg-[#0a161f] border border-white/10 rounded-xl py-3 pl-8 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] font-bold"
-                                                        min="5"
-                                                        required
-                                                    />
-                                                </div>
-                                                <div className="flex gap-2 flex-wrap">
-                                                    {[25, 50, 100, 500].map(amt => (
+                                            <div className="space-y-3">
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Select Bundle</label>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    {bundles.map(bundle => (
                                                         <button
-                                                            key={amt}
+                                                            key={bundle.id}
                                                             type="button"
-                                                            onClick={() => setDepositAmount(amt.toString())}
-                                                            className="px-3 py-1 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-colors"
+                                                            onClick={() => setSelectedBundle(bundle.id)}
+                                                            className={`p-3 border rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${selectedBundle === bundle.id
+                                                                ? 'bg-[#00b9f0]/10 border-[#00b9f0] shadow-[0_0_15px_rgba(0,185,240,0.2)]'
+                                                                : 'bg-[#0a161f] border-white/5 hover:border-white/20'
+                                                                }`}
                                                         >
-                                                            ${amt}
+                                                            <div className="flex items-center gap-1 text-blue-400 font-bold mb-1 border-b border-white/5 pb-1 w-full justify-center">
+                                                                <span className="text-xs">♦</span> <span>{bundle.diamonds.toLocaleString()} GC</span>
+                                                            </div>
+                                                            <div className="text-xs text-amber-500 font-bold mb-1">
+                                                                + {bundle.forgesCoins} FC FREE
+                                                            </div>
+                                                            <div className="text-white font-black text-lg pt-1">
+                                                                ${bundle.price.toFixed(2)}
+                                                            </div>
                                                         </button>
                                                     ))}
                                                 </div>
@@ -327,64 +352,67 @@ export default function WalletModal({ isOpen, onClose, balance, setBalance }: Wa
 
                                             <button
                                                 type="submit"
-                                                disabled={loading || !depositAmount}
+                                                disabled={loading || selectedBundle === null}
                                                 className="w-full bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] h-12 rounded-xl font-bold text-sm transition-all shadow-[0_0_20px_rgba(0,185,240,0.2)] hover:shadow-[0_0_30px_rgba(0,185,240,0.4)] hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                             >
                                                 {loading ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />}
-                                                {loading ? 'Processing...' : 'Deposit Funds'}
+                                                {loading ? 'Processing...' : 'Purchase Bundle'}
                                             </button>
                                         </form>
                                     </div>
                                 )}
 
-                                {activeTab === 'withdraw' && (
+                                {activeTab === 'redeem' && (
                                     <div className="space-y-6">
                                         <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6">
-                                            <p className="text-amber-500 text-xs font-bold text-center">
-                                                Withdrawals are processed within 24 hours.
+                                            <p className="text-amber-500 text-xs font-bold text-center mb-1">
+                                                Redemptions are processed within 24 hours.
+                                            </p>
+                                            <p className="text-amber-500/70 text-[10px] text-center font-medium">
+                                                Note: Forges Coins (FC) must be played through at least 3 times before they can be redeemed.
                                             </p>
                                         </div>
 
-                                        <form onSubmit={handleWithdraw} className="space-y-6">
+                                        <form onSubmit={handleRedeem} className="space-y-6">
                                             <div className="space-y-2">
                                                 <div className="flex justify-between">
-                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Amount</label>
-                                                    <span className="text-xs text-slate-400">Available: <span className="text-white font-bold">${balance.toFixed(2)}</span></span>
+                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Amount (FC)</label>
+                                                    <span className="text-xs text-slate-400">Available: <span className="text-white font-bold">{forgesCoins.toFixed(2)} FC</span></span>
                                                 </div>
                                                 <div className="relative group">
-                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#00b9f0] transition-colors">$</span>
+                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-amber-500 group-focus-within:text-amber-400 transition-colors">FC</span>
                                                     <input
                                                         type="number"
-                                                        value={withdrawAmount}
-                                                        onChange={(e) => setWithdrawAmount(e.target.value)}
+                                                        value={redeemAmount}
+                                                        onChange={(e) => setRedeemAmount(e.target.value)}
                                                         placeholder="0.00"
-                                                        className="w-full bg-[#0a161f] border border-white/10 rounded-xl py-3 pl-8 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] font-bold"
+                                                        className="w-full bg-[#0a161f] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 font-bold"
                                                         min="10"
-                                                        max={balance}
+                                                        max={forgesCoins}
                                                         required
                                                     />
                                                 </div>
                                             </div>
 
                                             <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Withdrawal Address (USDT)</label>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Redemption Address (Crypto)</label>
                                                 <input
                                                     type="text"
-                                                    value={withdrawAddress}
-                                                    onChange={(e) => setWithdrawAddress(e.target.value)}
+                                                    value={redeemAddress}
+                                                    onChange={(e) => setRedeemAddress(e.target.value)}
                                                     placeholder="Enter wallet address"
-                                                    className="w-full bg-[#0a161f] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-slate-600 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] font-medium text-sm"
+                                                    className="w-full bg-[#0a161f] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 font-medium text-sm"
                                                     required
                                                 />
                                             </div>
 
                                             <button
                                                 type="submit"
-                                                disabled={loading || !withdrawAmount || !withdrawAddress}
+                                                disabled={loading || !redeemAmount || !redeemAddress}
                                                 className="w-full bg-white hover:bg-slate-200 text-[#0f212e] h-12 rounded-xl font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                             >
                                                 {loading ? <Loader2 className="animate-spin" size={20} /> : <ArrowUpCircle size={20} />}
-                                                {loading ? 'Processing...' : 'Request Withdrawal'}
+                                                {loading ? 'Processing...' : 'Request Redemption'}
                                             </button>
                                         </form>
                                     </div>
@@ -399,8 +427,8 @@ export default function WalletModal({ isOpen, onClose, balance, setBalance }: Wa
 
                                         <div className="space-y-2">
                                             <h2 className="text-2xl font-black text-white uppercase italic tracking-wide">Daily Reward</h2>
-                                            <p className="text-slate-400 text-sm max-w-xs mx-auto">
-                                                Come back every 24 hours to claim your free bonus balance!
+                                            <p className="text-sm max-w-xs mx-auto text-amber-500/80 font-bold border border-amber-500/20 bg-amber-500/10 py-2 px-4 rounded-xl mt-4">
+                                                Come back every 24 hours to claim your free Forges Coins!
                                             </p>
                                         </div>
 
@@ -438,12 +466,12 @@ export default function WalletModal({ isOpen, onClose, balance, setBalance }: Wa
                                                 transactions.map((tx) => (
                                                     <div key={tx.id} className="bg-[#0a161f]/50 border border-white/5 rounded-xl p-4 flex items-center justify-between">
                                                         <div className="flex items-center gap-4">
-                                                            <div className={`p-2.5 rounded-lg ${tx.type === 'deposit' ? 'bg-green-500/10 text-green-500' :
-                                                                tx.type === 'withdraw' ? 'bg-amber-500/10 text-amber-500' :
+                                                            <div className={`p-2.5 rounded-lg ${tx.type === 'purchase' ? 'bg-green-500/10 text-green-500' :
+                                                                tx.type === 'redeem' ? 'bg-amber-500/10 text-amber-500' :
                                                                     'bg-blue-500/10 text-blue-500'
                                                                 }`}>
-                                                                {tx.type === 'deposit' ? <ArrowDownCircle size={20} /> :
-                                                                    tx.type === 'withdraw' ? <ArrowUpCircle size={20} /> :
+                                                                {tx.type === 'purchase' ? <ArrowDownCircle size={20} /> :
+                                                                    tx.type === 'redeem' ? <ArrowUpCircle size={20} /> :
                                                                         <Gift size={20} />}
                                                             </div>
                                                             <div>
@@ -452,9 +480,10 @@ export default function WalletModal({ isOpen, onClose, balance, setBalance }: Wa
                                                             </div>
                                                         </div>
                                                         <div className="text-right">
-                                                            <p className={`font-bold ${tx.type === 'withdraw' ? 'text-white' : 'text-green-500'
+                                                            <p className={`font-bold ${tx.type === 'redeem' ? 'text-white' : 'text-green-500'
                                                                 }`}>
-                                                                {tx.type === 'withdraw' ? '-' : '+'}${tx.amount.toFixed(2)}
+                                                                {tx.type === 'redeem' ? '-' : '+'}
+                                                                {tx.type === 'purchase' ? `$${tx.amount.toFixed(2)}` : `${tx.amount.toFixed(2)} FC`}
                                                             </p>
                                                             <p className={`text-[10px] font-bold uppercase tracking-wider ${tx.status === 'completed' ? 'text-green-500' : 'text-amber-500'
                                                                 }`}>

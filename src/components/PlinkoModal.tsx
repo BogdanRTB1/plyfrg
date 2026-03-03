@@ -9,10 +9,17 @@ import { createPortal } from "react-dom";
 interface PlinkoModalProps {
     isOpen: boolean;
     onClose: () => void;
+    diamonds: number;
+    setDiamonds: React.Dispatch<React.SetStateAction<number>>;
+    forgesCoins: number;
+    setForgesCoins: React.Dispatch<React.SetStateAction<number>>;
 }
 
-export default function PlinkoModal({ isOpen, onClose }: PlinkoModalProps) {
-    const [balance, setBalance] = useState(1000);
+export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, forgesCoins, setForgesCoins }: PlinkoModalProps) {
+    const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
+    const balance = currencyType === 'GC' ? diamonds : forgesCoins;
+
+    // Default bet amounts based on currency type
     const [betAmount, setBetAmount] = useState(10);
     const [history, setHistory] = useState<number[]>([]);
     const [dropping, setDropping] = useState(false);
@@ -53,7 +60,12 @@ export default function PlinkoModal({ isOpen, onClose }: PlinkoModalProps) {
     const dropBall = useCallback(() => {
         if (dropping || balance < betAmount) return;
 
-        setBalance(prev => prev - betAmount);
+        if (currencyType === 'GC') {
+            setDiamonds(prev => prev - betAmount);
+        } else {
+            setForgesCoins(prev => prev - betAmount);
+        }
+
         setDropping(true);
         setBallPath([]); // Clear previous path immediately
 
@@ -94,7 +106,13 @@ export default function PlinkoModal({ isOpen, onClose }: PlinkoModalProps) {
                     const multiplier = MULTIPLIERS[randomBucketForDemo];
 
                     const winAmount = betAmount * multiplier;
-                    setBalance(prev => prev + winAmount);
+
+                    if (currencyType === 'GC') {
+                        setDiamonds(prev => prev + winAmount);
+                    } else {
+                        setForgesCoins(prev => prev + winAmount);
+                    }
+
                     setHistory(prev => [multiplier, ...prev].slice(0, 5));
 
                     if (multiplier >= 10) {
@@ -116,7 +134,7 @@ export default function PlinkoModal({ isOpen, onClose }: PlinkoModalProps) {
                 step++;
             }
         }, 50);
-    }, [dropping, balance, betAmount, ROWS, WIDTH, HEIGHT, MULTIPLIERS]);
+    }, [dropping, balance, betAmount, ROWS, WIDTH, HEIGHT, MULTIPLIERS, currencyType, setDiamonds, setForgesCoins]);
 
     // Handle closing via parent prop, ensure cleanup
     useEffect(() => {
@@ -151,17 +169,41 @@ export default function PlinkoModal({ isOpen, onClose }: PlinkoModalProps) {
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>
 
+                    {/* Currency Toggle */}
+                    <div className="bg-[#0f212e] p-1.5 rounded-xl flex">
+                        <button
+                            onClick={() => { setCurrencyType('GC'); setBetAmount(100); }}
+                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                                }`}
+                        >
+                            <span>♦</span> GC
+                        </button>
+                        <button
+                            onClick={() => { setCurrencyType('FC'); setBetAmount(1); }}
+                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                                }`}
+                        >
+                            <span>FC</span> SC
+                        </button>
+                    </div>
+
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-slate-500 uppercase">Bet Amount</label>
                         <div className="relative">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                {currencyType === 'GC' ?
+                                    <span className="text-blue-400 font-bold">♦</span> :
+                                    <span className="text-amber-500 font-bold text-xs">FC</span>}
+                            </div>
                             <input
                                 type="number"
                                 value={betAmount}
                                 onChange={(e) => setBetAmount(Number(e.target.value))}
-                                className="w-full bg-[#0f212e] border border-white/10 rounded-lg p-3 text-white font-bold focus:border-[#00b9f0] outline-none"
+                                className="w-full bg-[#0f212e] border border-white/10 rounded-lg p-3 pl-8 text-white font-bold focus:border-[var(--curr-color)] outline-none"
+                                style={{ '--curr-color': currencyType === 'GC' ? '#3b82f6' : '#f59e0b' } as React.CSSProperties}
                             />
                             <div className="absolute right-2 top-1.5 flex gap-1">
-                                <button onClick={() => setBetAmount(prev => Math.max(1, prev / 2))} className="px-2 py-1.5 bg-[#2f4553] rounded text-xs text-white font-bold hover:bg-[#3d5564]">½</button>
+                                <button onClick={() => setBetAmount(prev => Math.max(currencyType === 'GC' ? 10 : 0.1, prev / 2))} className="px-2 py-1.5 bg-[#2f4553] rounded text-xs text-white font-bold hover:bg-[#3d5564]">½</button>
                                 <button onClick={() => setBetAmount(prev => prev * 2)} className="px-2 py-1.5 bg-[#2f4553] rounded text-xs text-white font-bold hover:bg-[#3d5564]">2×</button>
                             </div>
                         </div>
@@ -170,14 +212,22 @@ export default function PlinkoModal({ isOpen, onClose }: PlinkoModalProps) {
                     <button
                         onClick={dropBall}
                         disabled={dropping || balance < betAmount}
-                        className="w-full md:mt-auto bg-[#00b9f0] hover:bg-[#38bdf8] disabled:opacity-50 disabled:cursor-not-allowed text-[#0f212e] h-14 rounded-xl font-black text-lg shadow-[0_4px_0_#0090bc] active:shadow-none active:translate-y-1 transition-all flex items-center justify-center gap-2"
+                        className={`w-full md:mt-auto text-[#0f212e] h-14 rounded-xl font-black text-lg active:shadow-none active:translate-y-1 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${currencyType === 'GC'
+                                ? 'bg-blue-500 hover:bg-blue-400 shadow-[0_4px_0_#1d4ed8]'
+                                : 'bg-amber-500 hover:bg-amber-400 shadow-[0_4px_0_#b45309]'
+                            }`}
                     >
                         {dropping ? <RotateCw className="animate-spin" /> : 'BET'}
                     </button>
 
-                    <div className="bg-[#0f212e] p-4 rounded-xl border border-white/5">
+                    <div className={`bg-[#0f212e] p-4 rounded-xl border ${currencyType === 'GC' ? 'border-blue-500/20' : 'border-amber-500/20'
+                        }`}>
                         <p className="text-slate-500 text-xs font-bold uppercase mb-1">Balance</p>
-                        <p className="text-white text-xl font-mono">${balance.toFixed(2)}</p>
+                        <p className={`text-xl font-mono flex items-center gap-2 ${currencyType === 'GC' ? 'text-blue-400' : 'text-amber-500'
+                            }`}>
+                            {currencyType === 'GC' ? '♦' : 'FC'}
+                            {currencyType === 'GC' ? balance.toLocaleString() : balance.toFixed(2)}
+                        </p>
                     </div>
                 </div>
 
@@ -187,9 +237,9 @@ export default function PlinkoModal({ isOpen, onClose }: PlinkoModalProps) {
                         <div className="flex gap-2">
                             {history.map((mult, i) => (
                                 <div key={i} className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-xs border-b-2 ${mult >= 10 ? 'bg-amber-500 text-[#0f212e] border-amber-700' :
-                                        mult >= 2 ? 'bg-purple-500 text-white border-purple-700' :
-                                            mult < 1 ? 'bg-slate-700 text-slate-400 border-slate-900' :
-                                                'bg-white text-[#0f212e] border-slate-300'
+                                    mult >= 2 ? 'bg-purple-500 text-white border-purple-700' :
+                                        mult < 1 ? 'bg-slate-700 text-slate-400 border-slate-900' :
+                                            'bg-white text-[#0f212e] border-slate-300'
                                     }`}>
                                     {mult}x
                                 </div>
@@ -222,9 +272,9 @@ export default function PlinkoModal({ isOpen, onClose }: PlinkoModalProps) {
                                     <div
                                         key={i}
                                         className={`flex-1 h-8 rounded text-[10px] font-bold flex items-center justify-center text-[#0f212e] shadow-lg ${mult >= 10 ? 'bg-gradient-to-t from-amber-600 to-amber-400' :
-                                                mult >= 3 ? 'bg-gradient-to-t from-purple-600 to-purple-400 text-white' :
-                                                    mult < 1 ? 'bg-gradient-to-t from-slate-600 to-slate-400' :
-                                                        'bg-gradient-to-t from-slate-200 to-white'
+                                            mult >= 3 ? 'bg-gradient-to-t from-purple-600 to-purple-400 text-white' :
+                                                mult < 1 ? 'bg-gradient-to-t from-slate-600 to-slate-400' :
+                                                    'bg-gradient-to-t from-slate-200 to-white'
                                             }`}
                                     >
                                         {mult}x
