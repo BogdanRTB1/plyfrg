@@ -12,6 +12,43 @@ import WalletModal from "./WalletModal";
 import { createClient } from "@/utils/supabase/client";
 import { useMobileNav } from "@/components/MobileNavProvider";
 
+function NotificationItem({ n, markOneAsRead, formatDate }: { n: any, markOneAsRead: (id: string) => void, formatDate: (d: string) => string }) {
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (n.is_read) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    markOneAsRead(n.id);
+                    observer.disconnect();
+                }
+            },
+            { threshold: 0.5 } // Trigger when 50% visible
+        );
+
+        if (ref.current) {
+            observer.observe(ref.current);
+        }
+
+        return () => observer.disconnect();
+    }, [n.id, n.is_read, markOneAsRead]);
+
+    return (
+        <div ref={ref} className={`px-4 py-3 hover:bg-white/[0.02] cursor-pointer transition-colors border-b last:border-0 border-white/5 relative group ${!n.is_read ? 'bg-white/[0.01]' : ''}`}>
+            {!n.is_read && <div className="absolute left-2 top-4 w-1.5 h-1.5 bg-[#00b9f0] rounded-full shadow-[0_0_8px_rgba(0,185,240,0.8)] animate-pulse"></div>}
+            <div className="pl-3">
+                <p className="text-xs font-bold text-white mb-0.5">{n.title}</p>
+                <p className={`text-sm font-medium leading-snug mb-1 group-hover:text-white transition-colors ${!n.is_read ? 'text-[#e0e0e0]' : 'text-slate-400'}`}>
+                    {n.message}
+                </p>
+                <p className="text-[10px] text-[#00b9f0] font-bold opacity-80">{formatDate(n.created_at)}</p>
+            </div>
+        </div>
+    );
+}
+
 export default function Header() {
     const [isAuthOpen, setIsAuthOpen] = useState<'login' | 'signup' | null>(null);
     const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
@@ -45,6 +82,20 @@ export default function Header() {
 
         setNotifications(notifications.map(n => ({ ...n, is_read: true })));
         setUnreadCount(0);
+    };
+
+    const markOneAsRead = async (id: string) => {
+        if (!user) return;
+
+        // Optimistic UI update
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+
+        // DB update
+        await supabase.from('notifications')
+            .update({ is_read: true })
+            .eq('id', id)
+            .eq('user_id', user.id);
     };
 
     const formatDate = (dateString: string) => {
@@ -205,18 +256,9 @@ export default function Header() {
                                     <p className="text-sm font-bold text-white">Notifications</p>
                                     <button onClick={markAllAsRead} className="text-xs text-[#00b9f0] hover:text-[#38bdf8] font-medium transition-colors">Mark all read</button>
                                 </div>
-                                <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                                <div className="max-h-[300px] overflow-y-auto custom-scrollbar relative">
                                     {notifications.length > 0 ? notifications.map((n, i) => (
-                                        <div key={i} className={`px-4 py-3 hover:bg-white/[0.02] cursor-pointer transition-colors border-b last:border-0 border-white/5 relative group ${!n.is_read ? 'bg-white/[0.01]' : ''}`}>
-                                            {!n.is_read && <div className="absolute left-2 top-4 w-1.5 h-1.5 bg-[#00b9f0] rounded-full"></div>}
-                                            <div className="pl-3">
-                                                <p className="text-xs font-bold text-white mb-0.5">{n.title}</p>
-                                                <p className="text-sm text-slate-300 font-medium leading-snug mb-1 group-hover:text-white transition-colors">
-                                                    {n.message}
-                                                </p>
-                                                <p className="text-[10px] text-[#00b9f0] font-bold">{formatDate(n.created_at)}</p>
-                                            </div>
-                                        </div>
+                                        <NotificationItem key={n.id || i} n={n} markOneAsRead={markOneAsRead} formatDate={formatDate} />
                                     )) : (
                                         <div className="px-4 py-6 text-center text-slate-500">
                                             <Bell className="mx-auto mb-2 opacity-20" size={24} />
