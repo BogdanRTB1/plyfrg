@@ -11,6 +11,7 @@ export default function KYCEnforcer() {
     const [needsKYC, setNeedsKYC] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [isClosing, setIsClosing] = useState(false);
     const supabase = createClient();
     const router = useRouter();
     const pathname = usePathname();
@@ -55,26 +56,33 @@ export default function KYCEnforcer() {
     };
 
     const handleVerifySuccess = async () => {
-        // Update user metadata to set KYC as verified
-        const { error } = await supabase.auth.updateUser({
-            data: { is_kyc_verified: true }
-        });
+        // Trigger the fade-out of the entire modal
+        setIsClosing(true);
 
-        if (error) {
-            toast.error("Failed to update status. Please try again.");
-            return;
-        }
+        // Wait for the fade-out animation to complete before updating state and unmounting
+        setTimeout(async () => {
+            // Update user metadata to set KYC as verified
+            const { error } = await supabase.auth.updateUser({
+                data: { is_kyc_verified: true }
+            });
 
-        toast.success("Age verified successfully!");
-        setNeedsKYC(false);
-        setIsVerifying(false);
-        router.refresh();
+            if (error) {
+                setIsClosing(false); // revert fade if error
+                toast.error("Failed to update status. Please try again.");
+                return;
+            }
+
+            toast.success("Age verified successfully!");
+            setNeedsKYC(false);
+            setIsVerifying(false);
+            router.refresh();
+        }, 500);
     };
 
     if (loading || !needsKYC) return null;
 
     return (
-        <>
+        <div className={`transition-opacity duration-500 ease-in-out ${isClosing ? 'opacity-0' : 'opacity-100'}`}>
             {/* Extended Background Overlay to block overscroll bounce */}
             <div className="fixed inset-[-50vh] z-[90] bg-[#050505] md:bg-black/95 md:backdrop-blur-md pointer-events-none" />
 
@@ -140,6 +148,6 @@ export default function KYCEnforcer() {
                     </div>
                 </div>
             </div>
-        </>
+        </div>
     );
 }

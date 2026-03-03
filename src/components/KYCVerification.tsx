@@ -20,7 +20,6 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
     const [capturedImage, setCapturedImage] = useState<string | null>(null);
     const [hasTorch, setHasTorch] = useState(false);
     const [isTorchOn, setIsTorchOn] = useState(false);
-    const [isFadingOut, setIsFadingOut] = useState(false);
 
     const startCamera = async () => {
         try {
@@ -140,10 +139,7 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
             if (ageStatus === 'verified') {
                 setStatus('success');
                 setTimeout(() => {
-                    setIsFadingOut(true);
-                    setTimeout(() => {
-                        onSuccess();
-                    }, 500); // Wait for fade-out animation to finish
+                    onSuccess();
                 }, 2000);
             } else if (ageStatus === 'underage') {
                 setStatus('rejected');
@@ -239,23 +235,17 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
     };
 
     const handleSkip = () => {
-        setIsFadingOut(true);
-        setTimeout(() => {
-            stopCamera();
-            onSuccess();
-        }, 500);
+        stopCamera();
+        onSuccess();
     };
 
     const handleCancel = () => {
-        setIsFadingOut(true);
-        setTimeout(() => {
-            stopCamera();
-            onCancel();
-        }, 500);
+        stopCamera();
+        onCancel();
     };
 
     return (
-        <div className={`flex flex-col items-center justify-center w-full space-y-6 transition-opacity duration-500 ease-in-out ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
+        <div className="flex flex-col items-center justify-center w-full space-y-6">
             <div className="text-center w-full">
                 <h3 className="text-xl font-bold text-white mb-2">Age Verification Required</h3>
                 <p className="text-sm text-slate-400">
