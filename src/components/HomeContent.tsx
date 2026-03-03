@@ -11,6 +11,10 @@ import PlinkoModal from "./PlinkoModal";
 export default function HomeContent() {
     const [isPlinkoOpen, setIsPlinkoOpen] = useState(false);
 
+    // State for PlinkoModal demo when accessed from home
+    const [diamonds, setDiamonds] = useState(100000);
+    const [forgesCoins, setForgesCoins] = useState(100);
+
     const originals = [
         { name: "Plinko", image: "/images/game-plinko.png", rtp: "99.0%" },
         { name: "Crash", image: "/images/game-crash.png", rtp: "99.0%" },
@@ -153,7 +157,14 @@ export default function HomeContent() {
                 ))}
             </motion.div>
 
-            <PlinkoModal isOpen={isPlinkoOpen} onClose={() => setIsPlinkoOpen(false)} />
+            <PlinkoModal
+                isOpen={isPlinkoOpen}
+                onClose={() => setIsPlinkoOpen(false)}
+                diamonds={diamonds}
+                setDiamonds={setDiamonds}
+                forgesCoins={forgesCoins}
+                setForgesCoins={setForgesCoins}
+            />
 
             {/* Popular Creators Section */}
             <motion.div variants={item} className="flex justify-between items-end mb-6">
