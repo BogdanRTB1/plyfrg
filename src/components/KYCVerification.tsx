@@ -99,52 +99,11 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
-        // Draw current video frame to canvas (fără filtre CSS, prelucrăm pixelii manual)
-        ctx.filter = 'none';
+        // Apply image filters to significantly improve OCR capability on low-quality/blurry images
+        ctx.filter = 'grayscale(100%) contrast(150%) brightness(110%)';
+
+        // Draw current video frame to canvas
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // --- METODA 1: PRE-PROCESARE AVANSATĂ A IMAGINII (BINARIZARE) ---
-        // Extragem datele pixelilor pentru a aplica praguri de luminanță
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-
-        let luminanceSum = 0;
-
-        // Pasul 1: Calculează Grayscale pentru fiecare pixel
-        for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
-            // Formula corectelor ponderi pentru ochiul uman / luminanță fotografică
-            const gray = (0.299 * r) + (0.587 * g) + (0.114 * b);
-
-            data[i] = gray;     // R
-            data[i + 1] = gray; // G
-            data[i + 2] = gray; // B
-
-            luminanceSum += gray;
-        }
-
-        // Pasul 2: Binarizare bazată pe medie (Thresholding dinamic)
-        const averageLuminance = luminanceSum / (canvas.width * canvas.height);
-
-        // Un prag ușor inferior mediei va forța izolarea nuanțelor închise (ex. textul de pe buletin)
-        // Setăm la 85% din media luminanței totale
-        const threshold = averageLuminance * 0.85;
-
-        for (let i = 0; i < data.length; i += 4) {
-            const gray = data[i];
-            // Orice e sub prag devine negru pur (0), restul alb pur (255)
-            const binaryValue = gray < threshold ? 0 : 255;
-
-            data[i] = binaryValue;
-            data[i + 1] = binaryValue;
-            data[i + 2] = binaryValue;
-        }
-
-        // Reimprimăm matricea de pixeli alb-negru înapoi pe Canvas
-        ctx.putImageData(imageData, 0, 0);
-        // ----------------------------------------------------------------
 
         // Turn off the flashlight immediately after we have the image frame stored
         if (isTorchOn) {
