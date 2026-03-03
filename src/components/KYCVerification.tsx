@@ -20,6 +20,7 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
     const [capturedImage, setCapturedImage] = useState<string | null>(null);
     const [hasTorch, setHasTorch] = useState(false);
     const [isTorchOn, setIsTorchOn] = useState(false);
+    const [isFadingOut, setIsFadingOut] = useState(false);
 
     const startCamera = async () => {
         try {
@@ -180,7 +181,10 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
             if (ageStatus === 'verified') {
                 setStatus('success');
                 setTimeout(() => {
-                    onSuccess();
+                    setIsFadingOut(true);
+                    setTimeout(() => {
+                        onSuccess();
+                    }, 500); // Wait for fade-out animation to finish
                 }, 2000);
             } else if (ageStatus === 'underage') {
                 setStatus('rejected');
@@ -276,12 +280,23 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
     };
 
     const handleSkip = () => {
-        stopCamera();
-        onSuccess();
+        setIsFadingOut(true);
+        setTimeout(() => {
+            stopCamera();
+            onSuccess();
+        }, 500);
+    };
+
+    const handleCancel = () => {
+        setIsFadingOut(true);
+        setTimeout(() => {
+            stopCamera();
+            onCancel();
+        }, 500);
     };
 
     return (
-        <div className="flex flex-col items-center justify-center w-full space-y-6">
+        <div className={`flex flex-col items-center justify-center w-full space-y-6 transition-opacity duration-500 ease-in-out ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
             <div className="text-center w-full">
                 <h3 className="text-xl font-bold text-white mb-2">Age Verification Required</h3>
                 <p className="text-sm text-slate-400">
@@ -379,10 +394,7 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
 
             <div className="flex flex-col items-center gap-4 mt-2">
                 <button
-                    onClick={() => {
-                        stopCamera();
-                        onCancel();
-                    }}
+                    onClick={handleCancel}
                     disabled={status === 'processing' || status === 'success' || status === 'rejected'}
                     className="text-xs font-bold text-slate-400 hover:text-white transition-colors underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                 >
