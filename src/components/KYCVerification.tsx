@@ -234,6 +234,11 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
         startCamera();
     };
 
+    const handleSkip = () => {
+        stopCamera();
+        onSuccess();
+    };
+
     return (
         <div className="flex flex-col items-center justify-center w-full space-y-6">
             <div className="text-center w-full">
@@ -331,16 +336,27 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
                 ) : null}
             </div>
 
-            <button
-                onClick={() => {
-                    stopCamera();
-                    onCancel();
-                }}
-                disabled={status === 'processing' || status === 'success' || status === 'rejected'}
-                className="text-xs font-bold text-slate-400 hover:text-white transition-colors underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                Cancel verification
-            </button>
+            <div className="flex flex-col items-center gap-4 mt-2">
+                <button
+                    onClick={() => {
+                        stopCamera();
+                        onCancel();
+                    }}
+                    disabled={status === 'processing' || status === 'success' || status === 'rejected'}
+                    className="text-xs font-bold text-slate-400 hover:text-white transition-colors underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Cancel verification
+                </button>
+
+                {/* DEV ONLY SKIP BUTTON */}
+                <button
+                    onClick={handleSkip}
+                    disabled={status === 'processing' || status === 'success' || status === 'rejected'}
+                    className="text-xs font-bold text-yellow-500 hover:text-yellow-400 transition-colors border border-yellow-500/30 bg-yellow-500/10 px-4 py-1.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 flex items-center gap-2"
+                >
+                    Skip Verification (Test Only)
+                </button>
+            </div>
         </div>
     );
 }
