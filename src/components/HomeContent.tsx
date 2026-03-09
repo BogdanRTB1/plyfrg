@@ -7,9 +7,17 @@ import GameCard from "@/components/GameCard";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import PlinkoModal from "./PlinkoModal";
+import HeistModal from "./HeistModal";
+import InfluencerModal from "./InfluencerModal";
+import EscapeModal from "./EscapeModal";
+import BombModal from "./BombModal";
 
 export default function HomeContent() {
     const [isPlinkoOpen, setIsPlinkoOpen] = useState(false);
+    const [isHeistOpen, setIsHeistOpen] = useState(false);
+    const [isInfluencerOpen, setIsInfluencerOpen] = useState(false);
+    const [isEscapeOpen, setIsEscapeOpen] = useState(false);
+    const [isBombOpen, setIsBombOpen] = useState(false);
 
     // State for PlinkoModal demo when accessed from home
     const [diamonds, setDiamonds] = useState(100000);
@@ -17,6 +25,10 @@ export default function HomeContent() {
 
     const originals = [
         { name: "Plinko", image: "/images/game-plinko.png", rtp: "99.0%" },
+        { name: "Heist", image: "/images/game-heist-v2.png", rtp: "98.5%" },
+        { name: "Influencer", image: "/images/game-influencer-v2.png", rtp: "97.8%" },
+        { name: "Escape", image: "/images/game-escape-v3.png", rtp: "98.2%" },
+        { name: "Bomb Defuse", image: "/images/game-bomb-v2.png", rtp: "99.1%" },
         { name: "Crash", image: "/images/game-crash.png", rtp: "99.0%" },
         { name: "Mines", image: "/images/game-mines.png", rtp: "99.0%" },
         { name: "Slots", image: "/images/game-slots.png", rtp: "99.0%" },
@@ -147,7 +159,13 @@ export default function HomeContent() {
                 className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-16"
             >
                 {originals.map((game, index) => (
-                    <div key={index} onClick={() => game.name === 'Plinko' && setIsPlinkoOpen(true)}>
+                    <div key={index} className="cursor-pointer" onClick={() => {
+                        if (game.name === 'Plinko') setIsPlinkoOpen(true);
+                        if (game.name === 'Heist') setIsHeistOpen(true);
+                        if (game.name === 'Influencer') setIsInfluencerOpen(true);
+                        if (game.name === 'Escape') setIsEscapeOpen(true);
+                        if (game.name === 'Bomb Defuse') setIsBombOpen(true);
+                    }}>
                         <GameCard
                             name={game.name}
                             image={game.image}
@@ -165,6 +183,10 @@ export default function HomeContent() {
                 forgesCoins={forgesCoins}
                 setForgesCoins={setForgesCoins}
             />
+            <HeistModal isOpen={isHeistOpen} onClose={() => setIsHeistOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <InfluencerModal isOpen={isInfluencerOpen} onClose={() => setIsInfluencerOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <EscapeModal isOpen={isEscapeOpen} onClose={() => setIsEscapeOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <BombModal isOpen={isBombOpen} onClose={() => setIsBombOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
 
             {/* Popular Creators Section */}
             <motion.div variants={item} className="flex justify-between items-end mb-6">

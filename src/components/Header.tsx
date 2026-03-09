@@ -268,7 +268,7 @@ export default function Header() {
                         </button>
 
                         {activeDropdown === 'notifications' && (
-                            <div className="absolute right-0 md:right-0 -right-20 top-full mt-2 w-[calc(100vw-32px)] md:w-80 max-w-sm bg-[#0f212e] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-2 animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+                            <div className="fixed left-1/2 -translate-x-1/2 top-[72px] md:absolute md:left-auto md:translate-x-0 md:right-0 md:top-full mt-2 w-[calc(100vw-32px)] md:w-80 max-w-sm bg-[#0f212e] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-2 animate-in fade-in slide-in-from-top-2 duration-200 z-50">
                                 <div className="px-4 py-3 border-b border-white/5 mb-1 flex justify-between items-center">
                                     <p className="text-sm font-bold text-white">Notifications</p>
                                     <button onClick={markAllAsRead} className="text-xs text-[#00b9f0] hover:text-[#38bdf8] font-medium transition-colors">Mark all read</button>

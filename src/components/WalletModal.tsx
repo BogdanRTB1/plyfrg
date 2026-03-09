@@ -39,6 +39,8 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
         { id: '2', type: 'bonus', amount: 2.50, date: new Date(Date.now() - 172800000), status: 'completed' }
     ]);
 
+    const supabase = createClient();
+
     // Deposit/Purchase state
     const [selectedBundle, setSelectedBundle] = useState<number | null>(null);
     const [depositMethod, setDepositMethod] = useState<'card' | 'crypto'>('card');
@@ -132,6 +134,20 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
         setSelectedBundle(null);
         toast.success(`Purchased ${bundle.diamonds.toLocaleString()} Diamonds + ${bundle.forgesCoins} Forges Coins Bonus!`);
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                await supabase.from('notifications').insert({
+                    user_id: user.id,
+                    title: 'Bundle Purchased',
+                    message: `You successfully purchased a bundle containing ${bundle.diamonds.toLocaleString()} Diamonds and ${bundle.forgesCoins} Forges Coins.`
+                });
+            }
+        } catch (error) {
+            console.error('Failed to add notification:', error);
+        }
+
         setLoading(false);
     };
 
@@ -160,6 +176,20 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
         setRedeemAmount("");
         setRedeemAddress("");
         toast.success(`Redemption request for ${redeemAmount} Forges Coins submitted`);
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                await supabase.from('notifications').insert({
+                    user_id: user.id,
+                    title: 'Redemption Request Submitted',
+                    message: `Your request to redeem ${redeemAmount} Forges Coins has been received and is being processed.`
+                });
+            }
+        } catch (error) {
+            console.error('Failed to add notification:', error);
+        }
+
         setLoading(false);
     };
 
@@ -185,6 +215,20 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
         updateTimer(new Date());
 
         toast.success(`You claimed your daily bonus: ${bonusAmount} Forges Coins`);
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                await supabase.from('notifications').insert({
+                    user_id: user.id,
+                    title: 'Daily Bonus Claimed',
+                    message: `You successfully claimed your daily bonus of ${bonusAmount} Forges Coins.`
+                });
+            }
+        } catch (error) {
+            console.error('Failed to add notification:', error);
+        }
+
         setLoading(false);
     };
 
