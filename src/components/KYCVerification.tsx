@@ -138,14 +138,25 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
                 </div>
             )}
             
-            {(status === 'failed' || status === 'idle') && (
+            <div className="flex flex-col items-center gap-4 mt-2">
+                {(status === 'failed' || status === 'idle') && (
+                    <button
+                        onClick={onCancel}
+                        className="text-xs font-bold text-slate-500 hover:text-slate-300 transition-colors uppercase tracking-wider"
+                    >
+                        Return
+                    </button>
+                )}
+
+                {/* DEV ONLY SKIP BUTTON */}
                 <button
-                    onClick={onCancel}
-                    className="text-xs font-bold text-slate-500 hover:text-slate-300 transition-colors uppercase tracking-wider"
+                    onClick={onSuccess}
+                    disabled={status === 'processing'}
+                    className="text-xs font-bold text-yellow-500 hover:text-yellow-400 transition-colors border border-yellow-500/30 bg-yellow-500/10 px-4 py-1.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 flex items-center gap-2"
                 >
-                    Return
+                    Skip Verification (Test Only)
                 </button>
-            )}
+            </div>
         </div>
     );
 }
