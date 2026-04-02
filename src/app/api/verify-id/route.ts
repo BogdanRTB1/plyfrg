@@ -26,13 +26,15 @@ export async function POST(req: Request) {
         const base64Data = image.split(',')[1];
         const mimeType = image.split(';')[0].split(':')[1] || 'image/jpeg';
 
-        const prompt = `You are an expert identity document parser. Extract the date of birth from this ID document. Evaluate if the person is 21 years old or older. The current year is 2026. 
+        const prompt = `You are a highly capable expert identity document parser. Your critical task is to meticulously examine this ID document and precisely extract the date of birth, even if the image is somewhat blurry, low quality, or poorly lit. 
+Pay close attention to standard fields like "DOB", "Date of Birth", "Data Nasterii", "Născut", or purely numeric formats like DD.MM.YYYY, DD-MM-YYYY, or MM/DD/YYYY often located near the center or bottom of the ID.
+Evaluate if the person is 21 years old or older. The current year is 2026.
 Return ONLY a JSON object with two fields. Do NOT use markdown code blocks (\`\`\`json). Just the raw JSON string:
 {
   "dateOfBirth": "YYYY-MM-DD",
   "isOver21": true/false
 }
-If you cannot find a date of birth clearly visible on the document, return:
+If you absolutely cannot discern a clear date of birth after close inspection, return:
 {
   "error": "not_found"
 }

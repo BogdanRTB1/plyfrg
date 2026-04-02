@@ -98,9 +98,6 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
-        // Apply image filters to significantly improve OCR capability on low-quality/blurry images
-        ctx.filter = 'grayscale(100%) contrast(150%) brightness(110%)';
-
         // Draw current video frame to canvas
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
