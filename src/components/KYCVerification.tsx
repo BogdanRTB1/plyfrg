@@ -12,6 +12,7 @@ interface KYCVerificationProps {
 export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYCVerificationProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [status, setStatus] = useState<'idle' | 'processing' | 'failed' | 'rejected'>('idle');
+    const [errorMsg, setErrorMsg] = useState("");
 
     // Downscale the image to prevent 413 Payload Too Large errors on Serverless/Vercel
     const processImage = (file: File): Promise<string> => {
@@ -60,7 +61,10 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
                 body: JSON.stringify({ image: base64Image }),
             });
 
-            if (!response.ok) throw new Error("API Limit or Failure");
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || `Server HTTP ${response.status}`);
+            }
 
             const result = await response.json();
             
@@ -72,9 +76,10 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
                 setStatus('rejected');
                 if (onUnderage) setTimeout(() => onUnderage(), 2000); // Give user a moment to cry
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("Verification error:", err);
             setStatus('failed');
+            setErrorMsg(err.message || "Unknown Error");
         }
     };
 
@@ -122,9 +127,14 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
             />
 
             {status === 'failed' && (
-                <div className="w-full p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3">
-                    <AlertCircle className="text-red-500 shrink-0" size={20} />
-                    <p className="text-red-400 text-sm font-medium">Could not read ID. Please ensure the date of birth is clearly visible in the photo.</p>
+                <div className="w-full p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex flex-col items-start gap-2">
+                    <div className="flex items-center gap-3">
+                        <AlertCircle className="text-red-500 shrink-0" size={20} />
+                        <p className="text-red-400 text-sm font-medium">Verification Failed</p>
+                    </div>
+                    <p className="text-white/60 text-xs font-mono bg-black/30 p-2 rounded w-full break-all">
+                        {errorMsg}
+                    </p>
                 </div>
             )}
             
