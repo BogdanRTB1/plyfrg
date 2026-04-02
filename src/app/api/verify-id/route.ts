@@ -11,32 +11,19 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Image is required' }, { status: 400 });
         }
 
-        if (!process.env.GEMINI_API_KEY) {
-            console.error('GEMINI_API_KEY is missing');
-            return NextResponse.json({ error: 'AI Setup Incomplete' }, { status: 500 });
-        }
-
         const model = genAI.getGenerativeModel({
             model: "gemini-2.5-flash",
             generationConfig: {
                 temperature: 0.1,
-                responseMimeType: "application/json",
             }
         });
 
         const base64Data = image.split(',')[1];
         const mimeType = image.split(';')[0].split(':')[1] || 'image/jpeg';
 
-        const prompt = `Extract the date of birth from this ID document. Evaluate if the person is 21 years old or older. The current year is 2026.
-Carefully examine the image, even if blurry or low-lit. Look for fields labeled "DOB", "Date of Birth", "Data Nasterii", "Născut", or purely numeric formats like DD.MM.YYYY.
-Respond ONLY with this JSON schema:
-{
-  "dateOfBirth": "YYYY-MM-DD" | null,
-  "isOver21": boolean | null,
-  "error": string | null
-}
-If you cannot find a date of birth clearly visible on the document, set "error" to "not_found" and the rest to null. Otherwise, set "error" to null.
-Do NOT return any other text or markdown code blocks.`;
+        const prompt = `Carefully find the date of birth on this ID card. The current year is 2026. Is this person 21 years old or older?
+If they are 21 or older, return EXACTLY: {"isOver21": true}
+If they are under 21, or if you cannot find a date of birth at all, return EXACTLY: {"isOver21": false}`;
 
         const result = await model.generateContent([
             prompt,
@@ -50,30 +37,15 @@ Do NOT return any other text or markdown code blocks.`;
 
         const text = result.response.text();
         
-        // Remove possible markdown fences if the model still returns them
-        let jsonStr = text.trim();
-        if (jsonStr.startsWith('\`\`\`json')) {
-            jsonStr = jsonStr.substring(7);
+        let isOver21 = false;
+        if (text.toLowerCase().includes('true')) {
+            isOver21 = true;
         }
-        if (jsonStr.startsWith('\`\`\`')) {
-            jsonStr = jsonStr.substring(3);
-        }
-        if (jsonStr.endsWith('\`\`\`')) {
-            jsonStr = jsonStr.substring(0, jsonStr.length - 3);
-        }
-        
-        jsonStr = jsonStr.trim();
-        
-        try {
-            const parsed = JSON.parse(jsonStr);
-            return NextResponse.json(parsed);
-        } catch (parseError) {
-             console.error("Failed to parse JSON out of text response. Text:", text);
-             return NextResponse.json({ error: "not_found" }, { status: 200 });
-        }
+
+        return NextResponse.json({ isOver21 });
 
     } catch (error: any) {
         console.error('Error verifying ID with Gemini:', error);
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
