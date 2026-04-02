@@ -58,6 +58,9 @@ export default function HomeContent() {
     const [isCustomCrashOpen, setIsCustomCrashOpen] = useState(false);
     const [isAIGameOpen, setIsAIGameOpen] = useState(false);
     const [customGames, setCustomGames] = useState<any[]>([]);
+    
+    // Randomizer full screen cinematic
+    const [isRandomizing, setIsRandomizing] = useState(false);
 
     useEffect(() => {
         const fetchCustomGames = () => {
@@ -124,12 +127,10 @@ export default function HomeContent() {
     ];
 
     const pickRandomGame = () => {
-        toast.info("Let's see what we have got today...", { 
-            icon: <Dices className="text-[#00b9f0] animate-spin" />,
-            duration: 2500 
-        });
+        setIsRandomizing(true);
         
         setTimeout(() => {
+            setIsRandomizing(false);
             const allGames = [...originals, ...customGames];
             if (allGames.length === 0) return;
             const seed = Math.floor(Math.random() * allGames.length);
@@ -162,7 +163,7 @@ export default function HomeContent() {
                 else if (randomPick.name === 'Penalty') setIsFootballOpen(true);
                 else if (randomPick.name === 'Glass Bridge') setIsBridgeOpen(true);
             }
-        }, 1500);
+        }, 2200);
     };
 
     const container = {
@@ -185,8 +186,39 @@ export default function HomeContent() {
             initial="hidden"
             animate="show"
             variants={container}
-            className="flex-1 h-full overflow-y-auto custom-scrollbar p-4 md:p-8 pb-8"
+            className="flex-1 h-full overflow-y-auto custom-scrollbar p-4 md:p-8 pb-8 relative"
         >
+            <AnimatePresence>
+                {isRandomizing && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] bg-zinc-900 flex flex-col items-center justify-center p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ ease: "easeOut", duration: 0.5 }}
+                            className="flex flex-col items-center gap-6"
+                        >
+                            <motion.div 
+                                animate={{ rotate: 360 }}
+                                transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                                className="w-16 h-16 rounded-2xl bg-[#00b9f0]/10 flex items-center justify-center border border-[#00b9f0]/30 shadow-[0_0_30px_rgba(0,185,240,0.3)]"
+                            >
+                                <Dices size={32} className="text-[#00b9f0]" />
+                            </motion.div>
+                            
+                            <h2 className="text-3xl md:text-5xl font-black text-white text-center tracking-tight">
+                                Let's see what we've got today...
+                            </h2>
+                            <p className="text-slate-400 font-medium animate-pulse">Finding the perfect game</p>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Hero Section */}
             <motion.section variants={item} className="relative min-h-[400px] h-auto md:h-[400px] rounded-3xl overflow-hidden flex items-center p-6 sm:p-8 md:p-12 mb-12 shadow-2xl border border-white/5 group">
                 <div className="absolute inset-0 bg-[#0f172a]">
