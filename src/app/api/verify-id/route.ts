@@ -20,25 +20,23 @@ export async function POST(req: Request) {
             model: "gemini-2.5-flash",
             generationConfig: {
                 temperature: 0.1,
+                responseMimeType: "application/json",
             }
         });
 
         const base64Data = image.split(',')[1];
         const mimeType = image.split(';')[0].split(':')[1] || 'image/jpeg';
 
-        const prompt = `You are a highly capable expert identity document parser. Your critical task is to meticulously examine this ID document and precisely extract the date of birth, even if the image is somewhat blurry, low quality, or poorly lit. 
-Pay close attention to standard fields like "DOB", "Date of Birth", "Data Nasterii", "Născut", or purely numeric formats like DD.MM.YYYY, DD-MM-YYYY, or MM/DD/YYYY often located near the center or bottom of the ID.
-Evaluate if the person is 21 years old or older. The current year is 2026.
-Return ONLY a JSON object with two fields. Do NOT use markdown code blocks (\`\`\`json). Just the raw JSON string:
+        const prompt = `Extract the date of birth from this ID document. Evaluate if the person is 21 years old or older. The current year is 2026.
+Carefully examine the image, even if blurry or low-lit. Look for fields labeled "DOB", "Date of Birth", "Data Nasterii", "Născut", or purely numeric formats like DD.MM.YYYY.
+Respond ONLY with this JSON schema:
 {
-  "dateOfBirth": "YYYY-MM-DD",
-  "isOver21": true/false
+  "dateOfBirth": "YYYY-MM-DD" | null,
+  "isOver21": boolean | null,
+  "error": string | null
 }
-If you absolutely cannot discern a clear date of birth after close inspection, return:
-{
-  "error": "not_found"
-}
-ONLY return the JSON object, absolutely no other text.`;
+If you cannot find a date of birth clearly visible on the document, set "error" to "not_found" and the rest to null. Otherwise, set "error" to null.
+Do NOT return any other text or markdown code blocks.`;
 
         const result = await model.generateContent([
             prompt,
