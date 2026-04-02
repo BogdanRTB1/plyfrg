@@ -16,14 +16,20 @@ export default function GameCard({ name, image, rtp = "99.0%", provider = "PlayF
                 <div className="absolute inset-0 flex items-center justify-center text-slate-600 font-bold opacity-30 select-none pointer-events-none">
                     {name}
                 </div>
-                {image && (
+                {image && image.startsWith('data:') ? (
+                    <img
+                        src={image}
+                        alt={name}
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                ) : image ? (
                     <Image
                         src={image}
                         alt={name}
                         fill
                         className="object-cover transition-transform duration-500 group-hover:scale-110"
                     />
-                )}
+                ) : null}
                 <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold text-[#00b9f0] border border-white/10 z-10">
                     RTP {rtp}
                 </div>

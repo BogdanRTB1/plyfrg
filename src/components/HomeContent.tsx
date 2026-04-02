@@ -4,13 +4,31 @@ import Image from "next/image";
 import { ChevronRight, ChevronLeft, Trophy, Zap, ShieldCheck, Flame, Gift, Clock, Twitter, Instagram, Youtube } from "lucide-react";
 import Link from "next/link";
 import GameCard from "@/components/GameCard";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import PlinkoModal from "./PlinkoModal";
 import HeistModal from "./HeistModal";
 import InfluencerModal from "./InfluencerModal";
 import EscapeModal from "./EscapeModal";
 import BombModal from "./BombModal";
+import MinesModal from "./MinesModal";
+import SlotsModal from "./SlotsModal";
+import BlackjackModal from "./BlackjackModal";
+import RouletteModal from "./RouletteModal";
+import CrashModal from "./CrashModal";
+import SneakModal from "./SneakModal";
+import DartWheelModal from "./DartWheelModal";
+import AviatorModal from "./AviatorModal";
+import TomatoesModal from "./TomatoesModal";
+import FootballModal from "./FootballModal";
+import GlassBridgeModal from "./GlassBridgeModal";
+import WantedModal from "./WantedModal";
+import CustomSlotsModal from "./CustomSlotsModal";
+import CustomPlinkoModal from "./CustomPlinkoModal";
+import CustomMinesModal from "./CustomMinesModal";
+import CustomCrashModal from "./CustomCrashModal";
+import AIGameModal from "./AIGameModal";
+import { useEffect } from "react";
 
 export default function HomeContent() {
     const [isPlinkoOpen, setIsPlinkoOpen] = useState(false);
@@ -18,6 +36,47 @@ export default function HomeContent() {
     const [isInfluencerOpen, setIsInfluencerOpen] = useState(false);
     const [isEscapeOpen, setIsEscapeOpen] = useState(false);
     const [isBombOpen, setIsBombOpen] = useState(false);
+    const [isMinesOpen, setIsMinesOpen] = useState(false);
+    const [isSlotsOpen, setIsSlotsOpen] = useState(false);
+    const [isBlackjackOpen, setIsBlackjackOpen] = useState(false);
+    const [isRouletteOpen, setIsRouletteOpen] = useState(false);
+    const [isCrashOpen, setIsCrashOpen] = useState(false);
+    const [isSneakOpen, setIsSneakOpen] = useState(false);
+    const [isDartOpen, setIsDartOpen] = useState(false);
+    const [isAviatorOpen, setIsAviatorOpen] = useState(false);
+    const [isTomatoesOpen, setIsTomatoesOpen] = useState(false);
+    const [isFootballOpen, setIsFootballOpen] = useState(false);
+    const [isBridgeOpen, setIsBridgeOpen] = useState(false);
+    const [isWantedOpen, setIsWantedOpen] = useState(false);
+
+    // Custom Game states
+    const [activeCustomGame, setActiveCustomGame] = useState<any>(null);
+    const [isCustomSlotsOpen, setIsCustomSlotsOpen] = useState(false);
+    const [isCustomPlinkoOpen, setIsCustomPlinkoOpen] = useState(false);
+    const [isCustomMinesOpen, setIsCustomMinesOpen] = useState(false);
+    const [isCustomCrashOpen, setIsCustomCrashOpen] = useState(false);
+    const [isAIGameOpen, setIsAIGameOpen] = useState(false);
+    const [customGames, setCustomGames] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchCustomGames = () => {
+            const data = localStorage.getItem('custom_published_games');
+            if (data) {
+                try {
+                    setCustomGames(JSON.parse(data));
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+        };
+        fetchCustomGames();
+        window.addEventListener('storage', fetchCustomGames);
+        return () => window.removeEventListener('storage', fetchCustomGames);
+    }, []);
+
+    const [originalsPage, setOriginalsPage] = useState(0);
+    const [pageDirection, setPageDirection] = useState(0);
+    const ITEMS_PER_PAGE = 12;
 
     // State for PlinkoModal demo when accessed from home
     const [diamonds, setDiamonds] = useState(100000);
@@ -27,6 +86,7 @@ export default function HomeContent() {
         { name: "Plinko", image: "/images/game-plinko.png", rtp: "99.0%" },
         { name: "Heist", image: "/images/game-heist-v2.png", rtp: "98.5%" },
         { name: "Influencer", image: "/images/game-influencer-v2.png", rtp: "97.8%" },
+        { name: "Wanted", image: "/images/game-influencer-run.png", rtp: "98.1%" },
         { name: "Escape", image: "/images/game-escape-v3.png", rtp: "98.2%" },
         { name: "Bomb Defuse", image: "/images/game-bomb-v2.png", rtp: "99.1%" },
         { name: "Crash", image: "/images/game-crash.png", rtp: "99.0%" },
@@ -34,7 +94,16 @@ export default function HomeContent() {
         { name: "Slots", image: "/images/game-slots.png", rtp: "99.0%" },
         { name: "Blackjack", image: "/images/game-blackjack.png", rtp: "99.5%" },
         { name: "Roulette", image: "/images/game-roulette.png", rtp: "97.3%" },
+        { name: "Secret Sneak", image: "/images/game-secret-sneak.png", rtp: "98.5%" },
+        { name: "Dart Wheel", image: "/images/game-dart-wheel.png", rtp: "97.5%" },
+        { name: "Aviator", image: "/images/game-aviator.png", rtp: "98.8%" },
+        { name: "Tomatoes", image: "/images/game-tomatoes.png", rtp: "98.0%" },
+        { name: "Penalty", image: "/images/game-football.png", rtp: "97.5%" },
+        { name: "Glass Bridge", image: "/images/game-glass-bridge.png", rtp: "96.5%" },
     ];
+
+    const totalPages = Math.ceil(originals.length / ITEMS_PER_PAGE);
+    const paginatedOriginals = originals.slice(originalsPage * ITEMS_PER_PAGE, (originalsPage + 1) * ITEMS_PER_PAGE);
 
     const topCreators = [
         { name: "AlexGaming", followers: "24.5K", image: "/images/creator-1.png" },
@@ -104,7 +173,7 @@ export default function HomeContent() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3 }}
-                        className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6 text-white leading-[1.1] tracking-tight drop-shadow-2xl"
+                        className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6 text-white leading-[1.1] tracking-tighter drop-shadow-2xl"
                     >
                         Create. Play.<br />
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00b9f0] to-white drop-shadow-sm">Win Together.</span>
@@ -145,34 +214,82 @@ export default function HomeContent() {
                     PlayForges Originals
                 </h2>
                 <div className="flex gap-2">
-                    <button className="p-2 rounded-full bg-[#1a2c38] hover:bg-[#2f4553] text-white transition-colors border border-white/5">
+                    <button
+                        onClick={() => { setPageDirection(-1); setOriginalsPage(p => Math.max(0, p - 1)); }}
+                        disabled={originalsPage === 0}
+                        className="p-2 rounded-full bg-[#1a2c38] hover:bg-[#2f4553] text-white transition-colors border border-white/5 disabled:opacity-50"
+                    >
                         <ChevronLeft size={20} />
                     </button>
-                    <button className="p-2 rounded-full bg-[#1a2c38] hover:bg-[#2f4553] text-white transition-colors border border-white/5">
+                    <button
+                        onClick={() => { setPageDirection(1); setOriginalsPage(p => Math.min(totalPages - 1, p + 1)); }}
+                        disabled={originalsPage >= totalPages - 1}
+                        className="p-2 rounded-full bg-[#1a2c38] hover:bg-[#2f4553] text-white transition-colors border border-white/5 disabled:opacity-50"
+                    >
                         <ChevronRight size={20} />
                     </button>
                 </div>
             </motion.div>
 
-            <motion.div
-                variants={item}
-                className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-16"
-            >
-                {originals.map((game, index) => (
-                    <div key={index} className="cursor-pointer" onClick={() => {
-                        if (game.name === 'Plinko') setIsPlinkoOpen(true);
-                        if (game.name === 'Heist') setIsHeistOpen(true);
-                        if (game.name === 'Influencer') setIsInfluencerOpen(true);
-                        if (game.name === 'Escape') setIsEscapeOpen(true);
-                        if (game.name === 'Bomb Defuse') setIsBombOpen(true);
-                    }}>
-                        <GameCard
-                            name={game.name}
-                            image={game.image}
-                            rtp={game.rtp}
-                        />
-                    </div>
-                ))}
+            <motion.div variants={item} className="mb-16 overflow-hidden max-w-full">
+                <AnimatePresence custom={pageDirection} mode="wait">
+                    <motion.div
+                        key={originalsPage}
+                        custom={pageDirection}
+                        variants={{
+                            enter: (direction: number) => ({
+                                x: direction > 0 ? 100 : -100,
+                                opacity: 0
+                            }),
+                            center: {
+                                zIndex: 1,
+                                x: 0,
+                                opacity: 1
+                            },
+                            exit: (direction: number) => ({
+                                zIndex: 0,
+                                x: direction < 0 ? 100 : -100,
+                                opacity: 0
+                            })
+                        }}
+                        initial="enter"
+                        animate="center"
+                        exit="exit"
+                        transition={{
+                            x: { type: "tween", duration: 0.2 },
+                            opacity: { duration: 0.2 }
+                        }}
+                        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6"
+                    >
+                        {paginatedOriginals.map((game, index) => (
+                            <div key={index} className="cursor-pointer" onClick={() => {
+                                if (game.name === 'Plinko') setIsPlinkoOpen(true);
+                                if (game.name === 'Heist') setIsHeistOpen(true);
+                                if (game.name === 'Influencer') setIsInfluencerOpen(true);
+                                if (game.name === 'Wanted') setIsWantedOpen(true);
+                                if (game.name === 'Escape') setIsEscapeOpen(true);
+                                if (game.name === 'Bomb Defuse') setIsBombOpen(true);
+                                if (game.name === 'Mines') setIsMinesOpen(true);
+                                if (game.name === 'Slots') setIsSlotsOpen(true);
+                                if (game.name === 'Blackjack') setIsBlackjackOpen(true);
+                                if (game.name === 'Roulette') setIsRouletteOpen(true);
+                                if (game.name === 'Crash') setIsCrashOpen(true);
+                                if (game.name === 'Secret Sneak') setIsSneakOpen(true);
+                                if (game.name === 'Dart Wheel') setIsDartOpen(true);
+                                if (game.name === 'Aviator') setIsAviatorOpen(true);
+                                if (game.name === 'Tomatoes') setIsTomatoesOpen(true);
+                                if (game.name === 'Penalty') setIsFootballOpen(true);
+                                if (game.name === 'Glass Bridge') setIsBridgeOpen(true);
+                            }}>
+                                <GameCard
+                                    name={game.name}
+                                    image={game.image}
+                                    rtp={game.rtp}
+                                />
+                            </div>
+                        ))}
+                    </motion.div>
+                </AnimatePresence>
             </motion.div>
 
             <PlinkoModal
@@ -187,6 +304,80 @@ export default function HomeContent() {
             <InfluencerModal isOpen={isInfluencerOpen} onClose={() => setIsInfluencerOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
             <EscapeModal isOpen={isEscapeOpen} onClose={() => setIsEscapeOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
             <BombModal isOpen={isBombOpen} onClose={() => setIsBombOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <MinesModal isOpen={isMinesOpen} onClose={() => setIsMinesOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <SlotsModal isOpen={isSlotsOpen} onClose={() => setIsSlotsOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <BlackjackModal isOpen={isBlackjackOpen} onClose={() => setIsBlackjackOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <RouletteModal isOpen={isRouletteOpen} onClose={() => setIsRouletteOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <CrashModal isOpen={isCrashOpen} onClose={() => setIsCrashOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <SneakModal isOpen={isSneakOpen} onClose={() => setIsSneakOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <DartWheelModal isOpen={isDartOpen} onClose={() => setIsDartOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <AviatorModal isOpen={isAviatorOpen} onClose={() => setIsAviatorOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <TomatoesModal isOpen={isTomatoesOpen} onClose={() => setIsTomatoesOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <FootballModal isOpen={isFootballOpen} onClose={() => setIsFootballOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <GlassBridgeModal isOpen={isBridgeOpen} onClose={() => setIsBridgeOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <WantedModal isOpen={isWantedOpen} onClose={() => setIsWantedOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+
+            <CustomSlotsModal
+                isOpen={isCustomSlotsOpen}
+                onClose={() => { setIsCustomSlotsOpen(false); setActiveCustomGame(null); }}
+                gameData={activeCustomGame}
+                diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins}
+            />
+            <CustomPlinkoModal
+                isOpen={isCustomPlinkoOpen}
+                onClose={() => { setIsCustomPlinkoOpen(false); setActiveCustomGame(null); }}
+                gameData={activeCustomGame}
+                diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins}
+            />
+            <CustomMinesModal
+                isOpen={isCustomMinesOpen}
+                onClose={() => { setIsCustomMinesOpen(false); setActiveCustomGame(null); }}
+                gameData={activeCustomGame}
+                diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins}
+            />
+            <CustomCrashModal
+                isOpen={isCustomCrashOpen}
+                onClose={() => { setIsCustomCrashOpen(false); setActiveCustomGame(null); }}
+                gameData={activeCustomGame}
+                diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins}
+            />
+            {activeCustomGame && (
+                <AIGameModal
+                    isOpen={isAIGameOpen}
+                    onClose={() => { setIsAIGameOpen(false); setActiveCustomGame(null); }}
+                    gameData={activeCustomGame}
+                    diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins}
+                />
+            )}
+
+            {/* Creator Games Section */}
+            {customGames.length > 0 && (
+                <motion.div variants={item} className="mb-16">
+                    <div className="flex justify-between items-end mb-6">
+                        <h2 className="text-2xl font-bold text-white flex items-center gap-3 before:content-[''] before:w-1 before:h-6 before:bg-purple-500 before:rounded-full">
+                            Creator Games
+                        </h2>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+                        {customGames.map((game: any, index: number) => (
+                            <div key={index} className="cursor-pointer" onClick={() => {
+                                setActiveCustomGame(game);
+                                if (game.type === 'ai_generated' || game.type === 'manual_template') setIsAIGameOpen(true);
+                                else if (game.type === 'slots') setIsCustomSlotsOpen(true);
+                                else if (game.type === 'plinko') setIsCustomPlinkoOpen(true);
+                                else if (game.type === 'mines') setIsCustomMinesOpen(true);
+                                else if (game.type === 'crash') setIsCustomCrashOpen(true);
+                            }}>
+                                <GameCard
+                                    name={game.name}
+                                    image={game.coverImage}
+                                    rtp="99.0%"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </motion.div>
+            )}
 
             {/* Popular Creators Section */}
             <motion.div variants={item} className="flex justify-between items-end mb-6">

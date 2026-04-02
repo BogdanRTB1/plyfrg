@@ -23,6 +23,7 @@ import { useMobileNav } from "@/components/MobileNavProvider";
 export default function Sidebar() {
     const pathname = usePathname();
     const [user, setUser] = useState<any>(null);
+    const [isCreator, setIsCreator] = useState(false);
     const supabase = createClient();
     const { isOpen, setIsOpen } = useMobileNav();
 
@@ -37,12 +38,40 @@ export default function Sidebar() {
             setUser(session?.user ?? null);
         });
 
-        return () => subscription.unsubscribe();
+        const checkCreatorStatus = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            const added = localStorage.getItem('added_creators');
+            if (added) {
+                try {
+                    const parsedAdded = JSON.parse(added);
+                    if (user && parsedAdded && parsedAdded.length > 0) {
+                        const isMatched = parsedAdded.some((c: any) => c.email === user.email || String(c.id) === String(user.id) || c.userId === user.id);
+                        setIsCreator(isMatched);
+                    } else {
+                        setIsCreator(false);
+                    }
+                } catch (e) { }
+            } else {
+                setIsCreator(false);
+            }
+        };
+
+        checkCreatorStatus();
+
+        // Listen for storage changes in case they create an account in another tab or same window
+        window.addEventListener('storage', checkCreatorStatus);
+
+        return () => {
+            subscription.unsubscribe();
+            window.removeEventListener('storage', checkCreatorStatus);
+        };
     }, []);
 
     const sidebarItems = [
         { icon: <HomeIcon size={20} />, label: "Lobby", href: "/" },
-        { icon: <Rocket size={20} />, label: "Become a Creator", href: "/become-creator" },
+        isCreator
+            ? { icon: <Rocket size={20} />, label: "Creator Studio", href: "/creator-studio" }
+            : { icon: <Rocket size={20} />, label: "Become a Creator", href: "/become-creator" },
         { icon: <Flame size={20} />, label: "Trending", href: "/trending" },
         { icon: <Dices size={20} />, label: "Casino", href: "/casino" },
         { icon: <Star size={20} />, label: "Originals", href: "/originals" },

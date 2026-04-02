@@ -7,46 +7,20 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import confetti from "canvas-confetti";
 import { createPortal } from "react-dom";
 
-// INFLUENCER/ADMIN CUSTOMIZATION CONFIG
-export const PLINKO_CONFIG = {
-    theme: {
-        background: "bg-[#0f212e]",
-        panelBg: "bg-[#121c22]",
-        accent: "text-purple-500",
-        buttonAccent: "bg-purple-600 hover:bg-purple-500",
-        gameBg: "bg-[#0a1114]", // very dark background for the board
-        pinColor: "bg-white",
-        pinGlow: "shadow-[0_0_5px_rgba(255,255,255,0.8)]",
-        ballColor: "bg-purple-500",
-        ballGlow: "shadow-[0_0_10px_#a855f7]"
-    },
-    names: {
-        title: "Plinko"
-    },
-    physics: {
-        rows: 16,
-        pinSize: 4,
-        ballSize: 8,
-        width: 600,
-        height: 400
-    },
-    multipliers: [110, 41, 10, 5, 3, 1.5, 1, 0.5, 0.3, 0.5, 1, 1.5, 3, 5, 10, 41, 110]
-};
-
-interface PlinkoModalProps {
+interface CustomPlinkoModalProps {
     isOpen: boolean;
     onClose: () => void;
+    gameData: any;
     diamonds: number;
     setDiamonds: React.Dispatch<React.SetStateAction<number>>;
     forgesCoins: number;
     setForgesCoins: React.Dispatch<React.SetStateAction<number>>;
 }
 
-export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, forgesCoins, setForgesCoins }: PlinkoModalProps) {
+export default function CustomPlinkoModal({ isOpen, onClose, gameData, diamonds, setDiamonds, forgesCoins, setForgesCoins }: CustomPlinkoModalProps) {
     const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
     const balance = currencyType === 'GC' ? diamonds : forgesCoins;
 
-    // Default bet amounts based on currency type
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
     const [history, setHistory] = useState<number[]>([]);
@@ -54,19 +28,20 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
     const [pins, setPins] = useState<{ x: number; y: number }[]>([]);
     const [ballPath, setBallPath] = useState<{ x: number; y: number }[]>([]);
 
-    // Refs for cleanup
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Game constants from config
-    const ROWS = PLINKO_CONFIG.physics.rows;
-    const PIN_SIZE = PLINKO_CONFIG.physics.pinSize;
-    const BALL_SIZE = PLINKO_CONFIG.physics.ballSize;
-    const WIDTH = PLINKO_CONFIG.physics.width;
-    const HEIGHT = PLINKO_CONFIG.physics.height;
-    const MULTIPLIERS = PLINKO_CONFIG.multipliers;
+    // Dynamic config based on user's custom game data
+    const ROWS = 16;
+    const PIN_SIZE = 4;
+    const BALL_SIZE = 12; // Slightly larger for custom assets
+    const WIDTH = 600;
+    const HEIGHT = 400;
+
+    // Fallback if no multipliers provided
+    const MULTIPLIERS = gameData?.config?.multipliers || [100, 20, 5, 2, 0.5, 0.2, 0.2, 0.5, 2, 5, 20, 100];
+    const BALL_IMAGE = gameData?.config?.ballImage;
 
     useEffect(() => {
-        // Generate pins
         const newPins = [];
         const spacingX = WIDTH / (ROWS + 2);
         const spacingY = HEIGHT / (ROWS + 2);
@@ -83,10 +58,10 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
-    }, []);
+    }, [ROWS, WIDTH, HEIGHT]);
 
     const dropBall = useCallback(() => {
-        if (dropping || balance < betAmount) return;
+        if (!gameData || dropping || balance < betAmount || betAmount <= 0) return;
 
         if (currencyType === 'GC') {
             setDiamonds(prev => prev - betAmount);
@@ -95,9 +70,8 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
         }
 
         setDropping(true);
-        setBallPath([]); // Clear previous path immediately
+        setBallPath([]);
 
-        // Calculate path
         let currentX = WIDTH / 2;
         let currentY = 20;
         const spacingX = WIDTH / (ROWS + 2);
@@ -110,14 +84,15 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
             bucketIndex += direction === 1 ? 1 : 0;
             currentX += (direction * spacingX) / 2;
             currentY += spacingY;
-            // Add some randomness/bounce to path
             path.push({
                 x: currentX + (Math.random() - 0.5) * 5,
                 y: currentY
             });
         }
 
-        // Animate ball
+        // Clamp bucket index to multipliers array length to avoid undefined
+        const clampedBucketIndex = Math.min(Math.max(bucketIndex, 0), MULTIPLIERS.length - 1);
+
         let step = 0;
 
         if (intervalRef.current) clearInterval(intervalRef.current);
@@ -127,11 +102,9 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                 if (intervalRef.current) clearInterval(intervalRef.current);
                 intervalRef.current = null;
 
-                // Ensure path has data before accessing logic
                 if (path.length > 0) {
-                    // Determine multiplier - logic simplified for determinism/demo
-                    const randomBucketForDemo = Math.floor(Math.random() * MULTIPLIERS.length);
-                    const multiplier = MULTIPLIERS[randomBucketForDemo];
+                    // For custom games, we use the actual calculated bucket based on the path
+                    const multiplier = MULTIPLIERS[clampedBucketIndex];
 
                     const winAmount = betAmount * multiplier;
                     setLastWin({ amount: winAmount, currency: currencyType });
@@ -145,11 +118,7 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                     setHistory(prev => [multiplier, ...prev].slice(0, 5));
 
                     if (multiplier >= 10) {
-                        confetti({
-                            particleCount: 100,
-                            spread: 70,
-                            origin: { y: 0.6 }
-                        });
+                        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
                     }
                 }
 
@@ -163,9 +132,8 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                 step++;
             }
         }, 50);
-    }, [dropping, balance, betAmount, ROWS, WIDTH, HEIGHT, MULTIPLIERS, currencyType, setDiamonds, setForgesCoins]);
+    }, [dropping, balance, betAmount, ROWS, WIDTH, HEIGHT, MULTIPLIERS, currencyType, setDiamonds, setForgesCoins, gameData]);
 
-    // Handle bet change (similar to other modals)
     const handleBetChange = (amount: number) => {
         if (dropping) return;
         let newAmount = Math.max(0, amount);
@@ -173,7 +141,6 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
         setBetAmount(Number(newAmount.toFixed(2)));
     };
 
-    // Handle closing via parent prop, ensure cleanup
     useEffect(() => {
         if (!isOpen) {
             if (intervalRef.current) {
@@ -185,10 +152,9 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
         }
     }, [isOpen]);
 
-    if (!isOpen) return null;
+    if (!isOpen || !gameData) return null;
     if (typeof document === "undefined") return null;
 
-    // Safe ball position access
     const lastBallPos = ballPath.length > 0 ? ballPath[ballPath.length - 1] : null;
 
     return createPortal(
@@ -197,19 +163,19 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className={`${PLINKO_CONFIG.theme.background} rounded-2xl w-full max-w-5xl border border-white/10 shadow-2xl overflow-hidden flex flex-col md:flex-row h-[600px] sm:h-[700px]`}
+                className={`bg-[#0f212e] rounded-2xl w-full max-w-5xl border border-blue-500/30 shadow-[0_0_50px_rgba(59,130,246,0.15)] overflow-hidden flex flex-col md:flex-row h-[600px] sm:h-[700px]`}
             >
                 {/* ADVANCED BETTING MENU */}
-                <div className={`w-full md:w-80 ${PLINKO_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
+                <div className={`w-full md:w-80 bg-[#121c22] p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
                     <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center gap-2 text-white">
-                            <Play className={PLINKO_CONFIG.theme.accent} />
-                            <h2 className="text-xl font-black uppercase italic tracking-widest">{PLINKO_CONFIG.names.title}</h2>
+                        <div className="flex flex-col gap-1 text-white">
+                            <h2 className="text-xl font-black uppercase tracking-widest leading-none truncate w-[200px]">{gameData.name}</h2>
+                            <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest truncate w-[200px]">By {gameData.creatorName}</p>
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>
 
-                    <div className="bg-[#0f171c] p-1 rounded-xl flex border border-white/5">
+                    <div className="bg-[#0f171c] p-1 rounded-xl flex border border-white/5 mt-2">
                         <button onClick={() => setCurrencyType('GC')} disabled={dropping} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> Diamonds</button>
                         <button onClick={() => setCurrencyType('FC')} disabled={dropping} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> Coins</button>
                     </div>
@@ -228,13 +194,13 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                 value={betAmount}
                                 onChange={(e) => handleBetChange(Number(e.target.value))}
                                 disabled={dropping}
-                                className="w-full bg-[#0a1114] border border-white/10 focus:border-purple-500 focus:shadow-[0_0_10px_rgba(168,85,247,0.2)] rounded-xl py-3 pl-10 pr-4 text-white font-mono text-lg font-bold transition-all outline-none"
+                                className="w-full bg-[#0a1114] border border-white/10 focus:border-blue-500 focus:shadow-[0_0_10px_rgba(59,130,246,0.2)] rounded-xl py-3 pl-10 pr-4 text-white font-mono text-lg font-bold transition-all outline-none"
                             />
                         </div>
                         <div className="grid grid-cols-4 gap-2">
                             <button onClick={() => handleBetChange(betAmount / 2)} disabled={dropping} className="bg-[#1a2c38] hover:bg-[#2f4553] text-slate-300 hover:text-white text-xs font-bold py-2 rounded-lg border border-white/5 transition-colors">1/2</button>
                             <button onClick={() => handleBetChange(betAmount * 2)} disabled={dropping} className="bg-[#1a2c38] hover:bg-[#2f4553] text-slate-300 hover:text-white text-xs font-bold py-2 rounded-lg border border-white/5 transition-colors">2X</button>
-                            <button onClick={() => handleBetChange(balance)} disabled={dropping} className={`bg-[#1a2c38] hover:bg-[#2f4553] ${PLINKO_CONFIG.theme.accent} text-xs font-black py-2 rounded-lg border border-purple-500/30 transition-colors`}>MAX</button>
+                            <button onClick={() => handleBetChange(balance)} disabled={dropping} className={`bg-[#1a2c38] hover:bg-[#2f4553] text-blue-500 text-xs font-black py-2 rounded-lg border border-blue-500/30 transition-colors`}>MAX</button>
                         </div>
                     </div>
 
@@ -254,7 +220,7 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                     <button
                         onClick={dropBall}
                         disabled={dropping || balance < betAmount || betAmount <= 0}
-                        className={`w-full mt-auto text-white h-14 rounded-xl font-black text-xl tracking-widest uppercase transition-all shadow-[0_5px_20px_rgba(168,85,247,0.3)] disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-1 relative overflow-hidden group ${PLINKO_CONFIG.theme.buttonAccent}`}
+                        className={`w-full mt-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:brightness-110 text-white h-14 rounded-xl font-black text-xl tracking-widest uppercase transition-all shadow-[0_5px_20px_rgba(59,130,246,0.3)] disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-1 relative overflow-hidden group`}
                     >
                         <span className="relative z-10 flex gap-2 items-center justify-center">
                             {dropping ? <RotateCw className="animate-spin" /> : 'PLAY'}
@@ -263,12 +229,13 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                 </div>
 
                 {/* Game Board */}
-                <div className={`flex-1 relative ${PLINKO_CONFIG.theme.gameBg} p-4 overflow-hidden flex flex-col shadow-inner`}>
-                    <div className="hidden md:flex justify-between items-center mb-4">
+                <div className={`flex-1 relative bg-[#06090c] p-4 overflow-hidden flex flex-col shadow-inner`}>
+                    <div className="hidden md:flex justify-between items-center mb-4 z-20">
                         <div className="flex gap-2">
+                            <div className="text-xs text-slate-500 font-bold py-2 bg-black/50 px-3 rounded text-center">HISTORY:</div>
                             {history.map((mult, i) => (
                                 <div key={i} className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-xs border-b-2 ${mult >= 10 ? 'bg-amber-500 text-[#0f212e] border-amber-700' :
-                                    mult >= 2 ? 'bg-purple-500 text-white border-purple-700' :
+                                    mult >= 2 ? 'bg-blue-500 text-white border-blue-700' :
                                         mult < 1 ? 'bg-slate-700 text-slate-400 border-slate-900' :
                                             'bg-white text-[#0f212e] border-slate-300'
                                     }`}>
@@ -276,18 +243,15 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                 </div>
                             ))}
                         </div>
-                        <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-                            <X className="text-slate-400 hover:text-white" />
-                        </button>
                     </div>
 
-                    <div className="flex-1 relative flex items-center justify-center">
+                    <div className="flex-1 relative flex items-center justify-center mt-[-30px]">
                         <div className="relative" style={{ width: WIDTH, height: HEIGHT }}>
                             {/* Pins */}
                             {pins.map((pin, i) => (
                                 <div
                                     key={i}
-                                    className={`absolute rounded-full ${PLINKO_CONFIG.theme.pinColor} ${PLINKO_CONFIG.theme.pinGlow}`}
+                                    className={`absolute rounded-full bg-white/20 shadow-[0_0_5px_rgba(255,255,255,0.2)]`}
                                     style={{
                                         left: pin.x,
                                         top: pin.y,
@@ -297,13 +261,13 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                 />
                             ))}
 
-                            {/* Multipliers */}
-                            <div className="absolute bottom-0 flex justify-center gap-1 w-full px-8">
-                                {MULTIPLIERS.map((mult, i) => (
+                            {/* Multipliers - dynamically rendered from config array */}
+                            <div className="absolute bottom-0 flex justify-between gap-1 w-[600px] left-1/2 -translate-x-1/2 px-10">
+                                {MULTIPLIERS.map((mult: number, i: number) => (
                                     <div
                                         key={i}
-                                        className={`flex-1 h-8 rounded text-[10px] font-bold flex items-center justify-center text-[#0f212e] shadow-lg ${mult >= 10 ? 'bg-gradient-to-t from-amber-600 to-amber-400' :
-                                            mult >= 3 ? 'bg-gradient-to-t from-purple-600 to-purple-400 text-white' :
+                                        className={`flex-1 h-8 rounded text-[9px] font-bold flex items-center justify-center text-[#0f212e] shadow-lg overflow-hidden whitespace-nowrap px-0.5 ${mult >= 10 ? 'bg-gradient-to-t from-amber-600 to-amber-400' :
+                                            mult >= 2 ? 'bg-gradient-to-t from-blue-600 to-blue-400 text-white' :
                                                 mult < 1 ? 'bg-gradient-to-t from-slate-600 to-slate-400' :
                                                     'bg-gradient-to-t from-slate-200 to-white'
                                             }`}
@@ -316,7 +280,7 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                             {/* Ball */}
                             {lastBallPos && (
                                 <motion.div
-                                    className={`absolute ${PLINKO_CONFIG.theme.ballColor} rounded-full ${PLINKO_CONFIG.theme.ballGlow} z-10`}
+                                    className={`absolute z-10 flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.5)]`}
                                     style={{
                                         width: BALL_SIZE * 2,
                                         height: BALL_SIZE * 2,
@@ -326,7 +290,13 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                         top: lastBallPos.y - BALL_SIZE
                                     }}
                                     transition={{ duration: 0.05, ease: "linear" }}
-                                />
+                                >
+                                    {BALL_IMAGE ? (
+                                        <img src={BALL_IMAGE} className="w-full h-full object-cover rounded-full" alt="ball" />
+                                    ) : (
+                                        <div className="w-full h-full bg-blue-500 rounded-full" />
+                                    )}
+                                </motion.div>
                             )}
                         </div>
                     </div>

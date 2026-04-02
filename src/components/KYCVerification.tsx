@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import Tesseract from "tesseract.js";
+
 import { Camera, RefreshCw, Loader2, CheckCircle2, AlertCircle, Zap, ZapOff } from "lucide-react";
 
 interface KYCVerificationProps {
@@ -117,24 +117,40 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
         setErrorMsg("");
 
         try {
-            // Run Tesseract
-            const result = await Tesseract.recognize(
-                imageUrl,
-                'eng+ron', // Assuming English and Romanian for a Playforges demo, can be just eng
-                {
-                    logger: m => {
-                        if (m.status === 'recognizing text') {
-                            setProgress(Math.round(m.progress * 100));
-                        }
-                    }
-                }
-            );
+            // Simulate progress since API call doesn't have real-time progress
+            const progressInterval = setInterval(() => {
+                setProgress(prev => {
+                    if (prev >= 90) return 90;
+                    return prev + 10;
+                });
+            }, 500);
 
-            const text = result.data.text;
-            console.log("Extracted text:", text);
+            const response = await fetch('/api/verify-id', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ image: imageUrl }),
+            });
 
-            // Parse text to find date of birth and check if 21+
-            const ageStatus = verifyAge(text);
+            clearInterval(progressInterval);
+            setProgress(100);
+
+            if (!response.ok) {
+                throw new Error("Failed to verify document via API");
+            }
+
+            const result = await response.json();
+            console.log("Gemini Verification Result:", result);
+
+            let ageStatus: 'verified' | 'underage' | 'not_found' = 'not_found';
+            if (result.error === 'not_found') {
+                ageStatus = 'not_found';
+            } else if (result.isOver21) {
+                ageStatus = 'verified';
+            } else if (result.isOver21 === false) {
+                ageStatus = 'underage';
+            }
 
             if (ageStatus === 'verified') {
                 setStatus('success');
@@ -152,81 +168,11 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
                 setErrorMsg("We could not find a clear date of birth on the document provided. Please ensure it is clearly visible and try again.");
             }
         } catch (err) {
-            console.error("OCR Error:", err);
+            console.error("Verification Error:", err);
             setStatus('failed');
-            setErrorMsg("Failed to read the document. Please ensure good lighting and a clear view, then try again.");
+            setErrorMsg("Failed to analyze the document. Please ensure good lighting and a clear view, then try again.");
+            setProgress(0);
         }
-    };
-
-    const verifyAge = (text: string): 'verified' | 'underage' | 'not_found' => {
-        // Look for common date formats:
-        // DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
-        // YYYY.MM.DD, YYYY/MM/DD, YYYY-MM-DD
-        // YYMMDD (MRZ)
-
-        const dateRegexes = [
-            /\b(\d{2})[\.\/\-](\d{2})[\.\/\-](\d{4})\b/g, // DD.MM.YYYY
-            /\b(\d{4})[\.\/\-](\d{2})[\.\/\-](\d{2})\b/g, // YYYY.MM.DD
-        ];
-
-        let foundValidDOB = false;
-        let foundUnderageDOB = false;
-
-        const currentYear = new Date().getFullYear(); // 2026
-        // To be 21 in 2026, you must be born in 2005 or earlier.
-        // Even better, accurate calculation using exact dates, but OCR can be messy, 
-        // so checking the year is a solid heuristic for MVP.
-        const maxBirthYear = currentYear - 21;
-
-        // Collect all possible years from matches
-        const possibleYears: number[] = [];
-
-        // Match formats DD.MM.YYYY or YYYY.MM.DD
-        for (const regex of dateRegexes) {
-            let match;
-            while ((match = regex.exec(text)) !== null) {
-                const parts = [...match].slice(1); // the capturing groups
-                // One of these parts will be 4 digits (the year)
-                const yearPart = parts.find(p => p.length === 4);
-                if (yearPart) {
-                    const year = parseInt(yearPart, 10);
-                    possibleYears.push(year);
-                }
-            }
-        }
-
-        // Also look for MRZ DOB (YYMMDD) - usually on passport or ID back
-        // Format of MRZ DOB: 6 digits followed by M or F, e.g., 900512M
-        const mrzRegex = /\b(\d{2})(\d{2})(\d{2})[MF<]/gi;
-        let mrzMatch;
-        while ((mrzMatch = mrzRegex.exec(text)) !== null) {
-            const yy = parseInt(mrzMatch[1], 10);
-            // If yy is > 20 (e.g. 90), it's 1990. If yy < 20 (e.g. 05), it's 2005.
-            const year = yy + (yy > (currentYear % 100) ? 1900 : 2000);
-            possibleYears.push(year);
-        }
-
-        // Often OCR misses some punctuation, we can just look for freestanding 4-digit years between 1900 and currentYear
-        const yearRegex = new RegExp(`\\b(19\\d{2}|20[0-${currentYear - 2000}])\\b`, 'g');
-        let yearMatch;
-        while ((yearMatch = yearRegex.exec(text)) !== null) {
-            possibleYears.push(parseInt(yearMatch[1], 10));
-        }
-
-        console.log("Found possible years:", possibleYears);
-
-        // Analyze found years
-        for (const year of possibleYears) {
-            if (year >= 1900 && year <= maxBirthYear) {
-                foundValidDOB = true;
-            } else if (year > maxBirthYear && year <= currentYear) {
-                foundUnderageDOB = true;
-            }
-        }
-
-        if (foundValidDOB) return 'verified';
-        if (foundUnderageDOB) return 'underage';
-        return 'not_found';
     };
 
     const handleRetry = () => {

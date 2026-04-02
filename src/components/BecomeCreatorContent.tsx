@@ -2,10 +2,14 @@
 
 import { motion } from "framer-motion";
 import { Rocket, Zap, Globe, Coins, ArrowRight, Code, BarChart, Gem, Gamepad2 } from "lucide-react";
+import { useState } from "react";
 import Particles from "./Particles";
 import Link from "next/link";
+import CreatorApplicationModal from "./CreatorApplicationModal";
 
 export default function BecomeCreatorContent() {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
     const benefits = [
         {
             icon: <Globe className="text-blue-400" size={28} />,
@@ -103,7 +107,7 @@ export default function BecomeCreatorContent() {
                         <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
                             <div className="relative group">
                                 <div className="absolute -inset-1 bg-gradient-to-r from-[#00b9f0] via-blue-500 to-sky-600 rounded-xl blur opacity-60 group-hover:opacity-100 transition duration-500 group-hover:duration-200"></div>
-                                <button className="relative w-full sm:w-auto flex items-center justify-center gap-3 bg-[#0f212e] text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-[#152a3a] transition-colors">
+                                <button onClick={() => setIsModalOpen(true)} className="relative w-full sm:w-auto flex items-center justify-center gap-3 bg-[#0f212e] text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-[#152a3a] transition-colors">
                                     <span>Start Creating</span>
                                     <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
                                 </button>
@@ -247,7 +251,7 @@ export default function BecomeCreatorContent() {
                             Join the fastest growing web3 gaming platform today. Deployment takes less than 10 minutes.
                         </p>
 
-                        <button className="flex items-center gap-4 bg-white text-[#0f212e] px-10 py-5 rounded-2xl font-black text-xl hover:bg-slate-200 transition-colors shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105 duration-300">
+                        <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-4 bg-white text-[#0f212e] px-10 py-5 rounded-2xl font-black text-xl hover:bg-slate-200 transition-colors shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105 duration-300">
                             Apply as Creator
                             <ArrowRight size={24} />
                         </button>
@@ -255,6 +259,8 @@ export default function BecomeCreatorContent() {
                 </motion.div>
 
             </div>
+
+            <CreatorApplicationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
         </div>
     );
 }

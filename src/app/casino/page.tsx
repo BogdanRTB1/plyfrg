@@ -3,6 +3,17 @@
 import { Dices, Search, Filter, Sparkles, TrendingUp } from "lucide-react";
 import GameCard from "@/components/GameCard";
 import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import PlinkoModal from "@/components/PlinkoModal";
+import MinesModal from "@/components/MinesModal";
+import SlotsModal from "@/components/SlotsModal";
+import BlackjackModal from "@/components/BlackjackModal";
+import RouletteModal from "@/components/RouletteModal";
+import CrashModal from "@/components/CrashModal";
+import SneakModal from "@/components/SneakModal";
+import DartWheelModal from "@/components/DartWheelModal";
+import AviatorModal from "@/components/AviatorModal";
+import AIGameModal from "@/components/AIGameModal";
 
 export default function CasinoPage() {
     const allGames = [
@@ -21,9 +32,47 @@ export default function CasinoPage() {
         { name: "Space Gems", image: null, rtp: "97.0%", provider: "StarStudios" },
         { name: "Wild West Shootout", image: null, rtp: "96.2%", provider: "WesternGaming" },
         { name: "Cyberpunk Dice", image: null, rtp: "99.0%", provider: "CyberSlots" },
+        { name: "Secret Sneak", image: "/images/game-secret-sneak.png", rtp: "97.5%", provider: "StealthGames" },
+        { name: 'Dart Wheel', image: '/images/game-dart-wheel.png', rtp: "96.8%", provider: "SpinMasters" },
+        { name: 'Aviator', image: '/images/game-aviator.png', rtp: "97.0%", provider: "SkyHighGames" }
     ];
 
     const categories = ["All Games", "Influencers", "Slots", "Live Casino", "Table Games", "New Releases"];
+
+    const [isPlinkoOpen, setIsPlinkoOpen] = useState(false);
+    const [isMinesOpen, setIsMinesOpen] = useState(false);
+    const [isSlotsOpen, setIsSlotsOpen] = useState(false);
+    const [isBlackjackOpen, setIsBlackjackOpen] = useState(false);
+    const [isRouletteOpen, setIsRouletteOpen] = useState(false);
+    const [isCrashOpen, setIsCrashOpen] = useState(false);
+    const [isSneakOpen, setIsSneakOpen] = useState(false);
+    const [isDartOpen, setIsDartOpen] = useState(false);
+    const [isAviatorOpen, setIsAviatorOpen] = useState(false);
+
+    // AI / Custom game states
+    const [customGames, setCustomGames] = useState<any[]>([]);
+    const [activeCustomGame, setActiveCustomGame] = useState<any>(null);
+    const [isAIGameOpen, setIsAIGameOpen] = useState(false);
+
+    const [diamonds, setDiamonds] = useState(100000);
+    const [forgesCoins, setForgesCoins] = useState(100);
+
+    // Load custom published games from localStorage
+    useEffect(() => {
+        const fetchCustomGames = () => {
+            const data = localStorage.getItem('custom_published_games');
+            if (data) {
+                try {
+                    setCustomGames(JSON.parse(data));
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+        };
+        fetchCustomGames();
+        window.addEventListener('storage', fetchCustomGames);
+        return () => window.removeEventListener('storage', fetchCustomGames);
+    }, []);
 
     return (
         <div className="flex-1 h-full overflow-y-auto bg-[#050505] relative custom-scrollbar p-6 md:p-10 pb-32 z-0">
@@ -122,7 +171,17 @@ export default function CasinoPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 * (index % 10) }}
                     >
-                        <div className="relative h-full">
+                        <div className="relative h-full cursor-pointer" onClick={() => {
+                            if (game.name.includes('Plinko')) setIsPlinkoOpen(true);
+                            if (game.name.includes('Minesweeper')) setIsMinesOpen(true);
+                            if (game.name.includes('Slots')) setIsSlotsOpen(true);
+                            if (game.name.includes('Blackjack')) setIsBlackjackOpen(true);
+                            if (game.name.includes('Roulette')) setIsRouletteOpen(true);
+                            if (game.name === 'Crash') setIsCrashOpen(true);
+                            if (game.name === 'Secret Sneak') setIsSneakOpen(true);
+                            if (game.name === 'Dart Wheel') setIsDartOpen(true);
+                            if (game.name === 'Aviator') setIsAviatorOpen(true);
+                        }}>
                             <GameCard
                                 name={game.name}
                                 image={game.image || ""}
@@ -143,6 +202,68 @@ export default function CasinoPage() {
                     </motion.div>
                 ))}
             </motion.div>
+
+            {/* Creator / AI Games Section */}
+            {customGames.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                    className="mt-12"
+                >
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-1 h-6 bg-purple-500 rounded-full"></div>
+                        <h2 className="text-2xl font-bold text-white">Creator Games</h2>
+                        <span className="text-xs font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-3 py-1 rounded-full">{customGames.length} games</span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+                        {customGames.map((game: any, index: number) => (
+                            <motion.div
+                                key={game.id || index}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.05 * index }}
+                            >
+                                <div className="relative h-full cursor-pointer" onClick={() => {
+                                    setActiveCustomGame(game);
+                                    if (game.type === 'ai_generated' || game.type === 'manual_template') setIsAIGameOpen(true);
+                                }}>
+                                    <GameCard
+                                        name={game.name}
+                                        image={game.coverImage || ""}
+                                        rtp="99.0%"
+                                        provider={game.creatorName ? `@${game.creatorName}` : undefined}
+                                    />
+                                    <div className="absolute top-2 left-2 z-20">
+                                        <span className="px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider backdrop-blur-md border bg-fuchsia-500/90 text-white border-fuchsia-400/50 shadow-[0_0_10px_rgba(217,70,239,0.5)]">
+                                            AI
+                                        </span>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+                </motion.div>
+            )}
+
+            <PlinkoModal isOpen={isPlinkoOpen} onClose={() => setIsPlinkoOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <MinesModal isOpen={isMinesOpen} onClose={() => setIsMinesOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <SlotsModal isOpen={isSlotsOpen} onClose={() => setIsSlotsOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <BlackjackModal isOpen={isBlackjackOpen} onClose={() => setIsBlackjackOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <RouletteModal isOpen={isRouletteOpen} onClose={() => setIsRouletteOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <CrashModal isOpen={isCrashOpen} onClose={() => setIsCrashOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <SneakModal isOpen={isSneakOpen} onClose={() => setIsSneakOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <DartWheelModal isOpen={isDartOpen} onClose={() => setIsDartOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <AviatorModal isOpen={isAviatorOpen} onClose={() => setIsAviatorOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+
+            {activeCustomGame && (
+                <AIGameModal
+                    isOpen={isAIGameOpen}
+                    onClose={() => { setIsAIGameOpen(false); setActiveCustomGame(null); }}
+                    gameData={activeCustomGame}
+                    diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins}
+                />
+            )}
 
         </div>
     );

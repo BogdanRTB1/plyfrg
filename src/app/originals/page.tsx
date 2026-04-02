@@ -3,6 +3,20 @@
 import { Star, ShieldCheck, Zap, Info } from "lucide-react";
 import GameCard from "@/components/GameCard";
 import { motion } from "framer-motion";
+import { useState } from "react";
+import PlinkoModal from "@/components/PlinkoModal";
+import MinesModal from "@/components/MinesModal";
+import SlotsModal from "@/components/SlotsModal";
+import RouletteModal from "@/components/RouletteModal";
+import CrashModal from "@/components/CrashModal";
+import SneakModal from "@/components/SneakModal";
+import DartWheelModal from "@/components/DartWheelModal";
+import AviatorModal from "@/components/AviatorModal";
+import InfluencerModal from "@/components/InfluencerModal";
+import WantedModal from "@/components/WantedModal";
+import TomatoesModal from "@/components/TomatoesModal";
+import FootballModal from "@/components/FootballModal";
+import GlassBridgeModal from "@/components/GlassBridgeModal";
 
 export default function OriginalsPage() {
     const originalGames = [
@@ -13,8 +27,32 @@ export default function OriginalsPage() {
         { name: "Roulette", image: null, rtp: "99.0%", provider: "PlayForges", badge: "Live" },
         { name: "Wheel", image: null, rtp: "99.0%", provider: "PlayForges", badge: "Coming Soon" },
         { name: "Tower", image: null, rtp: "99.0%", provider: "PlayForges", badge: "Coming Soon" },
-        { name: "Keno", image: null, rtp: "99.0%", provider: "PlayForges", badge: "Coming Soon" },
+        { name: 'Secret Sneak', image: '/images/game-secret-sneak.png', rtp: "99.0%", provider: "PlayForges", badge: "Live" },
+        { name: 'Dart Wheel', image: '/images/game-dart-wheel.png', rtp: "99.0%", provider: "PlayForges", badge: "Live" },
+        { name: 'Aviator', image: '/images/game-aviator.png', rtp: "99.0%", provider: "PlayForges", badge: "Live" },
+        { name: "Influencer", image: "/images/game-influencer-v2.png", rtp: "97.8%", provider: "PlayForges", badge: "Live" },
+        { name: "Wanted", image: "/images/game-influencer-run.png", rtp: "98.1%", provider: "PlayForges", badge: "Live" },
+        { name: "Tomatoes", image: "/images/game-tomatoes.png", rtp: "98.0%", provider: "PlayForges", badge: "Live" },
+        { name: "Penalty", image: "/images/game-football.png", rtp: "97.5%", provider: "PlayForges", badge: "Live" },
+        { name: "Glass Bridge", image: "/images/game-glass-bridge.png", rtp: "96.5%", provider: "PlayForges", badge: "Live" },
     ];
+
+    const [isPlinkoOpen, setIsPlinkoOpen] = useState(false);
+    const [isMinesOpen, setIsMinesOpen] = useState(false);
+    const [isSlotsOpen, setIsSlotsOpen] = useState(false);
+    const [isRouletteOpen, setIsRouletteOpen] = useState(false);
+    const [isCrashOpen, setIsCrashOpen] = useState(false);
+    const [isSneakOpen, setIsSneakOpen] = useState(false);
+    const [isDartOpen, setIsDartOpen] = useState(false);
+    const [isAviatorOpen, setIsAviatorOpen] = useState(false);
+    const [isInfluencerOpen, setIsInfluencerOpen] = useState(false);
+    const [isWantedOpen, setIsWantedOpen] = useState(false);
+    const [isTomatoesOpen, setIsTomatoesOpen] = useState(false);
+    const [isFootballOpen, setIsFootballOpen] = useState(false);
+    const [isBridgeOpen, setIsBridgeOpen] = useState(false);
+
+    const [diamonds, setDiamonds] = useState(100000);
+    const [forgesCoins, setForgesCoins] = useState(100);
 
     return (
         <div className="flex-1 h-full overflow-y-auto bg-[#050505] relative custom-scrollbar p-6 md:p-10 pb-32 z-0">
@@ -98,7 +136,21 @@ export default function OriginalsPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 * index }}
                     >
-                        <div className="relative h-full group">
+                        <div className="relative h-full group cursor-pointer" onClick={() => {
+                            if (game.name === 'Plinko') setIsPlinkoOpen(true);
+                            if (game.name === 'Mines') setIsMinesOpen(true);
+                            if (game.name === 'Slots') setIsSlotsOpen(true);
+                            if (game.name === 'Roulette') setIsRouletteOpen(true);
+                            if (game.name === 'Crash') setIsCrashOpen(true);
+                            if (game.name === 'Secret Sneak') setIsSneakOpen(true);
+                            if (game.name === 'Dart Wheel') setIsDartOpen(true);
+                            if (game.name === 'Aviator') setIsAviatorOpen(true);
+                            if (game.name === 'Influencer') setIsInfluencerOpen(true);
+                            if (game.name === 'Wanted') setIsWantedOpen(true);
+                            if (game.name === 'Tomatoes') setIsTomatoesOpen(true);
+                            if (game.name === 'Penalty') setIsFootballOpen(true);
+                            if (game.name === 'Glass Bridge') setIsBridgeOpen(true);
+                        }}>
                             {/* Glow effect behind card for Originals */}
                             <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition duration-500 z-[-1]"></div>
 
@@ -112,7 +164,7 @@ export default function OriginalsPage() {
                             {/* Customized Badge for Originals */}
                             <div className="absolute top-2 left-2 z-20">
                                 <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-widest backdrop-blur-md border ${game.badge === 'Live' ? 'bg-amber-500/90 text-[#0f212e] border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)]' :
-                                        'bg-slate-800/90 text-slate-300 border-white/20 shadow-lg'
+                                    'bg-slate-800/90 text-slate-300 border-white/20 shadow-lg'
                                     }`}>
                                     {game.badge}
                                 </span>
@@ -130,6 +182,20 @@ export default function OriginalsPage() {
                     </motion.div>
                 ))}
             </motion.div>
+
+            <PlinkoModal isOpen={isPlinkoOpen} onClose={() => setIsPlinkoOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <MinesModal isOpen={isMinesOpen} onClose={() => setIsMinesOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <SlotsModal isOpen={isSlotsOpen} onClose={() => setIsSlotsOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <RouletteModal isOpen={isRouletteOpen} onClose={() => setIsRouletteOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <CrashModal isOpen={isCrashOpen} onClose={() => setIsCrashOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <SneakModal isOpen={isSneakOpen} onClose={() => setIsSneakOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <DartWheelModal isOpen={isDartOpen} onClose={() => setIsDartOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <AviatorModal isOpen={isAviatorOpen} onClose={() => setIsAviatorOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <InfluencerModal isOpen={isInfluencerOpen} onClose={() => setIsInfluencerOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <WantedModal isOpen={isWantedOpen} onClose={() => setIsWantedOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <TomatoesModal isOpen={isTomatoesOpen} onClose={() => setIsTomatoesOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <FootballModal isOpen={isFootballOpen} onClose={() => setIsFootballOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <GlassBridgeModal isOpen={isBridgeOpen} onClose={() => setIsBridgeOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
 
         </div>
     );
