@@ -33,6 +33,7 @@ export default function RootLayout({
         <ScrollReset />
         <CookieConsent />
         <KYCEnforcer />
+        <Toaster theme="dark" position="top-right" richColors />
         <MobileNavProvider>
           {/* Sidebar (Fixed Left) */}
           <Sidebar />
