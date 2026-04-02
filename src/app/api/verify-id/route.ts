@@ -21,9 +21,9 @@ export async function POST(req: Request) {
         const base64Data = image.split(',')[1];
         const mimeType = image.split(';')[0].split(':')[1] || 'image/jpeg';
 
-        const prompt = `Carefully find the date of birth on this ID card. The current year is 2026. Is this person 21 years old or older?
-If they are 21 or older, return EXACTLY: {"isOver21": true}
-If they are under 21, or if you cannot find a date of birth at all, return EXACTLY: {"isOver21": false}`;
+        const prompt = `Carefully find the date of birth on this ID card. The current year is 2026. Is this person 18 years old or older?
+If they are 18 or older, return EXACTLY: {"isOver18": true}
+If they are under 18, or if you cannot find a date of birth at all, return EXACTLY: {"isOver18": false}`;
 
         const result = await model.generateContent([
             prompt,
@@ -37,12 +37,12 @@ If they are under 21, or if you cannot find a date of birth at all, return EXACT
 
         const text = result.response.text();
         
-        let isOver21 = false;
+        let isOver18 = false;
         if (text.toLowerCase().includes('true')) {
-            isOver21 = true;
+            isOver18 = true;
         }
 
-        return NextResponse.json({ isOver21 });
+        return NextResponse.json({ isOver18 });
 
     } catch (error: any) {
         console.error('Error verifying ID with Gemini:', error);

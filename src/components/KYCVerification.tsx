@@ -68,7 +68,7 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
 
             const result = await response.json();
             
-            if (result.isOver21) {
+            if (result.isOver18) {
                 // Instantly pass verification
                 onSuccess();
             } else {
@@ -96,7 +96,7 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
     return (
         <div className="flex flex-col items-center justify-center w-full space-y-6">
             <div className="text-center w-full">
-                <h3 className="text-2xl font-bold text-white mb-2">Verify Age (21+)</h3>
+                <h3 className="text-2xl font-bold text-white mb-2">Verify Age (18+)</h3>
                 <p className="text-sm text-slate-400">
                     Upload a clear picture of your ID.
                 </p>
