@@ -41,16 +41,35 @@ export default function ProfilePage() {
                         isOwner: true
                     });
                 } else {
-                    // MOCK INTERFACE: For demonstration until a 'profiles' SQL table is built in Supabase
-                    setProfile({
-                        username: username,
-                        avatar: null,
-                        bio: "none",
-                        visibility: 'public', // force public
-                        email: null,
-                        joinDate: 'New User',
-                        isOwner: false
-                    });
+                    // Fetch public profile from Supabase profiles table
+                    const { data: publicProfile, error: profileError } = await supabase
+                        .from('profiles')
+                        .select('username, avatar_url, bio, created_at')
+                        .ilike('username', username)
+                        .single();
+
+                    if (publicProfile) {
+                        setProfile({
+                            username: publicProfile.username,
+                            avatar: publicProfile.avatar_url,
+                            bio: publicProfile.bio || "none",
+                            visibility: 'public',
+                            email: null,
+                            joinDate: publicProfile.created_at ? new Date(publicProfile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'New User',
+                            isOwner: false
+                        });
+                    } else {
+                        // Fallback if the user doesn't exist yet in the public table
+                        setProfile({
+                            username: username,
+                            avatar: null,
+                            bio: "none",
+                            visibility: 'public',
+                            email: null,
+                            joinDate: 'New User',
+                            isOwner: false
+                        });
+                    }
                 }
             } catch (err: any) {
                 setError("Could not load profile.");
