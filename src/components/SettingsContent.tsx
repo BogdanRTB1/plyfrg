@@ -146,7 +146,7 @@ export default function SettingsContent() {
             if (error) throw error;
 
             setUser({ ...user, displayName, bio });
-            toast.success("Profile updated successfully");
+            toast.success("Modified profile settings");
         } catch (error: any) {
             toast.error(error.message || "Error updating profile");
         } finally {

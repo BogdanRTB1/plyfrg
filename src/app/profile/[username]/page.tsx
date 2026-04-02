@@ -34,24 +34,21 @@ export default function ProfilePage() {
                     setProfile({
                         username: currentUserUsername,
                         avatar: user?.user_metadata?.avatar_url,
-                        bio: user?.user_metadata?.bio || "No bio yet.",
-                        visibility: user?.user_metadata?.profile_visibility || 'public',
+                        bio: user?.user_metadata?.bio || "none",
+                        visibility: 'public', // force public
                         email: user?.user_metadata?.show_email ? user?.email : null,
                         joinDate: new Date(user?.created_at as string).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
                         isOwner: true
                     });
                 } else {
                     // MOCK INTERFACE: For demonstration until a 'profiles' SQL table is built in Supabase
-                    // Ideally here you do: await supabase.from('profiles').select('*').eq('username', username).single()
-
-                    // Simulated random data for demo
                     setProfile({
                         username: username,
                         avatar: null,
-                        bio: `Hi, I'm ${username} and I love playing games on PlayForges!`,
-                        visibility: 'public', // Set to private to test private view
+                        bio: "none",
+                        visibility: 'public', // force public
                         email: null,
-                        joinDate: 'February 2026',
+                        joinDate: 'New User',
                         isOwner: false
                     });
                 }
@@ -65,11 +62,8 @@ export default function ProfilePage() {
         fetchProfile();
     }, [username, supabase]);
 
-    const achievements = [
-        { id: 1, title: 'First Win', icon: Trophy, color: 'text-yellow-400', bg: 'bg-yellow-400/10', date: 'Feb 10, 2026' },
-        { id: 2, title: 'High Roller', icon: Star, color: 'text-purple-400', bg: 'bg-purple-400/10', date: 'Feb 15, 2026' },
-        { id: 3, title: 'Jackpot Hunter', icon: Medal, color: 'text-[#00b9f0]', bg: 'bg-[#00b9f0]/10', date: 'Feb 20, 2026' },
-    ];
+    // New users shouldn't have any achievements by default
+    const achievements: any[] = [];
 
     if (loading) {
         return (
@@ -89,21 +83,7 @@ export default function ProfilePage() {
         );
     }
 
-    if (profile.visibility === 'private' && !profile.isOwner) {
-        return (
-            <div className="min-h-screen bg-[#071d2a] pt-24 px-4 sm:px-8 pb-12">
-                <div className="max-w-4xl mx-auto mt-20 text-center">
-                    <div className="bg-[#0f212e] rounded-3xl p-12 border border-white/5 relative overflow-hidden">
-                        <Lock size={64} className="text-slate-600 mx-auto mb-6 opacity-50" />
-                        <h1 className="text-3xl font-bold text-white mb-2">This profile is private</h1>
-                        <p className="text-slate-400 max-w-md mx-auto">
-                            {username} has chosen to keep their profile hidden from the public.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    // All profiles are public, removed privacy lock screen...
 
     return (
         <div className="min-h-[calc(100vh-80px)] bg-[#071d2a] pb-16">
@@ -179,15 +159,15 @@ export default function ProfilePage() {
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-center">
                                         <span className="text-slate-400 text-sm font-medium">Games Played</span>
-                                        <span className="text-white font-bold">1,204</span>
+                                        <span className="text-white font-bold">0</span>
                                     </div>
                                     <div className="flex justify-between items-center">
                                         <span className="text-slate-400 text-sm font-medium">Total Wins</span>
-                                        <span className="text-emerald-400 font-bold">458</span>
+                                        <span className="text-emerald-400 font-bold">0</span>
                                     </div>
                                     <div className="flex justify-between items-center">
                                         <span className="text-slate-400 text-sm font-medium">Favorite Game</span>
-                                        <span className="text-[#00b9f0] font-bold">Crypto Slots</span>
+                                        <span className="text-[#00b9f0] font-bold">none</span>
                                     </div>
                                 </div>
                             </div>
