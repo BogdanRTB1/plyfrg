@@ -10,8 +10,15 @@ export async function GET(request: Request) {
 
     if (code) {
         const supabase = await createClient()
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        if (!error) {
+        const { error, data } = await supabase.auth.exchangeCodeForSession(code)
+        if (!error && data?.user) {
+            const avatarUrl = data.user.user_metadata?.avatar_url;
+            // Block fetching avatars from discord or google so users must upload their own
+            if (avatarUrl && (avatarUrl.includes('googleusercontent') || avatarUrl.includes('discordapp') || avatarUrl.includes('githubusercontent'))) {
+                await supabase.auth.updateUser({
+                    data: { avatar_url: null }
+                });
+            }
             return NextResponse.redirect(`${origin}${next}`)
         }
     }

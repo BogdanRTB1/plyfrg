@@ -176,6 +176,15 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
         const existingCreators = JSON.parse(localStorage.getItem('added_creators') || '[]');
         localStorage.setItem('added_creators', JSON.stringify([newCreator, ...existingCreators]));
 
+        if (user) {
+            await supabase.from('notifications').insert({
+                user_id: user.id,
+                title: 'Welcome to Creators!',
+                message: 'Your application was accepted. You are now officially enrolled in the Playforges Creator Program!',
+                is_read: false
+            });
+        }
+
         onClose();
         setTimeout(() => setStep(1), 500);
 

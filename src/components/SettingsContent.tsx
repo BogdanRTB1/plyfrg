@@ -145,8 +145,15 @@ export default function SettingsContent() {
 
             if (error) throw error;
 
+            await supabase.from('notifications').insert({
+                user_id: user.id,
+                title: 'Profile Updated',
+                message: 'Your profile settings have been successfully saved.',
+                is_read: false
+            });
+
             setUser({ ...user, displayName, bio });
-            toast.success("Modified profile settings");
+            toast.success("Successfully saved");
         } catch (error: any) {
             toast.error(error.message || "Error updating profile");
         } finally {
@@ -211,6 +218,18 @@ export default function SettingsContent() {
 
             const { error } = await supabase.auth.updateUser({ password: newPassword });
             if (error) throw error;
+            
+            // Send notification about password change
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                await supabase.from('notifications').insert({
+                    user_id: user.id,
+                    title: 'Password Changed',
+                    message: 'Your account password was successfully updated. If this was not you, please contact support immediately.',
+                    is_read: false
+                });
+            }
+
             toast.success("Password updated successfully.");
             setCurrentPassword("");
             setNewPassword("");
@@ -274,6 +293,16 @@ export default function SettingsContent() {
             });
 
             if (error) throw error;
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                await supabase.from('notifications').insert({
+                    user_id: user.id,
+                    title: '2FA Enabled',
+                    message: 'Two-Factor Authentication was successfully enabled on your account.',
+                    is_read: false
+                });
+            }
 
             setMfaStatus('enabled');
             toast.success("Two-Factor Authentication successfully enabled!");
