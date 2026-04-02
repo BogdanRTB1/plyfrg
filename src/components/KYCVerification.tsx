@@ -24,7 +24,11 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
     const startCamera = async () => {
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { ideal: "environment" } } // Prefer back camera, but allow any
+                video: { 
+                    facingMode: { ideal: "environment" },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                } // Prefer back camera with high resolution
             });
             setStream(mediaStream);
             if (videoRef.current) {
@@ -98,9 +102,6 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
-        // Apply image filters to improve clarity on low-quality/blurry images before sending to AI
-        ctx.filter = 'grayscale(100%) contrast(150%) brightness(110%)';
-
         // Draw current video frame to canvas
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
@@ -110,7 +111,7 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
         }
 
         // Get image data URL
-        const imageUrl = canvas.toDataURL('image/jpeg');
+        const imageUrl = canvas.toDataURL('image/jpeg', 0.95);
         setCapturedImage(imageUrl);
         setStatus('processing');
         setProgress(0);
