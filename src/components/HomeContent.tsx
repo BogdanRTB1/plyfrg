@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { ChevronRight, ChevronLeft, Trophy, Zap, ShieldCheck, Flame, Gift, Clock, Twitter, Instagram, Youtube } from "lucide-react";
+import { ChevronRight, ChevronLeft, Trophy, Zap, ShieldCheck, Flame, Gift, Clock, Twitter, Instagram, Youtube, Dices } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 import GameCard from "@/components/GameCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
@@ -122,6 +123,48 @@ export default function HomeContent() {
         { game: "Mines", user: "BombSquad", multiplier: "5.45", payout: "$125.50", icon: "/images/game-mines.png" },
     ];
 
+    const pickRandomGame = () => {
+        toast.info("Let's see what we have got today...", { 
+            icon: <Dices className="text-[#00b9f0] animate-spin" />,
+            duration: 2500 
+        });
+        
+        setTimeout(() => {
+            const allGames = [...originals, ...customGames];
+            if (allGames.length === 0) return;
+            const seed = Math.floor(Math.random() * allGames.length);
+            const randomPick = allGames[seed];
+            
+            // Checks if it's a custom game vs original
+            if ('type' in randomPick) {
+                setActiveCustomGame(randomPick);
+                if (randomPick.type === 'ai_generated' || randomPick.type === 'manual_template') setIsAIGameOpen(true);
+                else if (randomPick.type === 'slots') setIsCustomSlotsOpen(true);
+                else if (randomPick.type === 'plinko') setIsCustomPlinkoOpen(true);
+                else if (randomPick.type === 'mines') setIsCustomMinesOpen(true);
+                else if (randomPick.type === 'crash') setIsCustomCrashOpen(true);
+            } else {
+                if (randomPick.name === 'Plinko') setIsPlinkoOpen(true);
+                else if (randomPick.name === 'Heist') setIsHeistOpen(true);
+                else if (randomPick.name === 'Influencer') setIsInfluencerOpen(true);
+                else if (randomPick.name === 'Wanted') setIsWantedOpen(true);
+                else if (randomPick.name === 'Escape') setIsEscapeOpen(true);
+                else if (randomPick.name === 'Bomb Defuse') setIsBombOpen(true);
+                else if (randomPick.name === 'Mines') setIsMinesOpen(true);
+                else if (randomPick.name === 'Slots') setIsSlotsOpen(true);
+                else if (randomPick.name === 'Blackjack') setIsBlackjackOpen(true);
+                else if (randomPick.name === 'Roulette') setIsRouletteOpen(true);
+                else if (randomPick.name === 'Crash') setIsCrashOpen(true);
+                else if (randomPick.name === 'Secret Sneak') setIsSneakOpen(true);
+                else if (randomPick.name === 'Dart Wheel') setIsDartOpen(true);
+                else if (randomPick.name === 'Aviator') setIsAviatorOpen(true);
+                else if (randomPick.name === 'Tomatoes') setIsTomatoesOpen(true);
+                else if (randomPick.name === 'Penalty') setIsFootballOpen(true);
+                else if (randomPick.name === 'Glass Bridge') setIsBridgeOpen(true);
+            }
+        }, 1500);
+    };
+
     const container = {
         hidden: { opacity: 0 },
         show: {
@@ -198,7 +241,7 @@ export default function HomeContent() {
                         transition={{ delay: 0.5 }}
                         className="flex flex-col sm:flex-row gap-3 md:gap-4"
                     >
-                        <button className="bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] px-8 py-3.5 rounded-full font-bold transition-all shadow-[0_0_20px_rgba(0,185,240,0.3)] hover:shadow-[0_0_30px_rgba(0,185,240,0.5)] hover:-translate-y-1 w-full sm:w-auto text-center">
+                        <button onClick={pickRandomGame} className="bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] px-8 py-3.5 rounded-full font-bold transition-all shadow-[0_0_20px_rgba(0,185,240,0.3)] hover:shadow-[0_0_30px_rgba(0,185,240,0.5)] hover:-translate-y-1 w-full sm:w-auto text-center">
                             Start Playing
                         </button>
                         <Link href="/creators" className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm px-8 py-3.5 rounded-full font-bold border border-white/10 transition-all hover:-translate-y-1 w-full sm:w-auto text-center flex items-center justify-center">

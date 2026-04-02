@@ -80,11 +80,27 @@ export default function Sidebar() {
         ...(user ? [{ icon: <Settings size={20} />, label: "Settings", href: "/settings" }] : []),
     ];
 
-    const favorites = [
-        { label: "Crash", color: "#f87171" },
-        { label: "Plinko", color: "#3b82f6" },
-        { label: "Mines", color: "#fbbf24" },
-    ];
+    const [favorites, setFavorites] = useState<{label: string, color: string}[]>([]);
+
+    useEffect(() => {
+        const loadFavorites = () => {
+            const stored = localStorage.getItem('playforges_favorites');
+            if (stored) {
+                try {
+                    setFavorites(JSON.parse(stored));
+                } catch(e) {}
+            } else {
+                setFavorites([
+                    { label: "Crash", color: "#f87171" },
+                    { label: "Plinko", color: "#3b82f6" },
+                    { label: "Mines", color: "#fbbf24" },
+                ]);
+            }
+        };
+        loadFavorites();
+        window.addEventListener('favorites_updated', loadFavorites);
+        return () => window.removeEventListener('favorites_updated', loadFavorites);
+    }, []);
 
     return (
         <>
