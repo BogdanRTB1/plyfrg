@@ -163,7 +163,7 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
             name: formData.displayName || formData.legalName || 'New Creator',
             role: "Content Creator",
             email: user?.email || "creator@playforges.com",
-            followers: formData.audienceSize === 'partner' ? '100K' : formData.audienceSize === 'established' ? '10K' : '1K',
+            followers: "0",
             description: formData.bio || formData.motivation || "A brand new creator on Playforges.",
             skills: [formData.contentType || 'Gaming', 'Community'],
             games: 0,
@@ -174,7 +174,18 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
         };
 
         const existingCreators = JSON.parse(localStorage.getItem('added_creators') || '[]');
-        localStorage.setItem('added_creators', JSON.stringify([newCreator, ...existingCreators]));
+        try {
+            localStorage.setItem('added_creators', JSON.stringify([newCreator, ...existingCreators]));
+        } catch (error) {
+            console.warn("Storage quota exceeded, storing without images.", error);
+            const fallbackCreator = { ...newCreator, profilePicture: null, bannerImage: null };
+            try {
+                localStorage.setItem('added_creators', JSON.stringify([fallbackCreator, ...existingCreators]));
+            } catch(e) {
+                const stripped = [fallbackCreator, ...existingCreators].map((c: any) => ({...c, profilePicture: null, bannerImage: null}));
+                localStorage.setItem('added_creators', JSON.stringify(stripped));
+            }
+        }
 
         if (user) {
             await supabase.from('notifications').insert({
@@ -189,17 +200,52 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
         setTimeout(() => setStep(1), 500);
 
         // Optionally redirect or show success toast
-        window.location.href = '/creators'; // Redirect to the View Creators page
+        window.location.href = `/profile/${encodeURIComponent(newCreator.name)}`; // Redirect to the Creator Profile page
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+    const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<string> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height = Math.round((height * maxWidth) / width);
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width = Math.round((width * maxHeight) / height);
+                            height = maxHeight;
+                        }
+                    }
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    
+                    resolve(canvas.toDataURL('image/jpeg', 0.7)); // Compress to JPEG to save significant space
+                };
+            };
+        });
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setFormData({ ...formData, [field]: reader.result as string });
-            };
-            reader.readAsDataURL(file); // Encode as base64 to save in localStorage for mockup
+            const maxWidth = field === 'bannerImage' ? 1200 : 300;
+            const maxHeight = field === 'bannerImage' ? 400 : 300;
+            const resizedBase64 = await resizeImage(file, maxWidth, maxHeight);
+            setFormData((prev: any) => ({ ...prev, [field]: resizedBase64 }));
         }
     };
 
@@ -554,8 +600,18 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
     };
 
     const isNextDisabled = () => {
+        if (step === 1) {
+            return !formData.contentType || !formData.audienceSize || !formData.motivation.trim();
+        }
+        if (step === 3) {
+            if (formData.taxType === 'business') {
+                return !formData.companyName.trim() || !formData.taxId.trim() || !formData.state;
+            } else {
+                return !formData.legalName.trim() || !formData.taxId.trim() || !formData.state;
+            }
+        }
         if (step === 4) {
-            return !formData.agreeToTerms || !formData.agreeToFinancialDisclosure;
+            return !formData.displayName.trim() || !formData.bio.trim() || !formData.profilePicture || !formData.bannerImage || !formData.agreeToTerms || !formData.agreeToFinancialDisclosure;
         }
         return false;
     };
@@ -662,7 +718,8 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
                                 {step < totalSteps && !isSubmitting && (
                                     <button
                                         onClick={nextStep}
-                                        className="flex-1 py-4 px-6 rounded-xl bg-gradient-to-r from-[#00b9f0] to-blue-600 text-white font-bold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(0,185,240,0.3)] hover:shadow-[0_0_30px_rgba(0,185,240,0.5)] flex items-center justify-center gap-2"
+                                        disabled={isNextDisabled()}
+                                        className={`flex-1 py-4 px-6 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(0,185,240,0.3)] hover:shadow-[0_0_30px_rgba(0,185,240,0.5)] flex items-center justify-center gap-2 ${isNextDisabled() ? 'bg-white/10 text-slate-500 cursor-not-allowed shadow-none hover:shadow-none' : 'bg-gradient-to-r from-[#00b9f0] to-blue-600 text-white hover:brightness-110 hover:-translate-y-1'}`}
                                     >
                                         Next Step
                                         <ArrowRight size={20} />

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Heart, MessageCircle, Share2, Flame, Trophy, Smartphone } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
+import FavoriteToggle from "./FavoriteToggle";
 import confetti from "canvas-confetti";
 
 const EVENTS = [
@@ -134,6 +135,7 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
                         <div className="flex items-center gap-2 text-white">
                             <Smartphone className="text-purple-500" />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">Viral</h2>
+                            <FavoriteToggle gameName="Viral" />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>

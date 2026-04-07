@@ -2,16 +2,26 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Lock, Unlock, Zap, Trophy, Goal } from "lucide-react";
+import { X, Lock, Unlock, Zap, Trophy, Goal, Crosshair } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
+import FavoriteToggle from "./FavoriteToggle";
 import confetti from "canvas-confetti";
+
+const HEIST_CONFIG = {
+    names: { title: "Heist" },
+    theme: { accent: "text-yellow-500" }
+};
 
 export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, forgesCoins, setForgesCoins }: any) {
     const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
     const balance = currencyType === 'GC' ? diamonds : forgesCoins;
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
+
+    // Session tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
 
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'CRASHED' | 'WON'>('IDLE');
     const [multiplier, setMultiplier] = useState(1.00);
@@ -27,6 +37,8 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         setGameState('PLAYING');
         setMultiplier(1.00);
@@ -65,6 +77,8 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
             setForgesCoins((prev: number) => prev + winAmount);
         }
 
+        setSessionPayout(prev => prev + winAmount);
+
         confetti({ particleCount: 200, spread: 90, colors: ['#ffe000', '#ffcc00', '#ffb300', '#ffffff'], origin: { y: 0.6 } });
     };
 
@@ -77,10 +91,33 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
 
     useEffect(() => {
         if (!isOpen) {
+            // Save session to history if any bets were made
+            if (sessionWagered > 0) {
+                const hist = JSON.parse(localStorage.getItem('playforges_history') || '[]');
+                hist.unshift({
+                    id: `session_${Math.floor(Math.random()*100000)}`,
+                    game: "Heist",
+                    image: "/images/game-heist-v2.png",
+                    time: new Date().toLocaleString(),
+                    bet: sessionWagered,
+                    multiplier: sessionWagered > 0 ? (sessionPayout / sessionWagered) : 0,
+                    payout: sessionPayout,
+                    status: (sessionPayout >= sessionWagered) ? 'win' : 'loss',
+                    provablyFair: "Verify",
+                    currency: currencyType
+                });
+                localStorage.setItem('playforges_history', JSON.stringify(hist.slice(0, 50)));
+                window.dispatchEvent(new Event('history_updated'));
+                
+                // Reset session
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
+
             if (timerRef.current) clearInterval(timerRef.current);
             setGameState('IDLE');
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout]);
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
@@ -97,8 +134,9 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
                 <div className="w-full md:w-80 bg-[#121c22] p-6 flex flex-col gap-4 border-r border-white/5 z-20">
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
-                            <Goal className="text-yellow-500" />
-                            <h2 className="text-xl font-black uppercase italic tracking-widest">Heist</h2>
+                            <Crosshair className={HEIST_CONFIG.theme.accent} />
+                            <h2 className="text-xl font-black uppercase italic tracking-widest">{HEIST_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={HEIST_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>

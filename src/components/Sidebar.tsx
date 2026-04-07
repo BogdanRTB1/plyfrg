@@ -90,11 +90,7 @@ export default function Sidebar() {
                     setFavorites(JSON.parse(stored));
                 } catch(e) {}
             } else {
-                setFavorites([
-                    { label: "Crash", color: "#f87171" },
-                    { label: "Plinko", color: "#3b82f6" },
-                    { label: "Mines", color: "#fbbf24" },
-                ]);
+                setFavorites([]);
             }
         };
         loadFavorites();
@@ -156,24 +152,27 @@ export default function Sidebar() {
                         );
                     })}
 
-                    <div className="mt-8 mb-4 px-4">
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Favorites</h3>
-                    </div>
+                    {favorites.length > 0 && (
+                        <div className="mt-8 mb-4 px-4">
+                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Favorites ({favorites.length}/5)</h3>
+                        </div>
+                    )}
 
                     <div className="space-y-1">
                         {favorites.map((fav, index) => (
-                            <Link
-                                href="#"
+                            <button
                                 key={index}
-                                onClick={() => setIsOpen(false)}
-                                className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-[#1a2c38]/50 hover:text-white transition-colors group"
+                                onClick={() => {
+                                    setIsOpen(false);
+                                    window.dispatchEvent(new CustomEvent('open_game', { detail: fav.label }));
+                                }}
+                                className="w-full flex items-center justify-between px-4 py-2 text-slate-400 hover:bg-[#1a2c38] hover:text-white rounded-lg transition-colors group"
                             >
-                                <div
-                                    className="w-2 h-2 rounded-full ring-2 ring-transparent group-hover:ring-white/10 transition-all"
-                                    style={{ backgroundColor: fav.color, boxShadow: `0 0 8px ${fav.color}40` }}
-                                />
-                                <span className="text-sm font-medium">{fav.label}</span>
-                            </Link>
+                                <span className="flex items-center gap-3">
+                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: fav.color }} />
+                                    {fav.label}
+                                </span>
+                            </button>
                         ))}
                     </div>
                 </nav>

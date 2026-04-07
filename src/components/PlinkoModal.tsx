@@ -6,6 +6,7 @@ import { X, Play, RotateCw } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import confetti from "canvas-confetti";
 import { createPortal } from "react-dom";
+import FavoriteToggle from "./FavoriteToggle";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
 export const PLINKO_CONFIG = {
@@ -50,6 +51,11 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
     const [history, setHistory] = useState<number[]>([]);
+    
+    // Session tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const [dropping, setDropping] = useState(false);
     const [pins, setPins] = useState<{ x: number; y: number }[]>([]);
     const [ballPath, setBallPath] = useState<{ x: number; y: number }[]>([]);
@@ -93,6 +99,8 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
         } else {
             setForgesCoins(prev => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         setDropping(true);
         setBallPath([]); // Clear previous path immediately
@@ -142,6 +150,8 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                         setForgesCoins(prev => prev + winAmount);
                     }
 
+                    setSessionPayout(prev => prev + winAmount);
+
                     setHistory(prev => [multiplier, ...prev].slice(0, 5));
 
                     if (multiplier >= 10) {
@@ -173,9 +183,27 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
         setBetAmount(Number(newAmount.toFixed(2)));
     };
 
-    // Handle closing via parent prop, ensure cleanup
+    // Handle closing via parent prop, ensure cleanup and session saving
     useEffect(() => {
         if (!isOpen) {
+            // Save session to history if any bets were made
+            if (sessionWagered > 0) {
+                // Record session for consolidated history
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: "Plinko", 
+                        gameImage: "/images/game-plinko.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
+                
+                // Reset session
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
+
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;
@@ -183,7 +211,7 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
             setDropping(false);
             setBallPath([]);
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout]);
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
@@ -205,6 +233,7 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                         <div className="flex items-center gap-2 text-white">
                             <Play className={PLINKO_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{PLINKO_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={PLINKO_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>

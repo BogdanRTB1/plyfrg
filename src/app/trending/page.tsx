@@ -1,31 +1,121 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { Flame, TrendingUp, Sparkles } from "lucide-react";
+import { Flame, TrendingUp, Sparkles, Users, Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import GameCard from "@/components/GameCard";
+import { motion, AnimatePresence } from "framer-motion";
+import { createClient } from "@/utils/supabase/client";
 
-import { motion } from "framer-motion";
+interface GameStat {
+    name: string;
+    image: string;
+    rtp: string;
+    provider: string;
+    recentPlayers: number;
+    weeklyAvg?: number;
+    monthlyAvg?: number;
+}
 
 export default function TrendingPage() {
-    const trendingGames = [
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const [trendingGames, setTrendingGames] = useState<GameStat[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const baseGames = [
         { name: "Crash", image: "/images/game-crash.png", rtp: "98.5%", provider: "InfluenBet" },
         { name: "Plinko", image: "/images/game-plinko.png", rtp: "99.0%", provider: "InfluenBet" },
         { name: "Mines", image: "/images/game-mines.png", rtp: "98.5%", provider: "InfluenBet" },
         { name: "Slots", image: "/images/game-slots.png", rtp: "96.5%", provider: "InfluenBet" },
         { name: "Blackjack", image: "/images/game-blackjack.png", rtp: "99.5%", provider: "InfluenBet" },
         { name: "Roulette", image: "/images/game-roulette.png", rtp: "97.3%", provider: "InfluenBet" },
+        { name: "Aviator", image: "/images/game-aviator.png", rtp: "97.0%", provider: "InfluenBet" },
+        { name: "Dart Wheel", image: "/images/game-darts.png", rtp: "98.0%", provider: "InfluenBet" },
+        { name: "Penalty", image: "/images/game-penalty.png", rtp: "96.0%", provider: "InfluenBet" },
+        { name: "Glass Bridge", image: "/images/game-bridge.png", rtp: "95.5%", provider: "InfluenBet" },
+        { name: "Wanted", image: "/images/game-wanted.png", rtp: "96.8%", provider: "InfluenBet" },
+        { name: "Escape", image: "/images/game-escape.png", rtp: "97.5%", provider: "InfluenBet" },
     ];
 
-    const risingStars = [
-        { name: "Dragon's Luck", provider: "Provider X", growth: "+240% Player Count", image: null },
-        { name: "Cosmic Spins", provider: "GalaxyGames", growth: "+180% Player Count", image: null },
-        { name: "Neon Rider", provider: "CyberSlots", growth: "+120% Player Count", image: null },
-    ];
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const supabase = createClient();
+                const now = new Date();
+                const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+                const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+                const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+                const { data: recentData } = await supabase
+                    .from('game_activity')
+                    .select('game_name, user_id')
+                    .gt('created_at', twentyFourHoursAgo);
+
+                const { data: weeklyData } = await supabase
+                    .from('game_activity')
+                    .select('game_name, user_id')
+                    .gt('created_at', sevenDaysAgo);
+
+                const { data: monthlyData } = await supabase
+                    .from('game_activity')
+                    .select('game_name, user_id')
+                    .gt('created_at', thirtyDaysAgo);
+
+                const getUniqueCount = (data: any[] | null, gameName: string) => {
+                    if (!data) return 0;
+                    const users = new Set(data.filter(d => d.game_name === gameName).map(d => d.user_id || `guest_${Math.random()}`));
+                    return users.size;
+                };
+
+                const mappedGames = baseGames.map(game => {
+                    const recent = getUniqueCount(recentData, game.name);
+                    const weekly = getUniqueCount(weeklyData, game.name);
+                    const monthly = getUniqueCount(monthlyData, game.name);
+
+                    return {
+                        ...game,
+                        recentPlayers: recent,
+                        weeklyAvg: Math.round(weekly / 7),
+                        monthlyAvg: Math.round(monthly / 30)
+                    };
+                }).sort((a, b) => b.recentPlayers - a.recentPlayers);
+
+                setTrendingGames(mappedGames);
+            } catch (err) {
+                console.error("Error fetching trending stats:", err);
+                setTrendingGames(baseGames.map(g => ({ ...g, recentPlayers: 0 })));
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStats();
+    }, []);
+
+    const scroll = (direction: 'left' | 'right') => {
+        if (scrollRef.current) {
+            const { scrollLeft, clientWidth } = scrollRef.current;
+            const scrollTo = direction === 'left' ? scrollLeft - clientWidth : scrollLeft + clientWidth;
+            scrollRef.current.scrollTo({ left: scrollTo, behavior: 'smooth' });
+        }
+    };
+
+    const playNow = (gameName: string) => {
+        // Dispatch event directly — GlobalGameModals will catch it regardless of path
+        window.dispatchEvent(new CustomEvent('open_game', { detail: gameName }));
+    };
+
+    const risingStars = trendingGames.slice(0, 3).map(g => ({
+        name: g.name,
+        provider: g.provider,
+        growth: `+${Math.round(Math.random() * 200 + 50)}% Growth`,
+        image: g.image
+    }));
 
     const creatorPicks = [
-        { name: "Space Gems", picker: "@Ninja", badge: "Featured", image: null },
-        { name: "Crypto Quest", picker: "@TechnoKing", badge: "Featured", image: null },
-        { name: "Pixel Poker", picker: "@RetroGamer", badge: "Featured", image: null },
+        { name: "Plinko", picker: "@Ninja", badge: "Live Now", image: "/images/game-plinko.png" },
+        { name: "Wanted", picker: "@TechnoKing", badge: "New Record", image: "/images/game-wanted.png" },
+        { name: "Blackjack", picker: "@RetroGamer", badge: "High Stakes", image: "/images/game-blackjack.png" },
     ];
 
     return (
@@ -37,59 +127,114 @@ export default function TrendingPage() {
                 className="mb-8"
             >
                 <div className="flex items-center gap-3 mb-2">
-                    <Flame className="text-orange-500" size={32} />
-                    <h1 className="text-3xl font-bold text-white">Trending Now</h1>
+                    <Flame className="text-orange-500 animate-pulse" size={32} />
+                    <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter">Trending Now</h1>
                 </div>
-                <p className="text-slate-400">The most played games in the last 24 hours.</p>
+                <p className="text-slate-400 font-medium font-sans">Discover what's hot. Real-time player counts from the last 24 hours.</p>
             </motion.div>
 
-            <div className="w-full h-px bg-slate-800 mb-8 opacity-50"></div>
+            {/* Navigation Arrows Row - Lowered */}
+            <div className="flex justify-between items-center mb-4">
+                 <div className="w-full h-px bg-slate-800 opacity-20 mr-8"></div>
+                 <div className="flex gap-2 items-center">
+                    <button 
+                        onClick={() => scroll('left')}
+                        className="p-2.5 rounded-full bg-[#1a2c38] hover:bg-[#2f4553] text-white transition-all border border-white/10 active:scale-90 shadow-lg hover:border-[#00b9f0]/40"
+                    >
+                        <ChevronLeft size={18} />
+                    </button>
+                    <button 
+                        onClick={() => scroll('right')}
+                        className="p-2.5 rounded-full bg-[#1a2c38] hover:bg-[#2f4553] text-white transition-all border border-white/10 active:scale-90 shadow-lg hover:border-[#00b9f0]/40"
+                    >
+                        <ChevronRight size={18} />
+                    </button>
+                </div>
+            </div>
 
-            {/* Top Trending Games Grid */}
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12"
-            >
-                {trendingGames.map((game, index) => (
-                    <GameCard
-                        key={index}
-                        name={game.name}
-                        image={game.image}
-                        rtp={game.rtp}
-                        provider={game.provider}
-                    />
-                ))}
-            </motion.div>
+            <AnimatePresence mode="wait">
+                {loading ? (
+                    <div className="flex gap-4 overflow-hidden mb-12">
+                        {[1, 2, 3, 4, 5, 6].map(i => (
+                            <div key={i} className="min-w-[160px] md:min-w-[200px] aspect-[3/4] bg-[#0f212e] rounded-2xl animate-pulse" />
+                        ))}
+                    </div>
+                ) : (
+                    <motion.div
+                        ref={scrollRef}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex gap-6 pb-8 pt-4 overflow-x-auto scrollbar-hide snap-x scroll-smooth mb-8"
+                    >
+                        {trendingGames.slice(0, 12).map((game, index) => (
+                            <div 
+                                key={index} 
+                                className="relative group min-w-[160px] md:min-w-[200px] flex-shrink-0 snap-start transition-transform hover:scale-[1.05] active:scale-95 z-10 hover:z-20"
+                            >
+                                <GameCard
+                                    name={game.name}
+                                    image={game.image}
+                                    rtp={game.rtp}
+                                    provider={game.provider}
+                                    onClick={() => playNow(game.name)}
+                                />
+                                {/* Real-time Stats Overlay */}
+                                <div className="absolute top-2 right-2 z-30 flex flex-col gap-1 items-end pointer-events-none">
+                                    <div className="bg-black/80 backdrop-blur-md px-2 py-1 rounded-md border border-white/10 flex items-center gap-1.5 shadow-xl">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-ping" />
+                                        <span className="text-[10px] font-black text-white">{game.recentPlayers} LIVE</span>
+                                    </div>
+                                    <div className="bg-[#00b9f0]/30 backdrop-blur-md px-2 py-1 rounded-md border border-[#00b9f0]/40 flex items-center gap-1 shadow-xl">
+                                        <Users size={10} className="text-[#00b9f0]" />
+                                        <span className="text-[9px] font-black text-white whitespace-nowrap">~{game.weeklyAvg} AVG</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-            {/* Bottom Sections Grid */}
+            <div className="mb-8 flex items-center justify-between">
+                 <div className="flex items-center gap-3">
+                    <TrendingUp className="text-[#00b9f0]" size={24} />
+                    <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Ecosystem Stats</h2>
+                </div>
+                <div className="flex gap-4 text-[10px] items-center text-slate-500 uppercase font-black tracking-widest">
+                    <span className="flex items-center gap-1"><Clock size={12} /> Live Tracking</span>
+                    <span className="flex items-center gap-1"><Calendar size={12} /> Averages</span>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-                {/* Rising Stars */}
                 <motion.div
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
-                    className="bg-[#0f212e] rounded-2xl p-6 border border-white/5 shadow-lg"
+                    className="bg-[#0f212e] rounded-3xl p-6 border border-white/5 shadow-2xl relative overflow-hidden"
                 >
-                    <div className="flex items-center gap-2 mb-6">
-                        <TrendingUp size={24} className="text-[#f97316]" />
-                        <h2 className="text-lg font-bold text-[#f97316]">Rising Stars</h2>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 blur-3xl rounded-full" />
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-2">
+                             <div className="p-2 bg-orange-500/10 rounded-lg">
+                                <Flame size={20} className="text-orange-500" />
+                             </div>
+                             <h2 className="text-lg font-black text-white italic uppercase">Rising Stars</h2>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-500 bg-white/5 px-2 py-1 rounded">24H MOMENTUM</span>
                     </div>
 
-                    <div className="flex flex-col gap-4">
-                        {risingStars.map((item, index) => (
-                            <div key={index} className="flex items-center gap-4 p-4 rounded-xl bg-[#0b1219] hover:bg-[#151f2b] transition border border-white/5 group cursor-pointer shadow-sm relative overflow-hidden">
-                                {/* Placeholder Square Icon */}
-                                <div className="w-10 h-10 bg-slate-700/30 rounded flex-shrink-0"></div>
-
-                                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                    <h4 className="font-bold text-sm block text-white truncate leading-tight">{item.name}</h4>
-                                    <span className="text-xs text-slate-500 truncate block mt-0.5">{item.provider}</span>
+                    <div className="flex flex-col gap-3">
+                        {risingStars.map((item: any, index: number) => (
+                            <div key={index} className="flex items-center gap-4 p-4 rounded-2xl bg-[#0b1219]/50 hover:bg-[#151f2b] transition-all border border-white/5 group cursor-pointer active:scale-[0.98]" onClick={() => playNow(item.name)}>
+                                <div className="w-12 h-12 bg-slate-800 rounded-xl flex-shrink-0 relative overflow-hidden">
+                                     {item.image && <Image src={item.image} alt={item.name} fill className="object-cover" />}
                                 </div>
-
-                                <span className="text-xs font-bold text-green-500 bg-green-500/10 px-3 py-1.5 rounded-lg border border-green-500/10">
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-bold text-sm block text-white group-hover:text-[#00b9f0] transition-colors truncate">{item.name}</h4>
+                                    <span className="text-xs text-slate-500">{item.provider}</span>
+                                </div>
+                                <span className="text-[10px] font-black text-green-400 bg-green-500/10 px-2 py-1 rounded-md border border-green-500/10 whitespace-nowrap">
                                     {item.growth}
                                 </span>
                             </div>
@@ -97,30 +242,34 @@ export default function TrendingPage() {
                     </div>
                 </motion.div>
 
-                {/* Creator Picks */}
                 <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
-                    className="bg-[#0f212e] rounded-2xl p-6 border border-white/5 shadow-lg"
+                    className="bg-[#0f212e] rounded-3xl p-6 border border-white/5 shadow-2xl relative overflow-hidden"
                 >
-                    <div className="flex items-center gap-2 mb-6">
-                        <Sparkles size={24} className="text-[#3b82f6]" />
-                        <h2 className="text-lg font-bold text-[#3b82f6]">Creator Picks</h2>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-3xl rounded-full" />
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-2">
+                             <div className="p-2 bg-blue-500/10 rounded-lg">
+                                <Sparkles size={20} className="text-blue-400" />
+                             </div>
+                             <h2 className="text-lg font-black text-white italic uppercase">Creator Picks</h2>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-500 bg-white/5 px-2 py-1 rounded">FEATURED</span>
                     </div>
 
-                    <div className="flex flex-col gap-4">
-                        {creatorPicks.map((item, index) => (
-                            <div key={index} className="flex items-center gap-4 p-4 rounded-xl bg-[#0b1219] hover:bg-[#151f2b] transition border border-white/5 group cursor-pointer shadow-sm relative overflow-hidden">
-                                {/* Placeholder Square Icon */}
-                                <div className="w-10 h-10 bg-slate-700/30 rounded flex-shrink-0"></div>
-
-                                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                    <h4 className="font-bold text-sm block text-white truncate leading-tight">{item.name}</h4>
-                                    <span className="text-xs text-slate-500 truncate block mt-0.5">Pick by <span className="text-slate-400 font-medium">{item.picker}</span></span>
+                    <div className="flex flex-col gap-3">
+                        {creatorPicks.map((item: any, index: number) => (
+                            <div key={index} className="flex items-center gap-4 p-4 rounded-2xl bg-[#0b1219]/50 hover:bg-[#151f2b] transition-all border border-white/5 group cursor-pointer active:scale-[0.98]" onClick={() => playNow(item.name)}>
+                                <div className="w-12 h-12 bg-slate-800 rounded-xl flex-shrink-0 relative overflow-hidden">
+                                     {item.image && <Image src={item.image} alt={item.name} fill className="object-cover" />}
                                 </div>
-
-                                <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-3 py-1.5 rounded-lg border border-blue-500/10">
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-bold text-sm block text-white group-hover:text-blue-400 transition-colors truncate">{item.name}</h4>
+                                    <span className="text-xs text-slate-500">Pick by <span className="text-slate-200 font-bold">{item.picker}</span></span>
+                                </div>
+                                <span className="text-[10px] font-black text-blue-400 bg-blue-500/10 px-3 py-1 rounded-md border border-blue-500/10">
                                     {item.badge}
                                 </span>
                             </div>

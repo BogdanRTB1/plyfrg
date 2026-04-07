@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { X, TrendingUp, Zap, Trophy, Goal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
+import FavoriteToggle from "./FavoriteToggle";
 import confetti from "canvas-confetti";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
@@ -33,6 +34,10 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
     const [betAmount, setBetAmount] = useState(10);
     const [autoCashout, setAutoCashout] = useState<number | string>(''); // Disabled by default
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC', mult: number } | null>(null);
+
+    // Session tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
 
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'CRASHED'>('IDLE');
     const [cashedOutAt, setCashedOutAt] = useState<number | null>(null);
@@ -72,6 +77,8 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
             setForgesCoins((prev: number) => prev - betAmount);
         }
 
+        setSessionWagered(prev => prev + betAmount);
+
         const cp = generateCrashPoint();
         crashPointRef.current = cp;
         setCrashPoint(cp);
@@ -99,6 +106,7 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
             currentMultiplierRef.current = crashPointRef.current;
             setMultiplier(crashPointRef.current);
             setGameState('CRASHED');
+            
             drawGraph(timeElapsedSec, crashPointRef.current, true);
             return;
         }
@@ -209,6 +217,9 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
             setForgesCoins((prev: number) => prev + winAmount);
         }
 
+        setSessionPayout(prev => prev + winAmount);
+        
+        setGameState('IDLE');
         confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
 
         // Note: Graph update continues normally loop logic. We do not restart timeStartRef.
@@ -223,6 +234,23 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
 
     useEffect(() => {
         if (!isOpen) {
+            // Record session for consolidated history
+            if (sessionWagered > 0) {
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: "Crash", 
+                        gameImage: "/images/game-crash.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
+                
+                // Reset session
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
+
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
             setGameState('IDLE');
             setMultiplier(1.00);
@@ -237,7 +265,7 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
             // initial render of canvas
             setTimeout(() => drawGraph(0, 1.0, false), 100);
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout]);
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
@@ -256,6 +284,7 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
                         <div className="flex items-center gap-2 text-white">
                             <TrendingUp className={CRASH_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{CRASH_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={CRASH_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>

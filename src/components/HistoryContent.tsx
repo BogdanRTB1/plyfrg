@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, Filter, Download, ChevronLeft, ChevronRight, Calendar, Gamepad2, Coins, TrendingUp, History, ShieldCheck } from "lucide-react";
+import { Search, Filter, Download, ChevronLeft, ChevronRight, Calendar, Coins, TrendingUp, History, ShieldCheck } from "lucide-react";
 import Image from "next/image";
+import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
+import { createClient } from "@/utils/supabase/client";
 
 interface GameSession {
     id: string;
@@ -14,51 +16,88 @@ interface GameSession {
     multiplier: number;
     payout: number;
     status: 'win' | 'loss';
-    provablyFair: string;
+    currency?: 'GC' | 'FC';
 }
 
 export default function HistoryContent() {
     const [filter, setFilter] = useState('all');
+    const [historyData, setHistoryData] = useState<GameSession[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    // Mock Data
-    const historyData: GameSession[] = [
-        { id: "bet_29384", game: "Plinko", image: "/images/game-plinko.png", time: "2 mins ago", bet: 50.00, multiplier: 130.00, payout: 6500.00, status: 'win', provablyFair: "Verify" },
-        { id: "bet_29383", game: "Crash", image: "/images/game-crash.png", time: "15 mins ago", bet: 25.00, multiplier: 1.00, payout: 0.00, status: 'loss', provablyFair: "Verify" },
-        { id: "bet_29382", game: "Slots", image: "/images/game-slots.png", time: "1 hour ago", bet: 10.00, multiplier: 5.50, payout: 55.00, status: 'win', provablyFair: "Verify" },
-        { id: "bet_29381", game: "Roulette", image: "/images/game-roulette.png", time: "3 hours ago", bet: 100.00, multiplier: 0.00, payout: 0.00, status: 'loss', provablyFair: "Verify" },
-        { id: "bet_29380", game: "Mines", image: "/images/game-mines.png", time: "5 hours ago", bet: 20.00, multiplier: 2.45, payout: 49.00, status: 'win', provablyFair: "Verify" },
-        { id: "bet_29379", game: "Plinko", image: "/images/game-plinko.png", time: "8 hours ago", bet: 50.00, multiplier: 0.20, payout: 10.00, status: 'loss', provablyFair: "Verify" },
-        { id: "bet_29378", game: "Blackjack", image: "/images/game-blackjack.png", time: "1 day ago", bet: 200.00, multiplier: 2.00, payout: 400.00, status: 'win', provablyFair: "Verify" },
-        { id: "bet_29377", game: "Crash", image: "/images/game-crash.png", time: "1 day ago", bet: 30.00, multiplier: 1.10, payout: 33.00, status: 'win', provablyFair: "Verify" },
-        { id: "bet_29376", game: "Slots", image: "/images/game-slots.png", time: "2 days ago", bet: 15.00, multiplier: 0.00, payout: 0.00, status: 'loss', provablyFair: "Verify" },
-        { id: "bet_29375", game: "Mines", image: "/images/game-mines.png", time: "2 days ago", bet: 25.00, multiplier: 5.00, payout: 125.00, status: 'win', provablyFair: "Verify" },
-    ];
+    const fetchHistory = async () => {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+            setHistoryData([]);
+            setLoading(false);
+            return;
+        }
+
+        const { data, error } = await supabase
+            .from('user_history')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+
+        if (data) {
+            const formatted: GameSession[] = data.map(session => ({
+                id: session.id.substring(0, 8),
+                game: session.game_name,
+                image: session.game_image || '/images/game-placeholder.png',
+                time: new Date(session.created_at).toLocaleString('ro-RO'),
+                bet: Number(session.wagered),
+                multiplier: Number(session.wagered) > 0 ? Number(session.payout) / Number(session.wagered) : 0,
+                payout: Number(session.payout),
+                status: session.status as 'win' | 'loss',
+                currency: session.currency as 'GC' | 'FC'
+            }));
+            setHistoryData(formatted);
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchHistory();
+        window.addEventListener('history_updated', fetchHistory);
+        return () => window.removeEventListener('history_updated', fetchHistory);
+    }, []);
+
+    const filteredData = historyData.filter(session => {
+        if (filter === 'all') return true;
+        if (filter === 'wins') return session.payout > session.bet;
+        if (filter === 'losses') return session.payout <= session.bet;
+        if (filter === 'high-rollers') return session.bet >= 100;
+        return true;
+    });
+
+    const totalWagered = historyData.reduce((acc, curr) => acc + curr.bet, 0);
+    const totalPayout = historyData.reduce((acc, curr) => acc + curr.payout, 0);
+    const totalProfit = totalPayout - totalWagered;
 
     const container = {
         hidden: { opacity: 0 },
         show: {
             opacity: 1,
             transition: {
-                staggerChildren: 0.1
+                staggerChildren: 0.05
             }
         }
     };
 
     const item = {
-        hidden: { opacity: 0, y: 20 },
+        hidden: { opacity: 0, y: 10 },
         show: { opacity: 1, y: 0 }
     };
 
     return (
         <div className="flex-1 h-full overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#050505] relative">
-            {/* Ambient Background */}
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] mix-blend-screen"></div>
                 <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[100px] mix-blend-screen"></div>
             </div>
 
             <div className="max-w-7xl mx-auto p-6 md:p-12 pb-32 min-h-[100dvh] md:min-h-0 relative z-10">
-                {/* Header Section */}
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -72,69 +111,50 @@ export default function HistoryContent() {
                         <p className="text-slate-400">View and analyze your past gameplay sessions.</p>
                     </div>
 
-                    <div className="w-full grid grid-cols-2 md:flex gap-3 md:gap-4 md:w-auto">
-                        <div className="bg-[#0f212e] border border-white/5 rounded-xl p-3 md:p-4 flex items-center gap-2 md:gap-4 md:min-w-[200px] overflow-hidden">
-                            <div className="p-2 md:p-3 bg-green-500/10 rounded-lg text-green-500 shrink-0">
-                                <TrendingUp className="w-5 h-5 md:w-6 md:h-6" />
+                    <div className="flex gap-4">
+                        <div className="bg-[#0f212e] border border-white/5 rounded-xl p-4 flex items-center gap-4 min-w-[180px]">
+                            <div className="p-3 bg-green-500/10 rounded-lg text-green-500">
+                                <TrendingUp size={24} />
                             </div>
-                            <div className="min-w-0">
-                                <p className="text-[10px] md:text-xs text-slate-500 font-bold uppercase truncate">Total Profit</p>
-                                <p className="text-sm md:text-xl font-bold text-white truncate">+$4,250.50</p>
+                            <div>
+                                <p className="text-xs text-slate-500 font-bold uppercase">Total Profit</p>
+                                <div className="flex items-center gap-1.5">
+                                    <p className={`text-xl font-bold ${totalProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                        {totalProfit >= 0 ? '+' : ''}{totalProfit.toFixed(2)}
+                                    </p>
+                                    <ForgesCoinIcon className="w-5 h-5" />
+                                </div>
                             </div>
                         </div>
-                        <div className="bg-[#0f212e] border border-white/5 rounded-xl p-3 md:p-4 flex items-center gap-2 md:gap-4 md:min-w-[200px] overflow-hidden">
-                            <div className="p-2 md:p-3 bg-amber-500/10 rounded-lg text-amber-500 shrink-0">
-                                <Coins className="w-5 h-5 md:w-6 md:h-6" />
+                        <div className="bg-[#0f212e] border border-white/5 rounded-xl p-4 flex items-center gap-4 min-w-[180px]">
+                            <div className="p-3 bg-amber-500/10 rounded-lg text-amber-500">
+                                <Coins size={24} />
                             </div>
-                            <div className="min-w-0">
-                                <p className="text-[10px] md:text-xs text-slate-500 font-bold uppercase truncate">Wagered</p>
-                                <p className="text-sm md:text-xl font-bold text-white truncate">$12,450.00</p>
+                            <div>
+                                <p className="text-xs text-slate-500 font-bold uppercase">Wagered</p>
+                                <div className="flex items-center gap-1.5">
+                                    <p className="text-xl font-bold text-white">{totalWagered.toFixed(2)}</p>
+                                    <ForgesCoinIcon className="w-5 h-5" />
+                                </div>
                             </div>
                         </div>
                     </div>
                 </motion.div>
 
-                {/* Filters & Controls */}
-                <motion.div
-                    variants={container}
-                    initial="hidden"
-                    animate="show"
-                    className="bg-[#0f212e] border border-white/5 rounded-2xl p-4 mb-8 flex flex-col md:flex-row justify-between gap-4"
-                >
-                    <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 custom-scrollbar">
+                <div className="bg-[#0f212e] border border-white/5 rounded-2xl p-4 mb-8 flex justify-between items-center">
+                    <div className="flex gap-2">
                         {['all', 'wins', 'losses', 'high-rollers'].map((f) => (
                             <button
                                 key={f}
                                 onClick={() => setFilter(f)}
-                                className={`px-4 py-2 rounded-lg text-sm font-bold capitalize whitespace-nowrap transition-all ${filter === f
-                                    ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.3)]'
-                                    : 'bg-[#1a2c38] text-slate-400 hover:text-white hover:bg-[#2f4553]'
-                                    }`}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold capitalize transition-all ${filter === f ? 'bg-[#00b9f0] text-[#0f212e]' : 'bg-[#1a2c38] text-slate-400 hover:text-white'}`}
                             >
                                 {f.replace('-', ' ')}
                             </button>
                         ))}
                     </div>
+                </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="relative group flex-1 md:w-64">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={16} />
-                            <input
-                                type="text"
-                                placeholder="Search by game or ID..."
-                                className="w-full bg-[#1a2c38] border border-white/5 rounded-lg py-2 pl-10 pr-4 text-sm text-white focus:outline-none focus:border-[#00b9f0] transition-all"
-                            />
-                        </div>
-                        <button className="p-2 bg-[#1a2c38] hover:bg-[#2f4553] text-slate-400 hover:text-white rounded-lg border border-white/5 transition-colors">
-                            <Filter size={20} />
-                        </button>
-                        <button className="p-2 bg-[#1a2c38] hover:bg-[#2f4553] text-slate-400 hover:text-white rounded-lg border border-white/5 transition-colors">
-                            <Download size={20} />
-                        </button>
-                    </div>
-                </motion.div>
-
-                {/* Data Table */}
                 <motion.div
                     variants={container}
                     initial="hidden"
@@ -142,85 +162,52 @@ export default function HistoryContent() {
                     className="bg-[#0f212e] border border-white/5 rounded-2xl overflow-hidden shadow-xl"
                 >
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-[#1a2c38]/50 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-white/5">
+                        <table className="w-full text-left">
+                            <thead className="bg-[#1a2c38]/50 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                <tr>
                                     <th className="p-4 pl-6">Game</th>
                                     <th className="p-4">Time</th>
-                                    <th className="p-4 text-right">Bet Amount</th>
+                                    <th className="p-4 text-right">Wagered</th>
                                     <th className="p-4 text-right">Multiplier</th>
-                                    <th className="p-4 text-right">Payout</th>
-                                    <th className="p-4 text-center">Verification</th>
+                                    <th className="p-4 text-right">Profit / Loss</th>
+                                    <th className="p-4 text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
-                                {historyData.map((session, index) => (
-                                    <motion.tr
-                                        key={session.id}
-                                        variants={item}
-                                        className="hover:bg-white/[0.02] transition-colors group"
-                                    >
-                                        <td className="p-4 pl-6">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-[#1a2c38] rounded-lg p-1.5 border border-white/5 group-hover:border-[#00b9f0]/30 transition-colors">
-                                                    <Image src={session.image} alt={session.game} width={40} height={40} className="w-full h-full object-contain" />
+                                {loading ? (
+                                    <tr><td colSpan={6} className="p-8 text-center text-slate-500 font-bold animate-pulse">Loading history...</td></tr>
+                                ) : filteredData.length > 0 ? (
+                                    filteredData.map((session, idx) => (
+                                        <tr key={`${session.id}-${idx}`} className="hover:bg-white/[0.04] transition-colors border-b border-white/[0.02] last:border-0 group">
+                                            <td className="p-4 pl-6 font-bold text-white whitespace-nowrap">{session.game}</td>
+                                            <td className="p-4 text-sm text-slate-400 whitespace-nowrap opacity-60 group-hover:opacity-100 transition-opacity">{session.time}</td>
+                                            <td className="p-4 text-right text-slate-300 font-mono">
+                                                {session.bet.toFixed(2)} <ForgesCoinIcon className="inline w-4 h-4 ml-1 align-sub" />
+                                            </td>
+                                            <td className="p-4 text-right">
+                                                <span className={`px-2 py-1 rounded text-xs font-black tracking-tight ${session.payout > session.bet ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                    {session.multiplier.toFixed(2)}x
+                                                </span>
+                                            </td>
+                                            <td className={`p-4 text-right font-black ${session.payout - session.bet >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                {(session.payout - session.bet).toFixed(2)} <ForgesCoinIcon className="inline w-4 h-4 ml-1 align-sub" />
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                <div className="flex justify-center transition-transform group-hover:scale-110">
+                                                    <ShieldCheck size={18} className="text-slate-600 group-hover:text-[#00b9f0] transition-colors" />
                                                 </div>
-                                                <div>
-                                                    <p className="font-bold text-white text-sm">{session.game}</p>
-                                                    <p className="text-xs text-slate-500 font-mono">{session.id}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-sm text-slate-400 font-medium">
-                                            <div className="flex items-center gap-2">
-                                                <Calendar size={14} className="opacity-50" />
-                                                {session.time}
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-right font-medium text-slate-300">
-                                            ${session.bet.toFixed(2)}
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold ${session.multiplier >= 1
-                                                ? 'bg-[#00b9f0]/10 text-[#00b9f0]'
-                                                : 'bg-slate-700/30 text-slate-500'
-                                                }`}>
-                                                {session.multiplier.toFixed(2)}x
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-right font-bold">
-                                            <span className={session.payout > 0 ? 'text-green-500' : 'text-slate-500'}>
-                                                {session.payout > 0 ? '+' : ''}${session.payout.toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <button className="text-xs font-medium text-slate-500 hover:text-white hover:underline transition-colors flex items-center justify-center gap-1 mx-auto">
-                                                <ShieldCheck size={12} />
-                                                Verify
-                                            </button>
-                                        </td>
-                                    </motion.tr>
-                                ))}
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr><td colSpan={6} className="p-12 text-center text-slate-600 italic">No game history found. Play a game to see your results!</td></tr>
+                                )}
+
                             </tbody>
                         </table>
-                    </div>
-
-                    {/* Pagination */}
-                    <div className="p-4 border-t border-white/5 flex items-center justify-between">
-                        <p className="text-sm text-slate-500">Showing <span className="text-white font-bold">1-10</span> of <span className="text-white font-bold">128</span> results</p>
-                        <div className="flex items-center gap-2">
-                            <button className="p-2 rounded-lg bg-[#1a2c38] hover:bg-[#2f4553] text-slate-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                                <ChevronLeft size={16} />
-                            </button>
-                            <button className="p-2 rounded-lg bg-[#1a2c38] hover:bg-[#2f4553] text-slate-400 hover:text-white transition-colors">
-                                <ChevronRight size={16} />
-                            </button>
-                        </div>
                     </div>
                 </motion.div>
             </div>
         </div>
     );
 }
-
-

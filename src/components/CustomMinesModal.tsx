@@ -7,6 +7,7 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
 import Image from "next/image";
+import FavoriteToggle from "./FavoriteToggle";
 
 export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, setDiamonds, forgesCoins, setForgesCoins }: any) {
     const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
@@ -185,9 +186,10 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
                     </div>
 
                     <div className="mt-2 bg-[#0a1114]/50 border border-green-500/20 rounded-xl p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Trophy className="text-green-500 w-4 h-4" />
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Last Win</span>
+                        <div className="flex items-center gap-2 text-white">
+                            <Target className="text-[#00b9f0]" />
+                            <h2 className="text-xl font-black uppercase italic tracking-widest">{gameData?.name || "Mines"}</h2>
+                            <FavoriteToggle gameName={gameData?.name || "Mines"} />
                         </div>
                         {lastWin ? (
                             <span className="text-sm font-black text-green-400 font-mono flex items-center gap-1">

@@ -4,74 +4,122 @@ import React, { useState, useEffect } from 'react';
 import { Search, Edit, User, Globe, Trophy, Play, Star, ExternalLink, Twitch, Youtube, Twitter } from "lucide-react";
 import { motion } from 'framer-motion';
 
+import Link from 'next/link';
+
 // Enhanced mock data to match the detailed card structure
-const defaultCreators = [
-    {
-        id: 1,
-        name: "AlexGaming",
-        role: "Pro Streamer",
-        email: "alex@playforges.com",
-        followers: "24.5K",
-        description: "Passionate about high volatility slots and sharing big wins with the community. Streaming daily at 8 PM.",
-        skills: ["Slots", "Blackjack", "Live Casino"],
-        games: 12,
-        featured: true,
-        profilePicture: null,
-        bannerImage: null
-    },
-    {
-        id: 2,
-        name: "SlotMaster",
-        role: "Pro Gambler",
-        followers: "18.2K",
-        description: "Hunting for the max win. I analyze RTP and volatility distributions.",
-        skills: ["Analytics", "Strategy", "Poker"],
-        games: 8,
-        profilePicture: null,
-        bannerImage: null
-    },
-    {
-        id: 3,
-        name: "CryptoKing",
-        role: "Crypto Enthusiast",
-        followers: "12.9K",
-        description: "Only playing with crypto. Fast deposits, instant withdrawals.",
-        skills: ["Crypto", "Blockchain", "High Stakes"],
-        games: 15,
-        profilePicture: null,
-        bannerImage: null
-    },
-    {
-        id: 4,
-        name: "LuckyCharm",
-        role: "Casual Player",
-        followers: "9.8K",
-        description: "Just here for the fun times and vibes. Let's spin together!",
-        skills: ["Community", "Fun", "Slots"],
-        games: 5,
-        profilePicture: null,
-        bannerImage: null
-    },
-];
+const defaultCreators: any[] = [];
 
 export default function CreatorsPage() {
     const [creators, setCreators] = useState<any[]>(defaultCreators);
 
+    const [followingState, setFollowingState] = useState<Record<string, boolean>>({});
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [globalFollowers, setGlobalFollowers] = useState<Record<string, number>>({}); 
+
     useEffect(() => {
-        // Load custom created creators from local storage
-        const added = localStorage.getItem('added_creators');
-        if (added) {
+        const fetchCreatorsAndFollowing = async () => {
+            let userId = 'guest';
             try {
-                const parsedAdded = JSON.parse(added);
-                setCreators([...parsedAdded, ...defaultCreators]);
-            } catch (e) {
-                console.error("Could not parse added_creators", e);
+                const { createClient } = await import('@/utils/supabase/client');
+                const supabase = createClient();
+                const { data } = await supabase.auth.getUser();
+                userId = data.user?.id || 'guest';
+                setCurrentUserId(data.user?.id || null);
+            } catch(e) {
+                console.warn(e);
             }
-        }
+
+            const added = localStorage.getItem('added_creators');
+            let parsedAdded = [];
+            if (added) {
+                try {
+                    parsedAdded = JSON.parse(added);
+                } catch (e) {
+                    console.error("Could not parse added_creators", e);
+                }
+            }
+            
+            const allCreators = [...parsedAdded, ...defaultCreators];
+
+            const initialFollowing: Record<string, boolean> = {};
+            const gFollows: Record<string, number> = {};
+            allCreators.forEach(c => {
+                if (localStorage.getItem(`following_${userId}_${c.name}`)) {
+                    initialFollowing[c.name] = true;
+                }
+                gFollows[c.name] = Number(localStorage.getItem(`global_followers_${c.name}`) || 0);
+            });
+            
+            // Sort by followers to get the top one
+            const sortedByFollowers = [...allCreators].sort((a, b) => (gFollows[b.name] || 0) - (gFollows[a.name] || 0));
+            const topCreator = sortedByFollowers[0];
+            const remainingCreators = sortedByFollowers.slice(1);
+            
+            // Randomize the rest
+            for (let i = remainingCreators.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [remainingCreators[i], remainingCreators[j]] = [remainingCreators[j], remainingCreators[i]];
+            }
+            
+            const processedCreators = topCreator ? [topCreator, ...remainingCreators] : [];
+            setCreators(processedCreators);
+            setFollowingState(initialFollowing);
+            setGlobalFollowers(gFollows);
+        };
+        fetchCreatorsAndFollowing();
+
+        // Sync auth state live
+        const setupAuthListener = async () => {
+            const { createClient } = await import('@/utils/supabase/client');
+            const supabase = createClient();
+            return supabase.auth.onAuthStateChange((_event, session) => {
+                setCurrentUserId(session?.user?.id || null);
+            });
+        };
+
+        const authSubscriptionPromise = setupAuthListener();
+
+        return () => {
+            authSubscriptionPromise.then(sub => sub.data.subscription?.unsubscribe());
+        };
     }, []);
 
     const featuredCreator = creators[0];
     const otherCreators = creators.slice(1);
+
+    const getFollowersCount = (creatorName: string) => {
+        const total = globalFollowers[creatorName] || 0;
+        if (total >= 1000000) return (total / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+        if (total >= 1000) return (total / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+        return total.toString();
+    };
+
+    const handleFollow = (creatorName: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!currentUserId) {
+            window.dispatchEvent(new CustomEvent('open_auth_modal', { detail: 'login' }));
+            return;
+        }
+
+        const isFollowing = followingState[creatorName];
+        const currentGlobal = globalFollowers[creatorName] || 0;
+
+        if (isFollowing) {
+            localStorage.removeItem(`following_${currentUserId}_${creatorName}`);
+            const newCount = Math.max(0, currentGlobal - 1);
+            localStorage.setItem(`global_followers_${creatorName}`, String(newCount));
+            setFollowingState(prev => ({ ...prev, [creatorName]: false }));
+            setGlobalFollowers(prev => ({ ...prev, [creatorName]: newCount }));
+        } else {
+            localStorage.setItem(`following_${currentUserId}_${creatorName}`, 'true');
+            const newCount = currentGlobal + 1;
+            localStorage.setItem(`global_followers_${creatorName}`, String(newCount));
+            setFollowingState(prev => ({ ...prev, [creatorName]: true }));
+            setGlobalFollowers(prev => ({ ...prev, [creatorName]: newCount }));
+        }
+    };
 
     return (
         <div className="flex-1 h-full overflow-y-auto bg-[#050B14] relative custom-scrollbar z-0 p-6 lg:p-12 pb-32">
@@ -107,13 +155,13 @@ export default function CreatorsPage() {
                     className="bg-[#0b1622]/80 backdrop-blur-xl rounded-[32px] mb-16 border border-white/10 relative overflow-hidden group shadow-[0_0_50px_rgba(0,0,0,0.5)]"
                 >
                     {/* Banner Image */}
-                    <div className="absolute top-0 w-full h-48 bg-gradient-to-r from-[#0f212e] to-[#152a3a] overflow-hidden -z-10">
+                    <div className="absolute top-0 w-full h-48 bg-gradient-to-r from-[#1e293b] to-[#334155] overflow-hidden -z-10">
                         {featuredCreator.bannerImage ? (
-                            <img src={featuredCreator.bannerImage} className="w-full h-full object-cover opacity-60" alt="Banner" />
+                            <img src={featuredCreator.bannerImage} className="w-full h-full object-cover opacity-80" alt="Banner" />
                         ) : (
-                            <div className="w-full h-full bg-[url('/noise.png')] mix-blend-overlay opacity-20"></div>
+                            <div className="w-full h-full bg-[url('/noise.png')] mix-blend-overlay opacity-30"></div>
                         )}
-                        <div className="absolute bottom-0 w-full h-full bg-gradient-to-t from-[#0b1622]/80 to-transparent"></div>
+                        <div className="absolute bottom-0 w-full h-full bg-gradient-to-t from-[#0b1622]/40 to-transparent"></div>
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-8 relative z-10 pt-24 px-8 pb-8">
@@ -151,12 +199,12 @@ export default function CreatorsPage() {
                                             <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wider border border-amber-500/30">Partner</span>
                                         )}
                                     </div>
-                                    <p className="text-[#00b9f0] font-bold">{featuredCreator.followers} Followers</p>
+                                    <p className="text-[#00b9f0] font-bold">{getFollowersCount(featuredCreator.name)} Followers</p>
                                 </div>
-                                <button className="flex items-center gap-2 px-6 py-3 bg-white text-[#0b1622] hover:bg-slate-200 rounded-xl font-bold shadow-[0_0_20px_rgba(255,255,255,0.2)] transition-all transform hover:scale-105">
+                                <Link href={`/profile/${featuredCreator.name}`} className="flex items-center gap-2 px-6 py-3 bg-white text-[#0b1622] hover:bg-slate-200 rounded-xl font-bold shadow-[0_0_20px_rgba(255,255,255,0.2)] transition-all transform hover:scale-105">
                                     <Play size={16} fill="currentColor" />
-                                    <span>Watch Live</span>
-                                </button>
+                                    <span>See Games</span>
+                                </Link>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -237,9 +285,9 @@ export default function CreatorsPage() {
                         className="bg-[#0b1622]/80 backdrop-blur-md rounded-[24px] border border-white/10 hover:border-[#00b9f0]/30 transition-all duration-300 group flex flex-col h-full hover:-translate-y-2 hover:shadow-[0_10px_40px_rgba(0,185,240,0.1)] overflow-hidden"
                     >
                         {/* Small Banner */}
-                        <div className="h-24 bg-gradient-to-r from-[#152a3a] to-[#0f212e] relative">
+                        <div className="h-24 bg-gradient-to-r from-[#334155] to-[#1e293b] relative">
                             {creator.bannerImage && (
-                                <img src={creator.bannerImage} className="w-full h-full object-cover opacity-50" alt="Banner" />
+                                <img src={creator.bannerImage} className="w-full h-full object-cover opacity-80" alt="Banner" />
                             )}
                         </div>
 
@@ -256,7 +304,7 @@ export default function CreatorsPage() {
                             <div className="pt-10 mb-4 flex justify-between items-start">
                                 <div>
                                     <h3 className="text-xl font-black text-white truncate group-hover:text-[#00b9f0] transition-colors">{creator.name}</h3>
-                                    <p className="text-slate-400 text-xs font-bold">{creator.followers} Followers</p>
+                                    <p className="text-slate-400 text-xs font-bold">{getFollowersCount(creator.name)} Followers</p>
                                 </div>
                                 <div className="text-xs font-black text-[#00b9f0] bg-[#00b9f0]/10 px-2 py-1 rounded-md border border-[#00b9f0]/20">
                                     {creator.role}
@@ -287,10 +335,22 @@ export default function CreatorsPage() {
                                 </div>
                             )}
 
-                            <button className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-colors mt-auto">
-                                <ExternalLink size={16} />
-                                View Profile
-                            </button>
+                            <div className="flex gap-2 mt-auto">
+                                <button
+                                    onClick={(e) => handleFollow(creator.name, e)}
+                                    className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
+                                        followingState[creator.name]
+                                            ? 'bg-white/10 text-slate-300 border border-white/10 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30'
+                                            : 'bg-[#00b9f0] text-[#0b1622] hover:bg-[#38bdf8] shadow-[0_0_15px_rgba(0,185,240,0.3)]'
+                                    }`}
+                                >
+                                    {followingState[creator.name] ? 'Following' : 'Follow'}
+                                </button>
+                                <Link href={`/profile/${creator.name}`} className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-colors">
+                                    <ExternalLink size={16} />
+                                    Profile
+                                </Link>
+                            </div>
                         </div>
                     </motion.div>
                 ))}

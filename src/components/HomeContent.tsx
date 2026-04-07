@@ -30,6 +30,7 @@ import CustomMinesModal from "./CustomMinesModal";
 import CustomCrashModal from "./CustomCrashModal";
 import AIGameModal from "./AIGameModal";
 import { useEffect } from "react";
+import { createClient } from "@/utils/supabase/client";
 
 export default function HomeContent() {
     const [isPlinkoOpen, setIsPlinkoOpen] = useState(false);
@@ -58,9 +59,21 @@ export default function HomeContent() {
     const [isCustomCrashOpen, setIsCustomCrashOpen] = useState(false);
     const [isAIGameOpen, setIsAIGameOpen] = useState(false);
     const [customGames, setCustomGames] = useState<any[]>([]);
-    
+
     // Randomizer full screen cinematic
     const [isRandomizing, setIsRandomizing] = useState(false);
+
+    const [topCreators, setTopCreators] = useState<any[]>([
+        { name: "AlexGaming", followers: "0", profilePicture: "/images/creator-1.png" },
+        { name: "SlotMaster", followers: "0", profilePicture: "/images/creator-2.png" },
+        { name: "CryptoKing", followers: "0", profilePicture: "/images/creator-3.png" },
+        { name: "LuckyCharm", followers: "0", profilePicture: "/images/creator-1.png" },
+        { name: "VegasPro", followers: "0", profilePicture: "/images/creator-2.png" },
+        { name: "HighRoller", followers: "0", profilePicture: "/images/creator-3.png" },
+    ]);
+    const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
+    const [globalFollowersMap, setGlobalFollowersMap] = useState<Record<string, number>>({});
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchCustomGames = () => {
@@ -73,14 +86,118 @@ export default function HomeContent() {
                 }
             }
         };
+
+        const fetchCreatorsAndFollowing = async () => {
+            const defaultCreators = [
+                { name: "AlexGaming", followers: "0", profilePicture: "/images/creator-1.png" },
+                { name: "SlotMaster", followers: "0", profilePicture: "/images/creator-2.png" },
+                { name: "CryptoKing", followers: "0", profilePicture: "/images/creator-3.png" },
+                { name: "LuckyCharm", followers: "0", profilePicture: "/images/creator-1.png" },
+                { name: "VegasPro", followers: "0", profilePicture: "/images/creator-2.png" },
+                { name: "HighRoller", followers: "0", profilePicture: "/images/creator-3.png" },
+            ];
+
+            const localData = localStorage.getItem('added_creators');
+            let localCreators = [];
+            if (localData) {
+                try { localCreators = JSON.parse(localData); } catch (e) { }
+            }
+
+            const merged = [...localCreators, ...defaultCreators].filter((c, index, self) => index === self.findIndex((t) => t.name === c.name));
+
+            const refreshView = (userId: string) => {
+                const fMap: Record<string, boolean> = {};
+                const globalFollows: Record<string, number> = {};
+
+                merged.forEach(c => {
+                    fMap[c.name] = !!localStorage.getItem(`following_${userId}_${c.name}`);
+                    globalFollows[c.name] = Number(localStorage.getItem(`global_followers_${c.name}`) || 0);
+                });
+
+                setFollowingMap(fMap);
+                setGlobalFollowersMap(globalFollows);
+
+                const sorted = [...merged].sort((a, b) => (globalFollows[b.name] || 0) - (globalFollows[a.name] || 0));
+                setTopCreators(sorted.slice(0, 6));
+            };
+
+            // Immediate
+            refreshView('guest');
+
+            try {
+                const supabase = createClient();
+                const { data } = await supabase.auth.getUser();
+                if (data?.user?.id) {
+                    setCurrentUserId(data.user.id);
+                    refreshView(data.user.id);
+                }
+            } catch (e) { }
+        };
+
         fetchCustomGames();
+        fetchCreatorsAndFollowing();
+
         window.addEventListener('storage', fetchCustomGames);
-        return () => window.removeEventListener('storage', fetchCustomGames);
+        window.addEventListener('storage', fetchCreatorsAndFollowing);
+        return () => {
+            window.removeEventListener('storage', fetchCustomGames);
+            window.removeEventListener('storage', fetchCreatorsAndFollowing);
+        };
     }, []);
 
-    const [originalsPage, setOriginalsPage] = useState(0);
-    const [pageDirection, setPageDirection] = useState(0);
-    const ITEMS_PER_PAGE = 12;
+    const toggleFollow = (creatorName: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const userId = currentUserId || 'guest';
+        const isFollowing = followingMap[creatorName];
+        let currentGlobal = Number(localStorage.getItem(`global_followers_${creatorName}`) || 0);
+
+        if (isFollowing) {
+            localStorage.removeItem(`following_${userId}_${creatorName}`);
+            setFollowingMap((prev) => ({ ...prev, [creatorName]: false }));
+
+            const newCount = Math.max(0, currentGlobal - 1);
+            localStorage.setItem(`global_followers_${creatorName}`, String(newCount));
+            setGlobalFollowersMap((prev) => ({ ...prev, [creatorName]: newCount }));
+            toast.success(`Unfollowed ${creatorName}`);
+        } else {
+            localStorage.setItem(`following_${userId}_${creatorName}`, 'true');
+            setFollowingMap((prev) => ({ ...prev, [creatorName]: true }));
+
+            const newCount = currentGlobal + 1;
+            localStorage.setItem(`global_followers_${creatorName}`, String(newCount));
+            setGlobalFollowersMap((prev) => ({ ...prev, [creatorName]: newCount }));
+            toast.success(`Followed ${creatorName}`);
+        }
+    };
+
+    // No pagination needed for Originals anymore as per user request (max 12)
+
+    useEffect(() => {
+        const handleOpenGame = ((e: CustomEvent) => {
+            const label = e.detail;
+            if (label === 'Plinko') setIsPlinkoOpen(true);
+            else if (label === 'Heist') setIsHeistOpen(true);
+            else if (label === 'Influencer') setIsInfluencerOpen(true);
+            else if (label === 'Wanted') setIsWantedOpen(true);
+            else if (label === 'Escape') setIsEscapeOpen(true);
+            else if (label === 'Bomb Defuse') setIsBombOpen(true);
+            else if (label === 'Mines') setIsMinesOpen(true);
+            else if (label === 'Slots') setIsSlotsOpen(true);
+            else if (label === 'Blackjack') setIsBlackjackOpen(true);
+            else if (label === 'Roulette') setIsRouletteOpen(true);
+            else if (label === 'Crash') setIsCrashOpen(true);
+            else if (label === 'Secret Sneak') setIsSneakOpen(true);
+            else if (label === 'Dart Wheel') setIsDartOpen(true);
+            else if (label === 'Aviator') setIsAviatorOpen(true);
+            else if (label === 'Tomatoes') setIsTomatoesOpen(true);
+            else if (label === 'Penalty') setIsFootballOpen(true);
+            else if (label === 'Glass Bridge') setIsBridgeOpen(true);
+        }) as EventListener;
+
+        window.addEventListener('open_game', handleOpenGame);
+        return () => window.removeEventListener('open_game', handleOpenGame);
+    }, []);
 
     // State for PlinkoModal demo when accessed from home
     const [diamonds, setDiamonds] = useState(100000);
@@ -106,17 +223,10 @@ export default function HomeContent() {
         { name: "Glass Bridge", image: "/images/game-glass-bridge.png", rtp: "96.5%" },
     ];
 
-    const totalPages = Math.ceil(originals.length / ITEMS_PER_PAGE);
-    const paginatedOriginals = originals.slice(originalsPage * ITEMS_PER_PAGE, (originalsPage + 1) * ITEMS_PER_PAGE);
+    // Enforce exactly max 12 items (2 rows on desktop)
+    const activeOriginals = originals.slice(0, 12);
 
-    const topCreators = [
-        { name: "AlexGaming", followers: "24.5K", image: "/images/creator-1.png" },
-        { name: "SlotMaster", followers: "18.2K", image: "/images/creator-2.png" },
-        { name: "CryptoKing", followers: "12.9K", image: "/images/creator-3.png" },
-        { name: "LuckyCharm", followers: "9.8K", image: "/images/creator-1.png" },
-        { name: "VegasPro", followers: "8.5K", image: "/images/creator-2.png" },
-        { name: "HighRoller", followers: "7.2K", image: "/images/creator-3.png" },
-    ];
+
 
     const recentWins = [
         { game: "Plinko", user: "Hidden_User", multiplier: "130.00", payout: "$1,300.00", icon: "/images/game-plinko.png" },
@@ -128,14 +238,14 @@ export default function HomeContent() {
 
     const pickRandomGame = () => {
         setIsRandomizing(true);
-        
+
         setTimeout(() => {
             setIsRandomizing(false);
             const allGames = [...originals, ...customGames];
             if (allGames.length === 0) return;
             const seed = Math.floor(Math.random() * allGames.length);
             const randomPick = allGames[seed];
-            
+
             // Checks if it's a custom game vs original
             if ('type' in randomPick) {
                 setActiveCustomGame(randomPick);
@@ -190,7 +300,7 @@ export default function HomeContent() {
         >
             <AnimatePresence>
                 {isRandomizing && (
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -202,14 +312,14 @@ export default function HomeContent() {
                             transition={{ ease: "easeOut", duration: 0.5 }}
                             className="flex flex-col items-center gap-6"
                         >
-                            <motion.div 
+                            <motion.div
                                 animate={{ rotate: 360 }}
                                 transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
                                 className="w-16 h-16 rounded-2xl bg-[#00b9f0]/10 flex items-center justify-center border border-[#00b9f0]/30 shadow-[0_0_30px_rgba(0,185,240,0.3)]"
                             >
                                 <Dices size={32} className="text-[#00b9f0]" />
                             </motion.div>
-                            
+
                             <h2 className="text-3xl md:text-5xl font-black text-white text-center tracking-tight">
                                 Let's see what we've got today...
                             </h2>
@@ -288,83 +398,38 @@ export default function HomeContent() {
                 <h2 className="text-2xl font-bold text-white flex items-center gap-3 before:content-[''] before:w-1 before:h-6 before:bg-[#00b9f0] before:rounded-full">
                     PlayForges Originals
                 </h2>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => { setPageDirection(-1); setOriginalsPage(p => Math.max(0, p - 1)); }}
-                        disabled={originalsPage === 0}
-                        className="p-2 rounded-full bg-[#1a2c38] hover:bg-[#2f4553] text-white transition-colors border border-white/5 disabled:opacity-50"
-                    >
-                        <ChevronLeft size={20} />
-                    </button>
-                    <button
-                        onClick={() => { setPageDirection(1); setOriginalsPage(p => Math.min(totalPages - 1, p + 1)); }}
-                        disabled={originalsPage >= totalPages - 1}
-                        className="p-2 rounded-full bg-[#1a2c38] hover:bg-[#2f4553] text-white transition-colors border border-white/5 disabled:opacity-50"
-                    >
-                        <ChevronRight size={20} />
-                    </button>
-                </div>
             </motion.div>
 
-            <motion.div variants={item} className="mb-16 overflow-hidden max-w-full">
-                <AnimatePresence custom={pageDirection} mode="wait">
-                    <motion.div
-                        key={originalsPage}
-                        custom={pageDirection}
-                        variants={{
-                            enter: (direction: number) => ({
-                                x: direction > 0 ? 100 : -100,
-                                opacity: 0
-                            }),
-                            center: {
-                                zIndex: 1,
-                                x: 0,
-                                opacity: 1
-                            },
-                            exit: (direction: number) => ({
-                                zIndex: 0,
-                                x: direction < 0 ? 100 : -100,
-                                opacity: 0
-                            })
-                        }}
-                        initial="enter"
-                        animate="center"
-                        exit="exit"
-                        transition={{
-                            x: { type: "tween", duration: 0.2 },
-                            opacity: { duration: 0.2 }
-                        }}
-                        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6"
-                    >
-                        {paginatedOriginals.map((game, index) => (
-                            <div key={index} className="cursor-pointer" onClick={() => {
-                                if (game.name === 'Plinko') setIsPlinkoOpen(true);
-                                if (game.name === 'Heist') setIsHeistOpen(true);
-                                if (game.name === 'Influencer') setIsInfluencerOpen(true);
-                                if (game.name === 'Wanted') setIsWantedOpen(true);
-                                if (game.name === 'Escape') setIsEscapeOpen(true);
-                                if (game.name === 'Bomb Defuse') setIsBombOpen(true);
-                                if (game.name === 'Mines') setIsMinesOpen(true);
-                                if (game.name === 'Slots') setIsSlotsOpen(true);
-                                if (game.name === 'Blackjack') setIsBlackjackOpen(true);
-                                if (game.name === 'Roulette') setIsRouletteOpen(true);
-                                if (game.name === 'Crash') setIsCrashOpen(true);
-                                if (game.name === 'Secret Sneak') setIsSneakOpen(true);
-                                if (game.name === 'Dart Wheel') setIsDartOpen(true);
-                                if (game.name === 'Aviator') setIsAviatorOpen(true);
-                                if (game.name === 'Tomatoes') setIsTomatoesOpen(true);
-                                if (game.name === 'Penalty') setIsFootballOpen(true);
-                                if (game.name === 'Glass Bridge') setIsBridgeOpen(true);
-                            }}>
-                                <GameCard
-                                    name={game.name}
-                                    image={game.image}
-                                    rtp={game.rtp}
-                                />
-                            </div>
-                        ))}
-                    </motion.div>
-                </AnimatePresence>
+            <motion.div variants={item} className="mb-12">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+                    {activeOriginals.map((game, index) => (
+                        <div key={index} className="cursor-pointer h-full" onClick={() => {
+                            if (game.name === 'Plinko') setIsPlinkoOpen(true);
+                            if (game.name === 'Heist') setIsHeistOpen(true);
+                            if (game.name === 'Influencer') setIsInfluencerOpen(true);
+                            if (game.name === 'Wanted') setIsWantedOpen(true);
+                            if (game.name === 'Escape') setIsEscapeOpen(true);
+                            if (game.name === 'Bomb Defuse') setIsBombOpen(true);
+                            if (game.name === 'Mines') setIsMinesOpen(true);
+                            if (game.name === 'Slots') setIsSlotsOpen(true);
+                            if (game.name === 'Blackjack') setIsBlackjackOpen(true);
+                            if (game.name === 'Roulette') setIsRouletteOpen(true);
+                            if (game.name === 'Crash') setIsCrashOpen(true);
+                            if (game.name === 'Secret Sneak') setIsSneakOpen(true);
+                            if (game.name === 'Dart Wheel') setIsDartOpen(true);
+                            if (game.name === 'Aviator') setIsAviatorOpen(true);
+                            if (game.name === 'Tomatoes') setIsTomatoesOpen(true);
+                            if (game.name === 'Penalty') setIsFootballOpen(true);
+                            if (game.name === 'Glass Bridge') setIsBridgeOpen(true);
+                        }}>
+                            <GameCard
+                                name={game.name}
+                                image={game.image}
+                                rtp={game.rtp}
+                            />
+                        </div>
+                    ))}
+                </div>
             </motion.div>
 
             <PlinkoModal
@@ -425,37 +490,11 @@ export default function HomeContent() {
                 />
             )}
 
-            {/* Creator Games Section */}
-            {customGames.length > 0 && (
-                <motion.div variants={item} className="mb-16">
-                    <div className="flex justify-between items-end mb-6">
-                        <h2 className="text-2xl font-bold text-white flex items-center gap-3 before:content-[''] before:w-1 before:h-6 before:bg-purple-500 before:rounded-full">
-                            Creator Games
-                        </h2>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-                        {customGames.map((game: any, index: number) => (
-                            <div key={index} className="cursor-pointer" onClick={() => {
-                                setActiveCustomGame(game);
-                                if (game.type === 'ai_generated' || game.type === 'manual_template') setIsAIGameOpen(true);
-                                else if (game.type === 'slots') setIsCustomSlotsOpen(true);
-                                else if (game.type === 'plinko') setIsCustomPlinkoOpen(true);
-                                else if (game.type === 'mines') setIsCustomMinesOpen(true);
-                                else if (game.type === 'crash') setIsCustomCrashOpen(true);
-                            }}>
-                                <GameCard
-                                    name={game.name}
-                                    image={game.coverImage}
-                                    rtp="99.0%"
-                                />
-                            </div>
-                        ))}
-                    </div>
-                </motion.div>
-            )}
+            {/* Creator Games Section Removed as per User Request */}
 
             {/* Popular Creators Section */}
-            <motion.div variants={item} className="flex justify-between items-end mb-6">
+            {/* Popular Creators Section */}
+            <div className="flex justify-between items-end mb-6 mt-8">
                 <h2 className="text-2xl font-bold text-white flex items-center gap-3 before:content-[''] before:w-1 before:h-6 before:bg-[#00b9f0] before:rounded-full">
                     Top Creators
                 </h2>
@@ -470,41 +509,47 @@ export default function HomeContent() {
                         <ChevronRight size={20} />
                     </button>
                 </div>
-            </motion.div>
+            </div>
 
-            <motion.div
-                variants={item}
-                className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-16"
-            >
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-16">
                 {topCreators.map((creator, index) => (
-                    <div key={index} className="bg-[#0f212e] rounded-xl overflow-hidden group cursor-pointer border border-white/5 hover:border-[#00b9f0]/50 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-[#00b9f0]/10 flex flex-col h-full">
-                        <div className="relative w-full aspect-square bg-[#1a2c38] overflow-hidden">
-                            {creator.image ? (
-                                <Image
-                                    src={creator.image}
-                                    alt={creator.name}
-                                    fill
-                                    className="object-cover transition-transform duration-500 group-hover:scale-110"
-                                />
-                            ) : (
-                                <div className="absolute inset-0 flex items-center justify-center text-slate-600 font-bold opacity-30 select-none pointer-events-none">
-                                    {creator.name}
-                                </div>
-                            )}
+                    <Link
+                        href={`/profile/${encodeURIComponent(creator.name)}`}
+                        key={index}
+                        className="bg-[#0f212e] rounded-xl overflow-hidden group border border-white/5 hover:border-[#00b9f0]/50 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-[#00b9f0]/10 flex flex-col h-full relative"
+                    >
+                        <div className="relative w-full aspect-square bg-[#1a2c38] overflow-hidden shrink-0">
+                            <img
+                                src={creator.profilePicture || creator.image}
+                                alt={creator.name}
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            />
+
+                            <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold text-[#00b9f0] border border-white/10 z-10 uppercase">
+                                Top Creator
+                            </div>
 
                             <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-[#0f212e] via-[#0f212e]/80 to-transparent flex flex-col justify-end h-3/4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-                                <button className="w-full py-2 bg-[#00b9f0] text-[#0f212e] text-xs font-bold rounded shadow-lg translate-y-4 group-hover:translate-y-0 transition-transform duration-300 hover:bg-[#38bdf8]">
-                                    Follow
+                                <button
+                                    onClick={(e) => toggleFollow(creator.name, e)}
+                                    className={`w-full py-2 ${followingMap[creator.name] ? 'bg-white/10 text-white' : 'bg-[#00b9f0] text-[#0f212e]'} text-xs font-bold rounded shadow-lg translate-y-4 group-hover:translate-y-0 transition-transform duration-300 hover:opacity-90`}
+                                >
+                                    {followingMap[creator.name] ? 'Following' : 'Follow Now'}
                                 </button>
                             </div>
                         </div>
-                        <div className="p-4 border-t border-white/5 group-hover:border-[#00b9f0]/20 transition-colors bg-[#0f212e] flex-1">
-                            <h3 className="font-bold text-white leading-tight mb-1 text-sm truncate">{creator.name}</h3>
-                            <p className="text-xs text-slate-400">{creator.followers} Followers</p>
+                        <div className="p-4 border-t border-white/5 bg-[#0f212e] flex-1">
+                            <h3 className="font-bold text-white leading-tight mb-1 text-sm truncate uppercase">{creator.name}</h3>
+                            <p className="text-xs text-slate-400">{(() => {
+                                const total = globalFollowersMap[creator.name] || 0;
+                                if (total >= 1000000) return (total / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+                                if (total >= 1000) return (total / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+                                return total.toString();
+                            })()} Followers</p>
                         </div>
-                    </div>
+                    </Link>
                 ))}
-            </motion.div>
+            </div>
 
             {/* Promotions Section */}
             <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">

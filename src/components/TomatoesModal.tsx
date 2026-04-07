@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, User, Trophy, Play, Target } from "lucide-react";
+import { X, User, Trophy, Play, Target, Star } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
+import FavoriteToggle from "./FavoriteToggle";
 import confetti from "canvas-confetti";
 
 export const TOMATOES_CONFIG = {
@@ -121,8 +122,9 @@ export default function TomatoesModal({ isOpen, onClose, diamonds, setDiamonds, 
                 <div className={`w-full md:w-80 ${TOMATOES_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-black/50 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
-                            <Target className={TOMATOES_CONFIG.theme.accent} />
+                            <Star className={TOMATOES_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{TOMATOES_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={TOMATOES_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>

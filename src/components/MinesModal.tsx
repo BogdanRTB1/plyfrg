@@ -7,6 +7,7 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
 import Image from "next/image";
+import FavoriteToggle from "./FavoriteToggle";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
 export const MINES_CONFIG = {
@@ -41,12 +42,22 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
     const [mineCount, setMineCount] = useState(3);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
 
+    // Session tracking locally for consolidation
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'EXPLODED' | 'WON'>('IDLE');
     const [multiplier, setMultiplier] = useState(1.00);
     const [nextMultiplier, setNextMultiplier] = useState(1.00);
-
-    // Grid: true = mine, false = safe
     const [grid, setGrid] = useState<{ isMine: boolean, revealed: boolean }[]>([]);
+
+    const updateMultipliers = (revealedSafe: number) => {
+        const base = 1 - (mineCount / 25);
+        const currMult = revealedSafe === 0 ? 1 : Math.pow(1 / base, revealedSafe) * 0.99;
+        const nextMult = Math.pow(1 / base, revealedSafe + 1) * 0.99;
+        setMultiplier(currMult);
+        setNextMultiplier(nextMult);
+    };
 
     const startGame = () => {
         if (balance < betAmount || betAmount <= 0) return;
@@ -57,10 +68,12 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
             setForgesCoins((prev: number) => prev - betAmount);
         }
 
+        // Track session wagered
+        setSessionWagered(prev => prev + betAmount);
+
         setGameState('PLAYING');
         setMultiplier(1.00);
 
-        // Generate new grid
         const newGrid = Array(25).fill({ isMine: false, revealed: false });
         let minesPlaced = 0;
         while (minesPlaced < mineCount) {
@@ -74,15 +87,6 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
         updateMultipliers(0);
     };
 
-    const updateMultipliers = (revealedSafe: number) => {
-        // Simple multiplier math for demo
-        const base = 1 - (mineCount / 25);
-        const currMult = revealedSafe === 0 ? 1 : Math.pow(1 / base, revealedSafe) * 0.99;
-        const nextMult = Math.pow(1 / base, revealedSafe + 1) * 0.99;
-        setMultiplier(currMult);
-        setNextMultiplier(nextMult);
-    };
-
     const revealCell = (index: number) => {
         if (gameState !== 'PLAYING') return;
         if (grid[index].revealed) return;
@@ -92,26 +96,21 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
         setGrid(newGrid);
 
         if (newGrid[index].isMine) {
-            // Reveal all mines (loss)
             setGameState('EXPLODED');
-            setMultiplier(0);
-            const finalGrid = newGrid.map(cell => cell.isMine ? { ...cell, revealed: true } : cell);
+            const finalGrid = newGrid.map(cell => ({ ...cell, revealed: true }));
             setGrid(finalGrid);
         } else {
-            const revealedCount = newGrid.filter(c => c.revealed && !c.isMine).length;
-            updateMultipliers(revealedCount);
-
-            // Auto win if all safe cells revealed
-            if (revealedCount === 25 - mineCount) {
-                cashOut(curr => curr);
+            const revealedSafe = newGrid.filter(c => c.revealed && !c.isMine).length;
+            updateMultipliers(revealedSafe);
+            if (revealedSafe === (25 - mineCount)) {
+                cashout();
             }
         }
     };
 
-    const cashOut = (calcMult = (m: number) => m) => {
+    const cashout = () => {
         if (gameState !== 'PLAYING') return;
-
-        const finalMult = calcMult(multiplier);
+        const finalMult = multiplier;
         setGameState('WON');
         const winAmount = betAmount * finalMult;
         setLastWin({ amount: winAmount, currency: currencyType });
@@ -122,10 +121,11 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
             setForgesCoins((prev: number) => prev + winAmount);
         }
 
-        // Reveal remaining grid
+        // Track session payout
+        setSessionPayout(prev => prev + winAmount);
+
         const finalGrid = grid.map(cell => ({ ...cell, revealed: true }));
         setGrid(finalGrid);
-
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     };
 
@@ -138,10 +138,25 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
 
     useEffect(() => {
         if (!isOpen) {
+            // Report consolidated session on exit
+            if (sessionWagered > 0) {
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: "Mines", 
+                        gameImage: "/images/game-mines.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
+                // Reset local session trackers
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
             setGameState('IDLE');
-            setGrid(Array(25).fill({ isMine: false, revealed: false }));
+            setGrid([]);
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout, currencyType]);
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
@@ -154,113 +169,103 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
                 exit={{ scale: 0.9, opacity: 0 }}
                 className={`${MINES_CONFIG.theme.background} rounded-2xl w-full max-w-4xl border border-white/10 shadow-2xl overflow-hidden flex flex-col md:flex-row h-[600px]`}
             >
-                {/* ADVANCED BETTING MENU */}
                 <div className={`w-full md:w-80 ${MINES_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
                             <Target className={MINES_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{MINES_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={MINES_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>
 
                     <div className="bg-[#0f171c] p-1 rounded-xl flex border border-white/5">
-                        <button onClick={() => setCurrencyType('GC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> Diamonds</button>
-                        <button onClick={() => setCurrencyType('FC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> Coins</button>
-                    </div>
-
-                    <div className="space-y-2 mt-2">
-                        <div className="flex justify-between items-end">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Bet Amount</label>
-                            <span className="text-xs font-mono font-bold text-slate-400 bg-black/30 px-2 py-1 rounded-md">Bal: {balance.toFixed(2)}</span>
-                        </div>
-                        <div className="relative group">
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                {currencyType === 'GC' ? <DiamondIcon className="w-5 h-5 opacity-70" /> : <ForgesCoinIcon className="w-5 h-5 opacity-70" />}
-                            </div>
-                            <input
-                                type="number"
-                                value={betAmount}
-                                onChange={(e) => handleBetChange(Number(e.target.value))}
-                                disabled={gameState === 'PLAYING'}
-                                className="w-full bg-[#0a1114] border border-white/10 focus:border-[#00b9f0] focus:shadow-[0_0_10px_rgba(0,185,240,0.2)] rounded-xl py-3 pl-10 pr-4 text-white font-mono text-lg font-bold transition-all outline-none"
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 gap-2 pb-2">
-                            <button onClick={() => handleBetChange(betAmount / 2)} disabled={gameState === 'PLAYING'} className="bg-[#1a2c38] hover:bg-[#2f4553] text-slate-300 hover:text-white text-xs font-bold py-2 rounded-lg border border-white/5 transition-colors">1/2</button>
-                            <button onClick={() => handleBetChange(betAmount * 2)} disabled={gameState === 'PLAYING'} className="bg-[#1a2c38] hover:bg-[#2f4553] text-slate-300 hover:text-white text-xs font-bold py-2 rounded-lg border border-white/5 transition-colors">2X</button>
-                            <button onClick={() => handleBetChange(balance)} disabled={gameState === 'PLAYING'} className="bg-[#1a2c38] hover:bg-[#2f4553] text-[#00b9f0] text-xs font-black py-2 rounded-lg border border-[#00b9f0]/30 transition-colors">MAX</button>
-                        </div>
-
-                        <div className="flex justify-between items-end">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Mines (1-24)</label>
-                        </div>
-                        <select
-                            value={mineCount}
-                            onChange={(e) => setMineCount(Number(e.target.value))}
-                            disabled={gameState === 'PLAYING'}
-                            className="w-full bg-[#0a1114] border border-white/10 focus:border-[#00b9f0] rounded-xl py-3 px-4 text-white font-bold outline-none appearance-none"
+                        <button
+                            onClick={() => setCurrencyType('GC')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${currencyType === 'GC' ? 'bg-[#1a2c38] text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
                         >
-                            {Array.from({ length: 24 }, (_, i) => i + 1).map(num => (
-                                <option key={num} value={num}>{num}</option>
-                            ))}
-                        </select>
+                            <DiamondIcon className="w-4 h-4" /> GC
+                        </button>
+                        <button 
+                            onClick={() => setCurrencyType('FC')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${currencyType === 'FC' ? 'bg-[#1a2c38] text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                        >
+                            <ForgesCoinIcon className="w-4 h-4" /> FC
+                        </button>
                     </div>
 
-                    <div className="mt-2 bg-[#0a1114]/50 border border-green-500/20 rounded-xl p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Trophy className="text-green-500 w-4 h-4" />
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Last Win</span>
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                <span>Bet Amount</span>
+                                <span className={MINES_CONFIG.theme.accent}>{balance.toFixed(2)}</span>
+                            </div>
+                            <div className="relative group">
+                                <input
+                                    type="number"
+                                    value={betAmount}
+                                    onChange={(e) => handleBetChange(Number(e.target.value))}
+                                    className="w-full bg-[#1a2c38] border border-white/5 rounded-xl py-3 px-4 text-white font-bold focus:outline-none focus:border-[#00b9f0]/50 transition-all"
+                                />
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                                    <button onClick={() => handleBetChange(betAmount / 2)} className="px-2 py-1 bg-[#2f4553] hover:bg-[#3d5a6d] text-xs font-bold text-white rounded-lg transition-colors border border-white/5">½</button>
+                                    <button onClick={() => handleBetChange(betAmount * 2)} className="px-2 py-1 bg-[#2f4553] hover:bg-[#3d5a6d] text-xs font-bold text-white rounded-lg transition-colors border border-white/5">2×</button>
+                                </div>
+                            </div>
                         </div>
-                        {lastWin ? (
-                            <span className="text-sm font-black text-green-400 font-mono flex items-center gap-1">
-                                +{lastWin.amount.toFixed(2)} {lastWin.currency === 'GC' ? <DiamondIcon className="w-3 h-3" /> : <ForgesCoinIcon className="w-3 h-3" />}
-                            </span>
-                        ) : (
-                            <span className="text-xs font-mono text-slate-600">---</span>
-                        )}
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Mines Count</label>
+                            <div className="grid grid-cols-4 gap-2">
+                                {[1, 3, 5, 24].map((count) => (
+                                    <button
+                                        key={count}
+                                        onClick={() => gameState !== 'PLAYING' && setMineCount(count)}
+                                        className={`py-2 rounded-xl text-xs font-bold border transition-all ${mineCount === count ? 'bg-[#00b9f0] border-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.3)]' : 'bg-[#1a2c38] border-white/5 text-slate-400 hover:border-white/20'}`}
+                                    >
+                                        {count}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="mt-auto">
-                        {gameState !== 'PLAYING' ? (
-                            <button onClick={startGame} disabled={balance < betAmount || betAmount <= 0} className={`w-full bg-gradient-to-r from-[#00b9f0] to-[#38bdf8] hover:from-[#38bdf8] hover:to-[#7dd3fc] text-[#0f212e] h-14 rounded-xl font-black text-lg tracking-widest uppercase transition-all shadow-[0_5px_20px_rgba(0,185,240,0.3)] disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-1 relative overflow-hidden group`}>
-                                <span className="relative z-10">BET</span>
+                    <div className="pt-4 mt-auto">
+                        {gameState === 'PLAYING' ? (
+                            <button
+                                onClick={cashout}
+                                className="w-full py-4 bg-green-500 hover:bg-green-400 text-black font-black uppercase tracking-widest rounded-xl transition-all flex flex-col items-center justify-center group shadow-[0_0_30px_rgba(34,197,94,0.3)]"
+                            >
+                                <span className="text-xs opacity-70 group-hover:scale-110 transition-transform">Cashout</span>
+                                <div className="flex items-center gap-1">
+                                    <Trophy size={16} />
+                                    <span>{(betAmount * multiplier).toFixed(2)}</span>
+                                </div>
                             </button>
                         ) : (
-                            <button onClick={() => cashOut(m => m)} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white h-14 rounded-xl font-black text-lg uppercase shadow-[0_0_30px_rgba(34,197,94,0.5)] animate-pulse hover:scale-[1.02] flex flex-col items-center justify-center">
-                                <span>CASHOUT</span>
-                                <span className="text-[10px] text-green-200 mt-[-2px]">Take {(betAmount * multiplier).toFixed(2)}</span>
+                            <button
+                                onClick={startGame}
+                                className={`w-full py-4 ${MINES_CONFIG.theme.buttonAccent} hover:opacity-90 text-black font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_30px_rgba(0,185,240,0.3)]`}
+                            >
+                                Start Game
                             </button>
                         )}
                     </div>
                 </div>
 
-                {/* GAME AREA */}
-                <div className="flex-1 relative bg-[#06090c] p-4 flex flex-col items-center justify-center overflow-hidden">
-                    <div className="absolute inset-x-0 top-0 p-6 flex justify-between items-center z-10">
-                        <div className="bg-[#121c22] border border-white/5 rounded-xl px-4 py-2 flex items-center gap-3 shadow-lg">
-                            <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Multiplier</span>
-                            <span className="text-[#00b9f0] font-mono font-black text-xl">{multiplier.toFixed(2)}x</span>
-                        </div>
-                        {gameState === 'PLAYING' && (
-                            <div className="bg-[#121c22] border border-white/5 rounded-xl px-4 py-2 flex items-center gap-3 shadow-lg">
-                                <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Next</span>
-                                <span className="text-green-400 font-mono font-black text-xl">{nextMultiplier.toFixed(2)}x</span>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className={`grid gap-2 sm:gap-3 lg:gap-4 p-4 mt-8`} style={{ gridTemplateColumns: `repeat(${MINES_CONFIG.theme.gridCols}, minmax(0, 1fr))` }}>
-                        {grid.length === 25 ? grid.map((cell, idx) => (
+                <div className="flex-1 bg-[#0a1114] p-4 sm:p-8 flex flex-col items-center justify-center relative">
+                    <div className="grid grid-cols-5 gap-2 sm:gap-3 bg-[#121c22]/50 p-3 sm:p-4 rounded-3xl border border-white/5">
+                        {grid.length > 0 ? grid.map((cell, idx) => (
                             <button
                                 key={idx}
-                                disabled={cell.revealed || gameState !== 'PLAYING'}
                                 onClick={() => revealCell(idx)}
+                                disabled={gameState !== 'PLAYING' || cell.revealed}
                                 className={`
-                                    relative w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-xl flex items-center justify-center transition-all duration-300 transform
-                                    ${!cell.revealed ? MINES_CONFIG.theme.cardUnrevealed + ' hover:bg-white/10 hover:scale-105 shadow-md hover:shadow-xl cursor-pointer' : ''}
-                                    ${cell.revealed && cell.isMine ? MINES_CONFIG.theme.cardRevealedMine + ' scale-95 opacity-90 shadow-inner border border-red-500/30' : ''}
-                                    ${cell.revealed && !cell.isMine ? MINES_CONFIG.theme.cardRevealedSafe + ' scale-95 opacity-90 shadow-inner border border-white/5' : ''}
+                                    w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-xl transition-all duration-300 relative overflow-hidden flex items-center justify-center
+                                    ${cell.revealed 
+                                        ? cell.isMine ? MINES_CONFIG.theme.cardRevealedMine : MINES_CONFIG.theme.cardRevealedSafe
+                                        : `${MINES_CONFIG.theme.cardUnrevealed} hover:bg-[#2f4553] shadow-[0_4px_0_rgba(0,0,0,0.3)] hover:-translate-y-1 active:translate-y-0 active:shadow-none`
+                                    }
                                     ${gameState === 'EXPLODED' && !cell.revealed ? 'opacity-50' : ''}
                                 `}
                             >
@@ -285,15 +290,14 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
                                 </AnimatePresence>
                             </button>
                         )) : (
-                            // Empty grid placeholder
                             Array(25).fill(0).map((_, idx) => (
                                 <div key={idx} className={`w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-xl ${MINES_CONFIG.theme.cardUnrevealed} opacity-50`}></div>
                             ))
                         )}
                     </div>
                 </div>
-            </motion.div >
-        </div >,
+            </motion.div>
+        </div>,
         document.body
     );
 }

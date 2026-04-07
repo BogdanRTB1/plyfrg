@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Footprints, Skull } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
+import FavoriteToggle from "./FavoriteToggle";
 import confetti from "canvas-confetti";
 
 export const BRIDGE_CONFIG = {
@@ -121,6 +122,7 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
                         <div className="flex items-center gap-2 text-white">
                             <Footprints className={BRIDGE_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{BRIDGE_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={BRIDGE_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-cyan-400 transition-colors" /></button>
                     </div>

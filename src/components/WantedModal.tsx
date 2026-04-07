@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Siren, Skull, Zap } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
+import FavoriteToggle from "./FavoriteToggle";
 import confetti from "canvas-confetti";
 
 export const WANTED_CONFIG = {
@@ -155,8 +156,9 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
                 <div className={`w-full md:w-80 ${WANTED_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
-                            <Siren className={WANTED_CONFIG.theme.accent} />
+                            <Skull className={WANTED_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{WANTED_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={WANTED_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>

@@ -6,6 +6,7 @@ import { X, Trophy, Coins, Repeat } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
+import FavoriteToggle from "./FavoriteToggle";
 
 export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, setDiamonds, forgesCoins, setForgesCoins }: any) {
     const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
@@ -102,7 +103,10 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
                 <div className={`w-full md:w-80 bg-[#121c22] p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex flex-col gap-1 text-white">
-                            <h2 className="text-xl font-black uppercase tracking-widest leading-none truncate w-[200px]">{gameData.name}</h2>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-xl font-black uppercase italic tracking-widest">{gameData?.name || "Slots"}</h2>
+                                <FavoriteToggle gameName={gameData?.name || "Slots"} />
+                            </div>
                             <p className="text-[10px] text-purple-400 font-bold uppercase tracking-widest truncate w-[200px]">By {gameData.creatorName}</p>
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>

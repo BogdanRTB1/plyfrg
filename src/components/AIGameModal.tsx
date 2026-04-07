@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Zap, Sparkles } from "lucide-react";
+import { X, Trophy, Zap, Sparkles, Maximize2, Minimize2, Play } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
+import FavoriteToggle from "./FavoriteToggle";
 
 interface AIGameModalProps {
     isOpen: boolean;
@@ -91,7 +92,13 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC', multiplier: number } | null>(null);
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'RESULT'>('IDLE');
     const [gameReady, setGameReady] = useState(false);
+    
+    // Session tracking for history
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const iframeRef = useRef<HTMLIFrameElement>(null);
+
 
     // Listen for postMessage from iframe
     const handleMessage = useCallback((event: MessageEvent) => {
@@ -161,7 +168,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                 }
                 break;
         }
-    }, [betAmount, currencyType, setDiamonds, setForgesCoins]);
+    }, [betAmount, currencyType, setDiamonds, setForgesCoins, gameData]);
 
     useEffect(() => {
         window.addEventListener('message', handleMessage);
@@ -170,10 +177,24 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
 
     useEffect(() => {
         if (!isOpen) {
+            // Report session on close
+            if (sessionWagered > 0) {
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: gameData.name, 
+                        gameImage: "/images/game-placeholder.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
+            }
             setGameState('IDLE');
             setGameReady(false);
+            setSessionWagered(0);
+            setSessionPayout(0);
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout, gameData.name, currencyType]);
 
     const startGame = () => {
         if (balance < betAmount || betAmount <= 0 || !gameReady) return;
@@ -183,6 +204,9 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        // Track wager for session
+        setSessionWagered(prev => prev + betAmount);
 
         setGameState('PLAYING');
 
@@ -225,18 +249,13 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                 {/* BETTING PANEL (LEFT) */}
                 <div className="w-full md:w-80 bg-[#121c22] p-6 flex flex-col gap-4 border-r border-white/5 z-20 shrink-0">
                     {/* Header */}
-                    <div className="flex justify-between items-start mb-1">
-                        <div className="flex flex-col gap-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                                <h2 className="text-lg font-black uppercase tracking-wider text-white truncate">{gameData.name}</h2>
-                            </div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest truncate" style={{ color: accentColor }}>
-                                By {gameData.creatorName}
-                            </p>
+                    <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-2 text-white">
+                            <Play className="text-[#00b9f0]" />
+                            <h2 className="text-xl font-black uppercase italic tracking-widest">{gameData.name}</h2>
+                            <FavoriteToggle gameName={gameData.name} />
                         </div>
-                        <button onClick={onClose} className="shrink-0">
-                            <X className="text-slate-400 hover:text-white transition-colors" />
-                        </button>
+                        <button onClick={onClose}><X className="text-slate-400 hover:text-white transition-colors" /></button>
                     </div>
 
                     {/* Game Info */}

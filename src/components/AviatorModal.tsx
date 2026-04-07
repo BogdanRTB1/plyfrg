@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { X, TrendingUp, Zap, Trophy, Goal, Plane } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
+import FavoriteToggle from "./FavoriteToggle";
 import confetti from "canvas-confetti";
 
 // AVIATOR CUSTOMIZATION CONFIG
@@ -259,8 +260,9 @@ export default function AviatorModal({ isOpen, onClose, diamonds, setDiamonds, f
                 <div className={`w-full md:w-80 ${AVIATOR_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-black/50 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
-                            <Plane className={AVIATOR_CONFIG.theme.accent} />
+                            <TrendingUp className={AVIATOR_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{AVIATOR_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={AVIATOR_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>

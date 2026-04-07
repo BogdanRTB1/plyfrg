@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Hand, AlertTriangle, Trophy, EyeOff } from "lucide-react";
+import { X, Key, ShieldAlert, Zap, Trophy, EyeOff, AlertTriangle, Hand } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
+import FavoriteToggle from "./FavoriteToggle";
 import confetti from "canvas-confetti";
 
 export const SNEAK_CONFIG = {
@@ -129,8 +130,9 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
                 <div className={`w-full md:w-80 ${SNEAK_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-black/50 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
-                            <EyeOff className={SNEAK_CONFIG.theme.accent} />
+                            <Key className={SNEAK_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{SNEAK_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={SNEAK_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>

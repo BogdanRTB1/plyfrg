@@ -60,6 +60,23 @@ export default function Header() {
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [diamonds, setDiamonds] = useState(0);
     const [forgesCoins, setForgesCoins] = useState(0.00);
+
+    // Sync balance with localStorage
+    useEffect(() => {
+        const handleSync = () => {
+            const d = localStorage.getItem('user_diamonds');
+            const f = localStorage.getItem('user_forges_coins');
+            if (d) setDiamonds(parseInt(d));
+            if (f) setForgesCoins(parseFloat(f));
+        };
+        handleSync();
+        window.addEventListener('balance_updated', handleSync);
+        window.addEventListener('storage', handleSync);
+        return () => {
+            window.removeEventListener('balance_updated', handleSync);
+            window.removeEventListener('storage', handleSync);
+        };
+    }, []);
     const [notifications, setNotifications] = useState<any[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
 
@@ -143,6 +160,13 @@ export default function Header() {
             setShowLogoutConfirm(false);
         });
 
+        // Listen for programmatic auth modal open (e.g. from Follow button when not logged in)
+        const handleOpenAuth = ((e: CustomEvent) => {
+            const mode = e.detail as 'login' | 'signup';
+            setIsAuthOpen(mode || 'login');
+        }) as EventListener;
+        window.addEventListener('open_auth_modal', handleOpenAuth);
+
         // Click outside listener
         const handleClickOutside = (event: MouseEvent) => {
             const isOutsideNotifications = !dropdownRef.current || !dropdownRef.current.contains(event.target as Node);
@@ -157,6 +181,7 @@ export default function Header() {
 
         return () => {
             subscription.unsubscribe();
+            window.removeEventListener('open_auth_modal', handleOpenAuth);
             document.removeEventListener("mousedown", handleClickOutside);
         };
     }, []);
@@ -170,6 +195,11 @@ export default function Header() {
         await supabase.auth.signOut();
         setUser(null);
         setShowLogoutConfirm(false);
+
+        // Clear cached balance
+        localStorage.removeItem('user_diamonds');
+        localStorage.removeItem('user_forges_coins');
+
         toast.success("You signed out of your account");
 
         // Force a hard refresh and redirect to lobby to clear all states

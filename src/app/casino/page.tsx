@@ -54,8 +54,24 @@ export default function CasinoPage() {
     const [activeCustomGame, setActiveCustomGame] = useState<any>(null);
     const [isAIGameOpen, setIsAIGameOpen] = useState(false);
 
-    const [diamonds, setDiamonds] = useState(100000);
-    const [forgesCoins, setForgesCoins] = useState(100);
+    const [diamonds, setDiamonds] = useState(0);
+    const [forgesCoins, setForgesCoins] = useState(0);
+
+    useEffect(() => {
+        const sync = () => {
+            const d = localStorage.getItem('user_diamonds');
+            const f = localStorage.getItem('user_forges_coins');
+            if (d) setDiamonds(parseInt(d));
+            if (f) setForgesCoins(parseFloat(f));
+        };
+        sync();
+        window.addEventListener('balance_updated', sync);
+        window.addEventListener('storage', sync);
+        return () => {
+            window.removeEventListener('balance_updated', sync);
+            window.removeEventListener('storage', sync);
+        };
+    }, []);
 
     // Load custom published games from localStorage
     useEffect(() => {

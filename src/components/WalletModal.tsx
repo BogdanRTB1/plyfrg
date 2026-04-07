@@ -118,8 +118,16 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
         // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 1500));
 
-        setDiamonds(prev => prev + bundle.diamonds);
-        setForgesCoins(prev => prev + bundle.forgesCoins);
+        const newDiamonds = diamonds + bundle.diamonds;
+        const newForgesCoins = Number((forgesCoins + bundle.forgesCoins).toFixed(2));
+
+        setDiamonds(newDiamonds);
+        setForgesCoins(newForgesCoins);
+
+        // Sync to localStorage immediately so all other pages/modals update
+        localStorage.setItem('user_diamonds', newDiamonds.toString());
+        localStorage.setItem('user_forges_coins', newForgesCoins.toString());
+        window.dispatchEvent(new Event('balance_updated'));
 
         // Add transaction
         const newTx: Transaction = {

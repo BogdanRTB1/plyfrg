@@ -6,6 +6,7 @@ import { X, Trophy, Coins, Repeat } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
+import FavoriteToggle from "./FavoriteToggle";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
 export const SLOTS_CONFIG = {
@@ -36,6 +37,10 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
 
+    // Session tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const [gameState, setGameState] = useState<'IDLE' | 'SPINNING' | 'WON' | 'LOST'>('IDLE');
     const [reels, setReels] = useState<number[]>([1, 1, 1]);
     const [spinningReels, setSpinningReels] = useState<boolean[]>([false, false, false]);
@@ -49,6 +54,8 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         setGameState('SPINNING');
         setWinMultiplier(0);
@@ -90,6 +97,8 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
                     setForgesCoins((prev: number) => prev + winAmount);
                 }
 
+                setSessionPayout(prev => prev + winAmount);
+
                 confetti({ particleCount: 150, spread: 80, origin: { y: 0.5 } });
             } else {
                 setGameState('LOST');
@@ -106,9 +115,27 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
 
     useEffect(() => {
         if (!isOpen) {
+            // Save session to history if any bets were made
+            if (sessionWagered > 0) {
+                // Record session for consolidated history
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: "Slots", 
+                        gameImage: "/images/game-slots.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: 'FC'
+                    }
+                }));
+                
+                // Reset session
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
+
             setGameState('IDLE');
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout]);
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
@@ -127,6 +154,7 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
                         <div className="flex items-center gap-2 text-white">
                             <Coins className={SLOTS_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{SLOTS_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={SLOTS_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>

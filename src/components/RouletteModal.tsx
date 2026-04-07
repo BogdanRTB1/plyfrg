@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, RefreshCcw, CircleDashed } from "lucide-react";
+import { X, Trophy, RefreshCcw, Disc } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
+import FavoriteToggle from "./FavoriteToggle";
 import confetti from "canvas-confetti";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
@@ -36,6 +37,10 @@ export default function RouletteModal({ isOpen, onClose, diamonds, setDiamonds, 
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
 
+    // Session tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const [gameState, setGameState] = useState<'IDLE' | 'SPINNING' | 'WON' | 'LOST'>('IDLE');
     const [targetChoice, setTargetChoice] = useState<ColorChoice>('red');
     const [resultNumber, setResultNumber] = useState<number | null>(null);
@@ -49,6 +54,8 @@ export default function RouletteModal({ isOpen, onClose, diamonds, setDiamonds, 
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         setGameState('SPINNING');
 
@@ -83,6 +90,8 @@ export default function RouletteModal({ isOpen, onClose, diamonds, setDiamonds, 
                     setForgesCoins((prev: number) => prev + winAmount);
                 }
 
+                setSessionPayout(prev => prev + winAmount);
+
                 confetti({ particleCount: 150, spread: 80, origin: { y: 0.5 } });
             } else {
                 setGameState('LOST');
@@ -99,10 +108,33 @@ export default function RouletteModal({ isOpen, onClose, diamonds, setDiamonds, 
 
     useEffect(() => {
         if (!isOpen) {
+             // Save session to history if any bets were made
+             if (sessionWagered > 0) {
+                const hist = JSON.parse(localStorage.getItem('playforges_history') || '[]');
+                hist.unshift({
+                    id: `session_${Math.floor(Math.random()*100000)}`,
+                    game: "Roulette",
+                    image: "/images/game-roulette.png",
+                    time: new Date().toLocaleString(),
+                    bet: sessionWagered,
+                    multiplier: sessionWagered > 0 ? (sessionPayout / sessionWagered) : 0,
+                    payout: sessionPayout,
+                    status: (sessionPayout >= sessionWagered) ? 'win' : 'loss',
+                    provablyFair: "Verify",
+                    currency: currencyType
+                });
+                localStorage.setItem('playforges_history', JSON.stringify(hist.slice(0, 50)));
+                window.dispatchEvent(new Event('history_updated'));
+                
+                // Reset session
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
+
             setGameState('IDLE');
             setResultNumber(null);
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout]);
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
@@ -119,8 +151,9 @@ export default function RouletteModal({ isOpen, onClose, diamonds, setDiamonds, 
                 <div className={`w-full md:w-80 ${ROULETTE_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
-                            <CircleDashed className={ROULETTE_CONFIG.theme.accent} />
+                            <Disc className={ROULETTE_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{ROULETTE_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={ROULETTE_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>

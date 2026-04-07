@@ -2,10 +2,16 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Scissors, Trophy, Bomb } from "lucide-react";
+import { X, Scissors, Trophy, Bomb, ShieldAlert } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
+import FavoriteToggle from "./FavoriteToggle";
 import confetti from "canvas-confetti";
+
+const BOMB_CONFIG = {
+    names: { title: "Defuse" },
+    theme: { accent: "text-red-500" }
+};
 
 export default function BombModal({ isOpen, onClose, diamonds, setDiamonds, forgesCoins, setForgesCoins }: any) {
     const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
@@ -128,8 +134,9 @@ export default function BombModal({ isOpen, onClose, diamonds, setDiamonds, forg
                 <div className="w-full md:w-80 bg-[#121c22] p-6 flex flex-col gap-4 border-r border-white/5 z-20">
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
-                            <Bomb className="text-red-500" />
-                            <h2 className="text-xl font-black uppercase italic tracking-widest">Defuse</h2>
+                            <ShieldAlert className={BOMB_CONFIG.theme.accent} />
+                            <h2 className="text-xl font-black uppercase italic tracking-widest">{BOMB_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={BOMB_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>

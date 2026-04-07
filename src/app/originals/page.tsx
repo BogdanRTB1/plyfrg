@@ -3,7 +3,7 @@
 import { Star, ShieldCheck, Zap, Info } from "lucide-react";
 import GameCard from "@/components/GameCard";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import PlinkoModal from "@/components/PlinkoModal";
 import MinesModal from "@/components/MinesModal";
 import SlotsModal from "@/components/SlotsModal";
@@ -23,10 +23,6 @@ export default function OriginalsPage() {
         { name: "Crash", image: "/images/game-crash.png", rtp: "99.0%", provider: "PlayForges", badge: "Live" },
         { name: "Plinko", image: "/images/game-plinko.png", rtp: "99.0%", provider: "PlayForges", badge: "Live" },
         { name: "Mines", image: "/images/game-mines.png", rtp: "99.0%", provider: "PlayForges", badge: "Live" },
-        { name: "Dice", image: null, rtp: "99.0%", provider: "PlayForges", badge: "Live" },
-        { name: "Roulette", image: null, rtp: "99.0%", provider: "PlayForges", badge: "Live" },
-        { name: "Wheel", image: null, rtp: "99.0%", provider: "PlayForges", badge: "Coming Soon" },
-        { name: "Tower", image: null, rtp: "99.0%", provider: "PlayForges", badge: "Coming Soon" },
         { name: 'Secret Sneak', image: '/images/game-secret-sneak.png', rtp: "99.0%", provider: "PlayForges", badge: "Live" },
         { name: 'Dart Wheel', image: '/images/game-dart-wheel.png', rtp: "99.0%", provider: "PlayForges", badge: "Live" },
         { name: 'Aviator', image: '/images/game-aviator.png', rtp: "99.0%", provider: "PlayForges", badge: "Live" },
@@ -51,8 +47,46 @@ export default function OriginalsPage() {
     const [isFootballOpen, setIsFootballOpen] = useState(false);
     const [isBridgeOpen, setIsBridgeOpen] = useState(false);
 
-    const [diamonds, setDiamonds] = useState(100000);
-    const [forgesCoins, setForgesCoins] = useState(100);
+    const [diamonds, setDiamonds] = useState(0);
+    const [forgesCoins, setForgesCoins] = useState(0);
+
+    useEffect(() => {
+        const sync = () => {
+            const d = localStorage.getItem('user_diamonds');
+            const f = localStorage.getItem('user_forges_coins');
+            if (d) setDiamonds(parseInt(d));
+            if (f) setForgesCoins(parseFloat(f));
+        };
+        sync();
+        window.addEventListener('balance_updated', sync);
+        window.addEventListener('storage', sync);
+        return () => {
+            window.removeEventListener('balance_updated', sync);
+            window.removeEventListener('storage', sync);
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleOpenGame = ((e: CustomEvent) => {
+            const label = e.detail;
+            if (label === 'Plinko') setIsPlinkoOpen(true);
+            else if (label === 'Mines') setIsMinesOpen(true);
+            else if (label === 'Slots') setIsSlotsOpen(true);
+            else if (label === 'Roulette') setIsRouletteOpen(true);
+            else if (label === 'Crash') setIsCrashOpen(true);
+            else if (label === 'Secret Sneak') setIsSneakOpen(true);
+            else if (label === 'Dart Wheel') setIsDartOpen(true);
+            else if (label === 'Aviator') setIsAviatorOpen(true);
+            else if (label === 'Influencer') setIsInfluencerOpen(true);
+            else if (label === 'Wanted') setIsWantedOpen(true);
+            else if (label === 'Tomatoes') setIsTomatoesOpen(true);
+            else if (label === 'Penalty') setIsFootballOpen(true);
+            else if (label === 'Glass Bridge') setIsBridgeOpen(true);
+        }) as EventListener;
+
+        window.addEventListener('open_game', handleOpenGame);
+        return () => window.removeEventListener('open_game', handleOpenGame);
+    }, []);
 
     return (
         <div className="flex-1 h-full overflow-y-auto bg-[#050505] relative custom-scrollbar p-6 md:p-10 pb-32 z-0">

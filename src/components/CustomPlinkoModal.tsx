@@ -6,6 +6,8 @@ import { X, Play, RotateCw } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import confetti from "canvas-confetti";
 import { createPortal } from "react-dom";
+import Image from "next/image";
+import FavoriteToggle from "./FavoriteToggle";
 
 interface CustomPlinkoModalProps {
     isOpen: boolean;
@@ -168,12 +170,14 @@ export default function CustomPlinkoModal({ isOpen, onClose, gameData, diamonds,
                 {/* ADVANCED BETTING MENU */}
                 <div className={`w-full md:w-80 bg-[#121c22] p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
                     <div className="flex justify-between items-center mb-2">
-                        <div className="flex flex-col gap-1 text-white">
-                            <h2 className="text-xl font-black uppercase tracking-widest leading-none truncate w-[200px]">{gameData.name}</h2>
-                            <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest truncate w-[200px]">By {gameData.creatorName}</p>
+                        <div className="flex items-center gap-2 text-white">
+                            <Play className="text-purple-500" />
+                            <h2 className="text-xl font-black uppercase italic tracking-widest">{gameData?.name || "Plinko"}</h2>
+                            <FavoriteToggle gameName={gameData?.name || "Plinko"} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>
+                    <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest truncate w-[200px]">By {gameData.creatorName}</p>
 
                     <div className="bg-[#0f171c] p-1 rounded-xl flex border border-white/5 mt-2">
                         <button onClick={() => setCurrencyType('GC')} disabled={dropping} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> Diamonds</button>

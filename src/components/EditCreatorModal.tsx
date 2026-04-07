@@ -37,14 +37,49 @@ export default function EditCreatorModal({ isOpen, onClose, creatorData, onSave 
         setFormData({ ...formData, [name]: value });
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+    const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<string> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height = Math.round((height * maxWidth) / width);
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width = Math.round((width * maxHeight) / height);
+                            height = maxHeight;
+                        }
+                    }
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    
+                    resolve(canvas.toDataURL('image/jpeg', 0.7)); // Compress to JPEG to save significant space
+                };
+            };
+        });
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setFormData({ ...formData, [field]: reader.result as string });
-            };
-            reader.readAsDataURL(file);
+            const maxWidth = field === 'bannerImage' ? 1200 : 300;
+            const maxHeight = field === 'bannerImage' ? 400 : 300;
+            const resizedBase64 = await resizeImage(file, maxWidth, maxHeight);
+            setFormData((prev: any) => ({ ...prev, [field]: resizedBase64 }));
         }
     };
 
@@ -67,7 +102,20 @@ export default function EditCreatorModal({ isOpen, onClose, creatorData, onSave 
             // Update local storage
             const existingCreators = JSON.parse(localStorage.getItem('added_creators') || '[]');
             const updatedList = existingCreators.map((c: any) => c.id === updatedCreator.id ? updatedCreator : c);
-            localStorage.setItem('added_creators', JSON.stringify(updatedList));
+            
+            try {
+                localStorage.setItem('added_creators', JSON.stringify(updatedList));
+            } catch (error) {
+                console.warn("Storage quota exceeded, storing without images.", error);
+                const fallbackCreator = { ...updatedCreator, profilePicture: null, bannerImage: null };
+                const fallbackList = existingCreators.map((c: any) => c.id === fallbackCreator.id ? fallbackCreator : c);
+                try {
+                    localStorage.setItem('added_creators', JSON.stringify(fallbackList));
+                } catch(e) {
+                    const stripped = fallbackList.map((c: any) => ({...c, profilePicture: null, bannerImage: null}));
+                    localStorage.setItem('added_creators', JSON.stringify(stripped));
+                }
+            }
 
             onSave(updatedCreator);
             setIsSaving(false);

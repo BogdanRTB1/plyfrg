@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Spade, Club, Heart, Diamond } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
+import FavoriteToggle from "./FavoriteToggle";
 import confetti from "canvas-confetti";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
@@ -38,6 +39,10 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
     const balance = currencyType === 'GC' ? diamonds : forgesCoins;
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
+
+    // Session tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
 
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'DEALER_TURN' | 'WON' | 'LOST' | 'PUSH'>('IDLE');
 
@@ -82,6 +87,8 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         const pHand: Card[] = [drawCard(), drawCard()];
         const dHand: Card[] = [drawCard(), { ...drawCard(), hidden: true }];
@@ -163,6 +170,8 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
             setForgesCoins((prev: number) => prev + winAmount);
         }
 
+        setSessionPayout(prev => prev + winAmount);
+
         if (multiplier > 1) {
             confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         }
@@ -177,11 +186,30 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
 
     useEffect(() => {
         if (!isOpen) {
+            // Save session to history if any bets were made
+            if (sessionWagered > 0) {
+                // Record session for consolidated history
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: "Blackjack", 
+                        gameImage: "/images/game-blackjack.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
+
+                // Reset session
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
+
             setGameState('IDLE');
+
             setPlayerHand([]);
             setDealerHand([]);
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout]);
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
@@ -237,8 +265,8 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
                 <div className={`w-full md:w-80 ${BLACKJACK_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
-                            <Spade className={BLACKJACK_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{BLACKJACK_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={BLACKJACK_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>

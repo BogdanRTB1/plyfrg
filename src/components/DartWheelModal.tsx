@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Target, Zap, Trophy, Play } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
+import FavoriteToggle from "./FavoriteToggle";
 import confetti from "canvas-confetti";
 
 export const DART_CONFIG = {
@@ -115,6 +116,7 @@ export default function DartWheelModal({ isOpen, onClose, diamonds, setDiamonds,
                         <div className="flex items-center gap-2 text-white">
                             <Target className={DART_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{DART_CONFIG.names.title}</h2>
+                            <FavoriteToggle gameName={DART_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>

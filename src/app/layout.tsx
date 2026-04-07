@@ -9,6 +9,8 @@ import ScrollReset from "@/components/ScrollReset";
 import CookieConsent from "@/components/CookieConsent";
 import { MobileNavProvider } from "@/components/MobileNavProvider";
 import KYCEnforcer from "@/components/KYCEnforcer";
+import GlobalGameModals from "@/components/GlobalGameModals";
+
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -35,7 +37,9 @@ export default function RootLayout({
         <KYCEnforcer />
         <Toaster theme="dark" position="top-right" richColors />
         <MobileNavProvider>
+          <GlobalGameModals />
           {/* Sidebar (Fixed Left) */}
+
           <Sidebar />
 
           {/* Main Content Area (Right Side) */}
