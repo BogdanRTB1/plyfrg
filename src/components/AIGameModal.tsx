@@ -31,13 +31,13 @@ const playSynthSound = (type: string) => {
         if (type === 'spin') {
             const audio = new Audio('/game sounds/slots.mp3');
             audio.volume = 0.5;
-            audio.play().catch(() => {});
+            audio.play().catch(() => { });
             return;
         }
         if (type === 'tumble') {
             const audio = new Audio('/game sounds/dice.mp3');
             audio.volume = 0.5;
-            audio.play().catch(() => {});
+            audio.play().catch(() => { });
             return;
         }
 
@@ -75,14 +75,14 @@ const playSynthSound = (type: string) => {
             gain.gain.setValueAtTime(0.2, ctx.currentTime);
             gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
         } else {
-             return;
+            return;
         }
-        
+
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start();
         osc.stop(ctx.currentTime + 2.0);
-    } catch(e) {}
+    } catch (e) { }
 };
 
 export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDiamonds, forgesCoins, setForgesCoins }: AIGameModalProps) {
@@ -92,13 +92,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC', multiplier: number } | null>(null);
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'RESULT'>('IDLE');
     const [gameReady, setGameReady] = useState(false);
-    
-    // Session tracking for history
-    const [sessionWagered, setSessionWagered] = useState(0);
-    const [sessionPayout, setSessionPayout] = useState(0);
-
     const iframeRef = useRef<HTMLIFrameElement>(null);
-
 
     // Listen for postMessage from iframe
     const handleMessage = useCallback((event: MessageEvent) => {
@@ -129,7 +123,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                             const audio = new Audio(gameDataObj.winSound);
                             audio.volume = 0.5;
                             audio.play().catch(e => console.error("Win sound failed:", e));
-                        } catch(e) {}
+                        } catch (e) { }
                     }
 
                     const effect = gameDataObj.winEffect || 'confetti';
@@ -139,7 +133,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                         const duration = 2000;
                         const animationEnd = Date.now() + duration;
                         const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-                        const interval: any = setInterval(function() {
+                        const interval: any = setInterval(function () {
                             const timeLeft = animationEnd - Date.now();
                             if (timeLeft <= 0) return clearInterval(interval);
                             const particleCount = 50 * (timeLeft / duration);
@@ -153,7 +147,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                         const animationEnd = Date.now() + duration;
                         let skew = 1;
                         const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-                        const interval: any = setInterval(function() {
+                        const interval: any = setInterval(function () {
                             const timeLeft = animationEnd - Date.now();
                             if (timeLeft <= 0) return clearInterval(interval);
                             skew = Math.max(0.8, skew - 0.001);
@@ -168,7 +162,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                 }
                 break;
         }
-    }, [betAmount, currencyType, setDiamonds, setForgesCoins, gameData]);
+    }, [betAmount, currencyType, setDiamonds, setForgesCoins]);
 
     useEffect(() => {
         window.addEventListener('message', handleMessage);
@@ -177,24 +171,10 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
 
     useEffect(() => {
         if (!isOpen) {
-            // Report session on close
-            if (sessionWagered > 0) {
-                window.dispatchEvent(new CustomEvent('game_session_complete', {
-                    detail: { 
-                        gameName: gameData.name, 
-                        gameImage: "/images/game-placeholder.png", 
-                        wagered: sessionWagered, 
-                        payout: sessionPayout, 
-                        currency: currencyType 
-                    }
-                }));
-            }
             setGameState('IDLE');
             setGameReady(false);
-            setSessionWagered(0);
-            setSessionPayout(0);
         }
-    }, [isOpen, sessionWagered, sessionPayout, gameData.name, currencyType]);
+    }, [isOpen]);
 
     const startGame = () => {
         if (balance < betAmount || betAmount <= 0 || !gameReady) return;
@@ -204,9 +184,6 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
-
-        // Track wager for session
-        setSessionWagered(prev => prev + betAmount);
 
         setGameState('PLAYING');
 

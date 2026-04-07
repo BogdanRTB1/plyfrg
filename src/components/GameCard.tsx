@@ -8,16 +8,11 @@ interface GameCardProps {
     image: string;
     rtp?: string;
     provider?: string;
-    onClick?: () => void;
 }
 
-export default function GameCard({ name, image, rtp = "99.0%", provider = "PlayForges", onClick }: GameCardProps) {
+export default function GameCard({ name, image, rtp = "99.0%", provider = "PlayForges" }: GameCardProps) {
     return (
-        <div 
-            onClick={onClick}
-            className="bg-[#0f212e] rounded-xl overflow-hidden group cursor-pointer border border-white/5 hover:border-[#00b9f0]/50 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-[#00b9f0]/10 flex flex-col h-full relative"
-        >
-
+        <div className="bg-[#0f212e] rounded-xl overflow-hidden group cursor-pointer border border-white/5 hover:border-[#00b9f0]/50 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-[#00b9f0]/10 flex flex-col h-full relative">
             <div className="relative w-full aspect-square bg-[#1a2c38] overflow-hidden">
                 {/* Fallback pattern */}
                 <div className="absolute inset-0 flex items-center justify-center text-slate-600 font-bold opacity-30 select-none pointer-events-none">

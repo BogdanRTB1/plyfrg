@@ -40,31 +40,32 @@ export default function Sidebar() {
 
         const checkCreatorStatus = async () => {
             const { data: { user } } = await supabase.auth.getUser();
-            const added = localStorage.getItem('added_creators');
-            if (added) {
-                try {
-                    const parsedAdded = JSON.parse(added);
-                    if (user && parsedAdded && parsedAdded.length > 0) {
-                        const isMatched = parsedAdded.some((c: any) => c.email === user.email || String(c.id) === String(user.id) || c.userId === user.id);
-                        setIsCreator(isMatched);
-                    } else {
-                        setIsCreator(false);
-                    }
-                } catch (e) { }
-            } else {
+            if (!user) {
                 setIsCreator(false);
+                return;
             }
+
+            const { data: dbCreator } = await supabase
+                .from('creators')
+                .select('id')
+                .eq('id', user.id)
+                .single();
+
+            setIsCreator(!!dbCreator);
         };
 
         checkCreatorStatus();
 
-        // Listen for storage changes in case they create an account in another tab or same window
+
         window.addEventListener('storage', checkCreatorStatus);
+        window.addEventListener('creator_status_updated', checkCreatorStatus);
 
         return () => {
             subscription.unsubscribe();
             window.removeEventListener('storage', checkCreatorStatus);
+            window.removeEventListener('creator_status_updated', checkCreatorStatus);
         };
+
     }, []);
 
     const sidebarItems = [

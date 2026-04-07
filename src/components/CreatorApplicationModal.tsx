@@ -9,6 +9,8 @@ import {
     MessageSquare, ChevronDown
 } from 'lucide-react';
 import { createClient } from "@/utils/supabase/client";
+import { toast } from "sonner";
+
 
 interface CreatorApplicationModalProps {
     isOpen: boolean;
@@ -123,7 +125,19 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
         agreeToFinancialDisclosure: false,
     });
 
-    if (!isOpen) return null;
+    const [currentUser, setCurrentUser] = useState<any>(null);
+    useEffect(() => {
+        const supabase = createClient();
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            setCurrentUser(user);
+            if (!user && isOpen) {
+                // If modal is being opened but no user, redirect to login via event
+                onClose();
+                window.dispatchEvent(new CustomEvent('open_auth_modal', { detail: 'login' }));
+                toast.error("You must be logged in to apply as a creator.");
+            }
+        });
+    }, [isOpen]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
@@ -139,6 +153,12 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
         setFormData({ ...formData, [name]: value });
     };
 
+    if (!isOpen) return null;
+
+
+
+
+
     const nextStep = () => {
         if (step < totalSteps) setStep(step + 1);
     };
@@ -148,6 +168,11 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
     };
 
     const handleSubmit = async () => {
+        if (!currentUser) {
+            toast.error("You must be logged in to apply as a creator.");
+            return;
+        }
+
         if (!formData.agreeToTerms || !formData.agreeToFinancialDisclosure) {
             alert("You must agree to the terms and financial disclosure.");
             return;
@@ -155,53 +180,57 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
 
         setIsSubmitting(true);
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
 
-        // Save to local storage to demonstrate dynamically adding creators
-        const newCreator = {
-            id: user?.id || Date.now().toString(),
-            name: formData.displayName || formData.legalName || 'New Creator',
-            role: "Content Creator",
-            email: user?.email || "creator@playforges.com",
-            followers: "0",
-            description: formData.bio || formData.motivation || "A brand new creator on Playforges.",
-            skills: [formData.contentType || 'Gaming', 'Community'],
-            games: 0,
-            profilePicture: formData.profilePicture,
-            bannerImage: formData.bannerImage,
-            twitchUrl: formData.twitchUrl,
-            youtubeUrl: formData.youtubeUrl
-        };
-
-        const existingCreators = JSON.parse(localStorage.getItem('added_creators') || '[]');
         try {
-            localStorage.setItem('added_creators', JSON.stringify([newCreator, ...existingCreators]));
-        } catch (error) {
-            console.warn("Storage quota exceeded, storing without images.", error);
-            const fallbackCreator = { ...newCreator, profilePicture: null, bannerImage: null };
-            try {
-                localStorage.setItem('added_creators', JSON.stringify([fallbackCreator, ...existingCreators]));
-            } catch(e) {
-                const stripped = [fallbackCreator, ...existingCreators].map((c: any) => ({...c, profilePicture: null, bannerImage: null}));
-                localStorage.setItem('added_creators', JSON.stringify(stripped));
-            }
-        }
+            // Save to Supabase 'creators' table
+            const { error: upsertError } = await supabase.from('creators').upsert({
+                id: currentUser.id,
+                display_name: formData.displayName,
+                bio: formData.bio,
+                profile_picture: formData.profilePicture,
+                banner_image: formData.bannerImage,
+                content_type: formData.contentType,
+                audience_size: formData.audienceSize,
+                youtube_url: formData.youtubeUrl,
+                twitch_url: formData.twitchUrl,
+                twitter_url: formData.twitterUrl,
+                kick_url: formData.kickUrl,
+                tax_type: formData.taxType,
+                legal_name: formData.legalName || formData.companyName,
+                tax_id: formData.taxId,
+                state: formData.state,
+                updated_at: new Date().toISOString()
+            });
 
-        if (user) {
+            if (upsertError) throw upsertError;
+
+            // Notification
             await supabase.from('notifications').insert({
-                user_id: user.id,
+                user_id: currentUser.id,
                 title: 'Welcome to Creators!',
                 message: 'Your application was accepted. You are now officially enrolled in the Playforges Creator Program!',
                 is_read: false
             });
+
+            onClose();
+            toast.success("Welcome aboard, Creator!");
+            
+            // Notify UI for dynamic updates (Sidebar/Header)
+            window.dispatchEvent(new CustomEvent('creator_status_updated'));
+
+            setTimeout(() => {
+                window.location.href = `/creators/${encodeURIComponent(formData.displayName)}`;
+            }, 1000);
+
+
+        } catch (error: any) {
+            console.error("Submission Error:", error.message);
+            alert("Error submitting application: " + error.message);
+        } finally {
+            setIsSubmitting(false);
         }
-
-        onClose();
-        setTimeout(() => setStep(1), 500);
-
-        // Optionally redirect or show success toast
-        window.location.href = `/profile/${encodeURIComponent(newCreator.name)}`; // Redirect to the Creator Profile page
     };
+
 
     const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<string> => {
         return new Promise((resolve) => {

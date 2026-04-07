@@ -83,12 +83,37 @@ export default function EditCreatorModal({ isOpen, onClose, creatorData, onSave 
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         setIsSaving(true);
+        const { createClient } = await import('@/utils/supabase/client');
+        const supabase = createClient();
 
-        setTimeout(() => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Not authenticated");
+
             const updatedCreator = {
-                ...creatorData,
+                id: user.id,
+                display_name: formData.name,
+                bio: formData.description,
+                profile_picture: formData.profilePicture,
+                banner_image: formData.bannerImage,
+                twitch_url: formData.twitchUrl,
+                youtube_url: formData.youtubeUrl,
+                twitter_url: formData.twitterUrl,
+                kick_url: formData.kickUrl,
+                updated_at: new Date().toISOString()
+            };
+
+            const { error: upsertError } = await supabase
+                .from('creators')
+                .upsert(updatedCreator);
+
+            if (upsertError) throw upsertError;
+
+            // Update UI
+            onSave({
+                ...updatedCreator,
                 name: formData.name,
                 description: formData.description,
                 profilePicture: formData.profilePicture,
@@ -96,32 +121,20 @@ export default function EditCreatorModal({ isOpen, onClose, creatorData, onSave 
                 twitchUrl: formData.twitchUrl,
                 youtubeUrl: formData.youtubeUrl,
                 twitterUrl: formData.twitterUrl,
-                kickUrl: formData.kickUrl,
-            };
+                kickUrl: formData.kickUrl
+            });
 
-            // Update local storage
-            const existingCreators = JSON.parse(localStorage.getItem('added_creators') || '[]');
-            const updatedList = existingCreators.map((c: any) => c.id === updatedCreator.id ? updatedCreator : c);
-            
-            try {
-                localStorage.setItem('added_creators', JSON.stringify(updatedList));
-            } catch (error) {
-                console.warn("Storage quota exceeded, storing without images.", error);
-                const fallbackCreator = { ...updatedCreator, profilePicture: null, bannerImage: null };
-                const fallbackList = existingCreators.map((c: any) => c.id === fallbackCreator.id ? fallbackCreator : c);
-                try {
-                    localStorage.setItem('added_creators', JSON.stringify(fallbackList));
-                } catch(e) {
-                    const stripped = fallbackList.map((c: any) => ({...c, profilePicture: null, bannerImage: null}));
-                    localStorage.setItem('added_creators', JSON.stringify(stripped));
-                }
-            }
-
-            onSave(updatedCreator);
-            setIsSaving(false);
+            // Notify UI for dynamic updates
+            window.dispatchEvent(new CustomEvent('creator_status_updated'));
             onClose();
-        }, 1500);
+        } catch (error: any) {
+            console.error("Save Error:", error.message);
+            alert("Error saving profile: " + error.message);
+        } finally {
+            setIsSaving(false);
+        }
     };
+
 
     return (
         <AnimatePresence>

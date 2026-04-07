@@ -18,55 +18,50 @@ export default function CreatorsPage() {
 
     useEffect(() => {
         const fetchCreatorsAndFollowing = async () => {
-            let userId = 'guest';
-            try {
-                const { createClient } = await import('@/utils/supabase/client');
-                const supabase = createClient();
-                const { data } = await supabase.auth.getUser();
-                userId = data.user?.id || 'guest';
-                setCurrentUserId(data.user?.id || null);
-            } catch(e) {
-                console.warn(e);
+            const { createClient } = await import('@/utils/supabase/client');
+            const supabase = createClient();
+            
+            const { data: { user } } = await supabase.auth.getUser();
+            const userId = user?.id || 'guest';
+            setCurrentUserId(user?.id || null);
+
+            // Fetch ALL creators from Supabase
+            const { data: dbCreators, error } = await supabase
+                .from('creators')
+                .select('*')
+                .order('followers_count', { ascending: false });
+
+            if (error) {
+                console.error("Error fetching creators:", error);
+                return;
             }
 
-            const added = localStorage.getItem('added_creators');
-            let parsedAdded = [];
-            if (added) {
-                try {
-                    parsedAdded = JSON.parse(added);
-                } catch (e) {
-                    console.error("Could not parse added_creators", e);
-                }
-            }
-            
-            const allCreators = [...parsedAdded, ...defaultCreators];
+            const allCreators = dbCreators || [];
 
             const initialFollowing: Record<string, boolean> = {};
             const gFollows: Record<string, number> = {};
+            
             allCreators.forEach(c => {
+                // Compatibility mapping if DB fields differ from UI expectations
+                c.name = c.display_name;
+                c.profilePicture = c.profile_picture;
+                c.bannerImage = c.banner_image;
+                c.description = c.bio;
+                c.skills = Array.isArray(c.skills) ? c.skills : ['Creator', 'Influencer'];
+                c.role = c.content_type || 'Elite Creator';
+                
                 if (localStorage.getItem(`following_${userId}_${c.name}`)) {
                     initialFollowing[c.name] = true;
                 }
-                gFollows[c.name] = Number(localStorage.getItem(`global_followers_${c.name}`) || 0);
+                gFollows[c.name] = c.followers_count || 0;
             });
             
-            // Sort by followers to get the top one
-            const sortedByFollowers = [...allCreators].sort((a, b) => (gFollows[b.name] || 0) - (gFollows[a.name] || 0));
-            const topCreator = sortedByFollowers[0];
-            const remainingCreators = sortedByFollowers.slice(1);
-            
-            // Randomize the rest
-            for (let i = remainingCreators.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [remainingCreators[i], remainingCreators[j]] = [remainingCreators[j], remainingCreators[i]];
-            }
-            
-            const processedCreators = topCreator ? [topCreator, ...remainingCreators] : [];
-            setCreators(processedCreators);
+            setCreators(allCreators);
             setFollowingState(initialFollowing);
             setGlobalFollowers(gFollows);
         };
         fetchCreatorsAndFollowing();
+
 
         // Sync auth state live
         const setupAuthListener = async () => {
@@ -94,7 +89,7 @@ export default function CreatorsPage() {
         return total.toString();
     };
 
-    const handleFollow = (creatorName: string, e: React.MouseEvent) => {
+    const handleFollow = async (creatorName: string, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
 
@@ -103,23 +98,42 @@ export default function CreatorsPage() {
             return;
         }
 
+        const { createClient } = await import('@/utils/supabase/client');
+        const supabase = createClient();
+
         const isFollowing = followingState[creatorName];
         const currentGlobal = globalFollowers[creatorName] || 0;
+        const newCount = isFollowing ? Math.max(0, currentGlobal - 1) : currentGlobal + 1;
 
-        if (isFollowing) {
-            localStorage.removeItem(`following_${currentUserId}_${creatorName}`);
-            const newCount = Math.max(0, currentGlobal - 1);
-            localStorage.setItem(`global_followers_${creatorName}`, String(newCount));
-            setFollowingState(prev => ({ ...prev, [creatorName]: false }));
-            setGlobalFollowers(prev => ({ ...prev, [creatorName]: newCount }));
-        } else {
-            localStorage.setItem(`following_${currentUserId}_${creatorName}`, 'true');
-            const newCount = currentGlobal + 1;
-            localStorage.setItem(`global_followers_${creatorName}`, String(newCount));
-            setFollowingState(prev => ({ ...prev, [creatorName]: true }));
-            setGlobalFollowers(prev => ({ ...prev, [creatorName]: newCount }));
+        // Optimistic UI update
+        setFollowingState(prev => ({ ...prev, [creatorName]: !isFollowing }));
+        setGlobalFollowers(prev => ({ ...prev, [creatorName]: newCount }));
+
+        try {
+            // Update Supabase followers_count
+            const { error } = await supabase
+                .from('creators')
+                .update({ followers_count: newCount })
+                .ilike('display_name', creatorName);
+
+            if (error) throw error;
+
+            if (isFollowing) {
+                localStorage.removeItem(`following_${currentUserId}_${creatorName}`);
+            } else {
+                localStorage.setItem(`following_${currentUserId}_${creatorName}`, 'true');
+            }
+            
+            // Dispatch event for other components (like Lobby) to refresh
+            window.dispatchEvent(new CustomEvent('creator_stats_updated'));
+        } catch (err) {
+            console.error("Follow error:", err);
+            // Revert on error
+            setFollowingState(prev => ({ ...prev, [creatorName]: isFollowing }));
+            setGlobalFollowers(prev => ({ ...prev, [creatorName]: currentGlobal }));
         }
     };
+
 
     return (
         <div className="flex-1 h-full overflow-y-auto bg-[#050B14] relative custom-scrollbar z-0 p-6 lg:p-12 pb-32">
@@ -201,10 +215,11 @@ export default function CreatorsPage() {
                                     </div>
                                     <p className="text-[#00b9f0] font-bold">{getFollowersCount(featuredCreator.name)} Followers</p>
                                 </div>
-                                <Link href={`/profile/${featuredCreator.name}`} className="flex items-center gap-2 px-6 py-3 bg-white text-[#0b1622] hover:bg-slate-200 rounded-xl font-bold shadow-[0_0_20px_rgba(255,255,255,0.2)] transition-all transform hover:scale-105">
+                                <Link href={`/creators/${encodeURIComponent(featuredCreator.name)}`} className="flex items-center gap-2 px-6 py-3 bg-white text-[#0b1622] hover:bg-slate-200 rounded-xl font-bold shadow-[0_0_20px_rgba(255,255,255,0.2)] transition-all transform hover:scale-105">
                                     <Play size={16} fill="currentColor" />
-                                    <span>See Games</span>
+                                    <span>Visit Portfolio</span>
                                 </Link>
+
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -346,11 +361,12 @@ export default function CreatorsPage() {
                                 >
                                     {followingState[creator.name] ? 'Following' : 'Follow'}
                                 </button>
-                                <Link href={`/profile/${creator.name}`} className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-colors">
+                                <Link href={`/creators/${encodeURIComponent(creator.name)}`} className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-colors">
                                     <ExternalLink size={16} />
-                                    Profile
+                                    Portfolio
                                 </Link>
                             </div>
+
                         </div>
                     </motion.div>
                 ))}

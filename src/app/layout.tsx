@@ -37,9 +37,7 @@ export default function RootLayout({
         <KYCEnforcer />
         <Toaster theme="dark" position="top-right" richColors />
         <MobileNavProvider>
-          <GlobalGameModals />
           {/* Sidebar (Fixed Left) */}
-
           <Sidebar />
 
           {/* Main Content Area (Right Side) */}
@@ -50,6 +48,8 @@ export default function RootLayout({
               {children}
             </div>
           </main>
+          <GlobalGameModals />
+
         </MobileNavProvider>
       </body>
     </html>

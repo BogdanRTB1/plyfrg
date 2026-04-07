@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, Bell, LogOut, User as UserIcon, Settings, ChevronDown, Wallet, History, Menu, X } from "lucide-react";
+import { Search, Bell, LogOut, User as UserIcon, Settings, ChevronDown, Wallet, History, Menu, X, LayoutDashboard } from "lucide-react";
+
 import Link from "next/link";
 import AuthModal from "./AuthModal";
 import ConfirmModal from "./ConfirmModal";
@@ -51,7 +52,33 @@ function NotificationItem({ n, markOneAsRead, formatDate }: { n: any, markOneAsR
     );
 }
 
+const CreatorLink = ({ user, supabase, onNav }: any) => {
+    const [isVisible, setIsVisible] = useState(false);
+    useEffect(() => {
+        if (!user) return;
+        const check = async () => {
+            const { data } = await supabase.from('creators').select('id').eq('id', user.id).single();
+            setIsVisible(!!data);
+        };
+        check();
+    }, [user, supabase]);
+
+    if (!isVisible) return null;
+
+    return (
+        <Link
+            href="/creator-studio"
+            className="flex items-center gap-3 px-3 py-2.5 text-[#00b9f0] hover:text-[#00b9f0] hover:bg-[#00b9f0]/5 rounded-lg transition-colors text-sm font-bold border border-[#00b9f0]/10 mt-1"
+            onClick={onNav}
+        >
+            <LayoutDashboard size={16} />
+            <span>Creator Studio</span>
+        </Link>
+    );
+};
+
 export default function Header() {
+
     const [isAuthOpen, setIsAuthOpen] = useState<'login' | 'signup' | null>(null);
     const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
     const [user, setUser] = useState<any>(null);
@@ -360,8 +387,13 @@ export default function Header() {
                                             <UserIcon size={16} />
                                             <span>My Profile</span>
                                         </Link>
+                                        
+                                        {/* Creator Studio Link */}
+                                        <CreatorLink user={user} supabase={supabase} onNav={() => setActiveDropdown(null)} />
+
                                         <Link
                                             href="/settings"
+
                                             className="flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors text-sm font-medium"
                                             onClick={() => setActiveDropdown(null)}
                                         >

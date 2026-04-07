@@ -6,6 +6,7 @@ import { Flame, TrendingUp, Sparkles, Users, Calendar, Clock, ChevronLeft, Chevr
 import GameCard from "@/components/GameCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
+import { useRouter } from "next/navigation";
 
 interface GameStat {
     name: string;
@@ -18,6 +19,7 @@ interface GameStat {
 }
 
 export default function TrendingPage() {
+    const router = useRouter();
     const scrollRef = useRef<HTMLDivElement>(null);
     const [trendingGames, setTrendingGames] = useState<GameStat[]>([]);
     const [loading, setLoading] = useState(true);
@@ -101,8 +103,8 @@ export default function TrendingPage() {
     };
 
     const playNow = (gameName: string) => {
-        // Dispatch event directly — GlobalGameModals will catch it regardless of path
-        window.dispatchEvent(new CustomEvent('open_game', { detail: gameName }));
+        localStorage.setItem('open_game_on_load', gameName);
+        router.push('/');
     };
 
     const risingStars = trendingGames.slice(0, 3).map(g => ({
@@ -120,43 +122,46 @@ export default function TrendingPage() {
 
     return (
         <div className="flex-1 h-full overflow-y-auto bg-[#050505] relative custom-scrollbar p-6 md:p-10 pb-32 z-0">
-            {/* Header Section */}
             <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-8"
+                className="mb-6"
             >
-                <div className="flex items-center gap-3 mb-2">
-                    <Flame className="text-orange-500 animate-pulse" size={32} />
-                    <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter">Trending Now</h1>
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <Flame className="text-orange-500 animate-pulse" size={32} />
+                            <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter">Trending Now</h1>
+                        </div>
+                        <p className="text-slate-400 font-medium">Discover what's hot. Real-time player counts from the last 24 hours.</p>
+                    </div>
+
+                    <div className="flex gap-3 pr-2">
+                        <button 
+                            onClick={() => scroll('left')}
+                            className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-all border border-white/10 active:scale-90 shadow-2xl backdrop-blur-md group"
+                            title="Previous"
+                        >
+                            <ChevronLeft size={24} className="group-hover:-translate-x-0.5 transition-transform" />
+                        </button>
+                        <button 
+                            onClick={() => scroll('right')}
+                            className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-all border border-white/10 active:scale-90 shadow-2xl backdrop-blur-md group"
+                            title="Next"
+                        >
+                            <ChevronRight size={24} className="group-hover:translate-x-0.5 transition-transform" />
+                        </button>
+                    </div>
                 </div>
-                <p className="text-slate-400 font-medium font-sans">Discover what's hot. Real-time player counts from the last 24 hours.</p>
             </motion.div>
 
-            {/* Navigation Arrows Row - Lowered */}
-            <div className="flex justify-between items-center mb-4">
-                 <div className="w-full h-px bg-slate-800 opacity-20 mr-8"></div>
-                 <div className="flex gap-2 items-center">
-                    <button 
-                        onClick={() => scroll('left')}
-                        className="p-2.5 rounded-full bg-[#1a2c38] hover:bg-[#2f4553] text-white transition-all border border-white/10 active:scale-90 shadow-lg hover:border-[#00b9f0]/40"
-                    >
-                        <ChevronLeft size={18} />
-                    </button>
-                    <button 
-                        onClick={() => scroll('right')}
-                        className="p-2.5 rounded-full bg-[#1a2c38] hover:bg-[#2f4553] text-white transition-all border border-white/10 active:scale-90 shadow-lg hover:border-[#00b9f0]/40"
-                    >
-                        <ChevronRight size={18} />
-                    </button>
-                </div>
-            </div>
+            <div className="w-full h-px bg-slate-800 mb-8 opacity-20"></div>
 
             <AnimatePresence mode="wait">
                 {loading ? (
-                    <div className="flex gap-4 overflow-hidden mb-12">
+                    <div className="flex gap-4 overflow-hidden py-4">
                         {[1, 2, 3, 4, 5, 6].map(i => (
-                            <div key={i} className="min-w-[160px] md:min-w-[200px] aspect-[3/4] bg-[#0f212e] rounded-2xl animate-pulse" />
+                            <div key={i} className="min-w-[170px] md:min-w-[210px] aspect-[3/4] bg-[#0f212e] rounded-3xl animate-pulse" />
                         ))}
                     </div>
                 ) : (
@@ -164,29 +169,29 @@ export default function TrendingPage() {
                         ref={scrollRef}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="flex gap-6 pb-8 pt-4 overflow-x-auto scrollbar-hide snap-x scroll-smooth mb-8"
+                        className="flex gap-5 pb-12 pt-6 px-2 overflow-x-auto scrollbar-hide snap-x scroll-smooth -mx-2"
                     >
+
                         {trendingGames.slice(0, 12).map((game, index) => (
                             <div 
                                 key={index} 
-                                className="relative group min-w-[160px] md:min-w-[200px] flex-shrink-0 snap-start transition-transform hover:scale-[1.05] active:scale-95 z-10 hover:z-20"
+                                className="relative group min-w-[170px] md:min-w-[210px] flex-shrink-0 snap-start cursor-pointer transition-all hover:scale-[1.05] active:scale-95 z-10 hover:z-20"
+                                onClick={() => playNow(game.name)}
                             >
                                 <GameCard
                                     name={game.name}
                                     image={game.image}
                                     rtp={game.rtp}
                                     provider={game.provider}
-                                    onClick={() => playNow(game.name)}
                                 />
-                                {/* Real-time Stats Overlay */}
-                                <div className="absolute top-2 right-2 z-30 flex flex-col gap-1 items-end pointer-events-none">
-                                    <div className="bg-black/80 backdrop-blur-md px-2 py-1 rounded-md border border-white/10 flex items-center gap-1.5 shadow-xl">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-ping" />
-                                        <span className="text-[10px] font-black text-white">{game.recentPlayers} LIVE</span>
+                                <div className="absolute top-3 right-3 z-30 flex flex-col gap-1.5 items-end pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity">
+                                    <div className="bg-black/80 backdrop-blur-xl px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-2 shadow-2xl">
+                                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                        <span className="text-[11px] font-black text-white">{game.recentPlayers} LIVE</span>
                                     </div>
-                                    <div className="bg-[#00b9f0]/30 backdrop-blur-md px-2 py-1 rounded-md border border-[#00b9f0]/40 flex items-center gap-1 shadow-xl">
-                                        <Users size={10} className="text-[#00b9f0]" />
-                                        <span className="text-[9px] font-black text-white whitespace-nowrap">~{game.weeklyAvg} AVG</span>
+                                    <div className="bg-[#00b9f0]/30 backdrop-blur-xl px-2.5 py-1 rounded-lg border border-[#00b9f0]/40 flex items-center gap-1.5 shadow-2xl">
+                                        <Users size={12} className="text-[#00b9f0]" />
+                                        <span className="text-[10px] font-extrabold text-white whitespace-nowrap">~{game.weeklyAvg} AVG</span>
                                     </div>
                                 </div>
                             </div>
@@ -194,6 +199,7 @@ export default function TrendingPage() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
 
             <div className="mb-8 flex items-center justify-between">
                  <div className="flex items-center gap-3">

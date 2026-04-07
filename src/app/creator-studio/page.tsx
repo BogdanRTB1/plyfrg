@@ -18,30 +18,32 @@ export default function CreatorStudioPage() {
             const supabase = createClient();
             const { data: { user } } = await supabase.auth.getUser();
 
-            const added = localStorage.getItem('added_creators');
-            if (added) {
-                try {
-                    const parsedAdded = JSON.parse(added);
-                    if (parsedAdded && parsedAdded.length > 0) {
-                        if (user) {
-                            // Find the creator profile matching the logged in user
-                            const myCreator = parsedAdded.find((c: any) => c.email === user.email || String(c.id) === String(user.id) || c.userId === user.id);
-                            if (myCreator) {
-                                setCreatorData(myCreator);
-                            } else {
-                                window.location.href = "/become-creator";
-                            }
-                        } else {
-                            window.location.href = "/";
-                        }
-                    }
-                } catch (e) {
-                    console.error("Failed to parse creator data", e);
-                }
+            if (!user) {
+                window.location.href = "/";
+                return;
+            }
+
+            // Check Supabase 'creators' table
+            const { data: dbCreator, error } = await supabase
+                .from('creators')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+
+            if (dbCreator) {
+                // Map DB fields to UI expectations if necessary
+                dbCreator.name = dbCreator.display_name;
+                dbCreator.profilePicture = dbCreator.profile_picture;
+                dbCreator.bannerImage = dbCreator.banner_image;
+                setCreatorData(dbCreator);
+            } else {
+                // If not in DB, they aren't a creator yet
+                window.location.href = "/become-creator";
             }
         };
 
         checkCreatorStatus();
+
         window.addEventListener('storage', checkCreatorStatus);
         return () => window.removeEventListener('storage', checkCreatorStatus);
     }, []);
