@@ -194,10 +194,32 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
         );
     };
 
+    // Safety: auto-recover if game gets stuck in PLAYING for too long
+    useEffect(() => {
+        if (gameState !== 'PLAYING') return;
+        const stuckTimer = setTimeout(() => {
+            if (gameState === 'PLAYING') {
+                console.warn('Game stuck in PLAYING state — auto-recovering');
+                // Refund the bet
+                if (currencyType === 'GC') {
+                    setDiamonds((prev: number) => prev + betAmount);
+                } else {
+                    setForgesCoins((prev: number) => prev + betAmount);
+                }
+                setGameState('IDLE');
+                setLastWin(null);
+                // Force reset the iframe
+                iframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
+            }
+        }, 12000);
+        return () => clearTimeout(stuckTimer);
+    }, [gameState, betAmount, currencyType]);
+
     const resetGame = () => {
         setGameState('IDLE');
         iframeRef.current?.contentWindow?.postMessage(
             { type: 'RESET' },
+
             '*'
         );
     };

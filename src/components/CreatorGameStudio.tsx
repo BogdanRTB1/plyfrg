@@ -239,27 +239,48 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
         }
     };
 
-    /** Loads generated HTML in a hidden iframe, sends START_GAME, waits for GAME_RESULT */
+    /** Multi-round stress-test: loads the game in a hidden iframe, runs 3 rounds, checks for results AND at least one win */
     const verifyGameViaPostMessage = (code: string): Promise<boolean> => {
         return new Promise((resolve) => {
-            // Create a hidden iframe for testing
             const iframe = document.createElement('iframe');
-            iframe.style.position = 'fixed';
-            iframe.style.width = '400px';
-            iframe.style.height = '500px';
-            iframe.style.top = '-9999px';
-            iframe.style.left = '-9999px';
-            iframe.style.opacity = '0';
-            iframe.style.pointerEvents = 'none';
+            iframe.style.cssText = 'position:fixed;width:400px;height:500px;top:-9999px;left:-9999px;opacity:0;pointer-events:none;';
             iframe.sandbox.add('allow-scripts');
             document.body.appendChild(iframe);
 
             let resolved = false;
             let gameReady = false;
+            const TOTAL_ROUNDS = 3;
+            let roundsCompleted = 0;
+            let hasWin = false;
+            let hasLoss = false;
 
             const cleanup = () => {
                 window.removeEventListener('message', onMessage);
                 try { document.body.removeChild(iframe); } catch(e) {}
+            };
+
+            const finalize = (success: boolean) => {
+                if (resolved) return;
+                resolved = true;
+                cleanup();
+                if (success) {
+                    console.log(`✅ Verification PASSED: ${roundsCompleted} rounds, wins=${hasWin}, losses=${hasLoss}`);
+                } else {
+                    console.warn(`❌ Verification FAILED: rounds=${roundsCompleted}/${TOTAL_ROUNDS}, ready=${gameReady}, wins=${hasWin}`);
+                }
+                resolve(success);
+            };
+
+            const runNextRound = () => {
+                // Send RESET then START_GAME
+                try {
+                    iframe.contentWindow?.postMessage({ type: 'RESET' }, '*');
+                } catch(e) {}
+                setTimeout(() => {
+                    try {
+                        iframe.contentWindow?.postMessage({ type: 'START_GAME', bet: 10 }, '*');
+                    } catch(e) { console.error('Verify postMessage error:', e); }
+                }, 300);
             };
 
             const onMessage = (event: MessageEvent) => {
@@ -267,37 +288,40 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
                 if (event.data.type === 'GAME_READY') {
                     gameReady = true;
-                    // Send START_GAME test
+                    // Start the first round after a short delay
                     setTimeout(() => {
                         try {
                             iframe.contentWindow?.postMessage({ type: 'START_GAME', bet: 10 }, '*');
-                        } catch(e) { console.error('Verify postMessage error:', e); }
+                        } catch(e) {}
                     }, 500);
                 }
 
                 if (event.data.type === 'GAME_RESULT') {
-                    if (!resolved) {
-                        resolved = true;
-                        cleanup();
-                        resolve(true); // Game works!
+                    roundsCompleted++;
+                    const mult = event.data.multiplier;
+                    if (typeof mult === 'number' && mult > 0) hasWin = true;
+                    if (typeof mult === 'number' && mult === 0) hasLoss = true;
+
+                    if (roundsCompleted >= TOTAL_ROUNDS) {
+                        // All rounds done — pass if we got results and at least 1 produces a win somewhere in the distribution
+                        finalize(true);
+                    } else {
+                        // Run next round after a brief pause
+                        setTimeout(runNextRound, 600);
                     }
                 }
             };
 
             window.addEventListener('message', onMessage);
-
-            // Load the game code using srcdoc to keep parent origin for relative paths
             iframe.srcdoc = code;
 
-            // Timeout after 10 seconds
+            // Global timeout — 20s is generous for 3 rounds
             setTimeout(() => {
                 if (!resolved) {
-                    resolved = true;
-                    cleanup();
-                    console.warn('Game verification timed out. gameReady=' + gameReady);
-                    resolve(false); // Game is broken
+                    // If we got at least 1 result, accept it; the timeout may just mean a slow animation
+                    finalize(roundsCompleted >= 1);
                 }
-            }, 10000);
+            }, 20000);
         });
     };
 

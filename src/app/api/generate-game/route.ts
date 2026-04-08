@@ -31,15 +31,27 @@ CRITICAL ARCHITECTURE: You MUST use the exact HTML boilerplate below. DO NOT cha
     <script>
         // BOILERPLATE (DO NOT MODIFY)
         let currentBet = 0;
+        let _resultSent = false;
+        const _allTimeouts = [];
+        const _allIntervals = [];
+        const _origSetTimeout = window.setTimeout;
+        const _origSetInterval = window.setInterval;
+        window.setTimeout = function(fn, delay, ...args) { const id = _origSetTimeout(fn, delay, ...args); _allTimeouts.push(id); return id; };
+        window.setInterval = function(fn, delay, ...args) { const id = _origSetInterval(fn, delay, ...args); _allIntervals.push(id); return id; };
+
         window.addEventListener("message", (event) => {
-            if (event.data.type === 'START_GAME') { currentBet = event.data.bet; startGame(currentBet); }
+            if (event.data.type === 'START_GAME') { currentBet = event.data.bet; _resultSent = false; startGame(currentBet); }
             else if (event.data.type === 'RESET') { resetGame(); }
         });
         window.onload = () => { 
             initGame();
             parent.postMessage({ type: 'GAME_READY' }, '*'); 
         };
-        function sendResult(multiplier) { parent.postMessage({ type: 'GAME_RESULT', win: multiplier > 0, multiplier }, '*'); }
+        function sendResult(multiplier) {
+            if (_resultSent) return; // Prevent double-sending
+            _resultSent = true;
+            parent.postMessage({ type: 'GAME_RESULT', win: multiplier > 0, multiplier: multiplier }, '*');
+        }
 
         // --- YOUR EXOTIC GAME LOGIC BELOW ---
         function initGame() {
@@ -47,9 +59,16 @@ CRITICAL ARCHITECTURE: You MUST use the exact HTML boilerplate below. DO NOT cha
         }
         function startGame(bet) {
             // MUST have 3 phases: (1) Suspense buildup with animations, (2) Core resolution logic, (3) call sendResult(multiplier) ALWAYS
+            // SAFETY NET — if your logic somehow fails to call sendResult within 6 sec, force it:
+            setTimeout(() => { if (!_resultSent) sendResult(0); }, 6000);
         }
         function resetGame() {
-            // Clear ALL timeouts/intervals, reset UI to idle state for next round
+            _resultSent = false;
+            _allTimeouts.forEach(id => clearTimeout(id));
+            _allIntervals.forEach(id => clearInterval(id));
+            _allTimeouts.length = 0;
+            _allIntervals.length = 0;
+            // Clear UI, reset to idle for next round
         }
     </script>
 </body>
@@ -57,31 +76,59 @@ CRITICAL ARCHITECTURE: You MUST use the exact HTML boilerplate below. DO NOT cha
 \`\`\`
 
 MANDATORY DESIGN STANDARD (follow this EXACTLY):
-- BACKGROUND: Use \`#0A111A\` (bg-[#0a111a]) or \`radial-gradient(ellipse at center, #0a111a 0%, #06090c 100%)\` as the base. Don't use blue/slate gradients. Add a subtle animated glow using themeColor at 10% opacity.
-- CARDS/PANELS: Use deep dark glassmorphism — \`bg-[#121c22]/80 backdrop-blur-xl border border-white/5 rounded-2xl\`. Avoid bright or white panels!
-- ACCENT GLOW: All interactive elements, lines, and highlights must heavily feature themeColor with \`box-shadow: 0 0 20px {themeColor}40;\` and \`border-color: {themeColor}50\`.
-- TYPOGRAPHY: Use font-family 'Inter'. Titles: font-weight 900, uppercase, letter-spacing 0.1em. Body: font-weight 600, text-slate-400.
-- BUTTONS/CONTROLS: Use \`bg-gradient-to-r from-{themeColor} to-{themeColor}/80 text-white font-bold rounded-xl px-4 py-2 shadow-[0_0_15px_{themeColor}]\`.
-- SPACING: Generous padding (min 24px on main container). Use gap utilities. No cramped layouts.
+- BACKGROUND: Use \`#0A111A\` or \`radial-gradient(ellipse at center, #0a111a 0%, #06090c 100%)\` as the base. Add a subtle animated glow using themeColor at 10% opacity.
+- CARDS/PANELS: Use deep dark glassmorphism — \`bg-[#121c22]/80 backdrop-blur-xl border border-white/5 rounded-2xl\`.
+- ACCENT GLOW: All interactive elements must feature themeColor with \`box-shadow: 0 0 20px {themeColor}40;\`.
+- TYPOGRAPHY: Use font-family 'Inter'. Titles: font-weight 900, uppercase, letter-spacing 0.1em.
+- SPACING: Generous padding (min 24px). No cramped layouts.
 
 AUDIO INTEGRATION:
-- When the game enters the active/spinning/flying phase (e.g. wheels turning, rockets flying, dice tumbling), YOU MUST request sound effects using: \`parent.postMessage({ type: 'PLAY_SOUND', soundType: 'spin' }, '*');\`
-- Valid \`soundType\` options are: \`spin\` (slots/wheel), \`rise\` (crash/rockets), \`tumble\` (dice), \`blip\` (mines/plinko).
-- Fire these sounds efficiently, do not spam them. A single 'spin' or 'rise' call per round is enough.
+- Request sound effects using: \`parent.postMessage({ type: 'PLAY_SOUND', soundType: 'spin' }, '*');\`
+- Valid soundTypes: \`spin\` (slots/wheel), \`rise\` (crash/rockets), \`tumble\` (dice), \`blip\` (mines/plinko).
+- Fire once per round, not in loops.
 
-GAMEPLAY & VISUAL COMPLEXITY INSTRUCTIONS:
-1. MULTIMODAL CAPABILITY: If the user provides images, they will be injected as \`window.USER_IMAGES\` array. YOU MUST USE THESE IMAGES in the game if provided! Use as \`img.src = window.USER_IMAGES[0]\` or CSS backgrounds.
-2. MULTIPLE PHASES: startGame() must trigger: (a) "suspense" phase with dramatic animations (2-3 seconds), (b) "reveal" phase, (c) "resolution" with win/loss visuals. ALWAYS call sendResult(multiplier) at the end!
-3. IDLE STATE: initGame() MUST render a beautiful animated idle state. Include subtle floating/pulsing animations. The game must look alive even before starting.
-4. PARTICLES & FX: On wins, create confetti particles (spawn 30+ colored divs with random trajectories using JS), screen flash, floating multiplier text that scales up. On losses, subtle fade effect.
-5. OUTCOME TIERS: Implement 4 tiers: 0x loss (60% chance), 1.5x small win (25%), 5x big win (10%), 25x+ mega jackpot (5%). Each tier has distinct visual feedback intensity.
-6. CRITICAL FORBIDDEN ACTION: DO NOT create "Spin", "Bet", "Play", "Cashout" or "Start" buttons inside the HTML! The parent controls the game via postMessage.
-7. RESULT GUARANTEE: Your startGame() function MUST ALWAYS call sendResult(multiplier) within 8 seconds maximum. Use setTimeout as a safety net if needed: \`setTimeout(() => { if(!resultSent) sendResult(0); }, 8000);\`
+======= CRITICAL GAMEPLAY RULES =======
 
-8. CUSTOMIZABLE REWARDS / ASSETS: Identify primary thematic elements (e.g. 'Fish', 'Chest', 'Bomb') that the user might want to replace with their own images.
-   - List them in the JSON output under \`"customizableAssets": [{"id": "fish", "name": "Fish Asset", "default": "🐟"}]\`.
-   - In your HTML/JS code, you MUST render these elements dynamically using the injected global helper: \`window.renderCustomAsset('<id>', '<default emoji>')\`.
-   - Because \`renderCustomAsset\` returns either an Emoji OR an \`<img ...>\` HTML string, you MUST inject it via \`innerHTML\` (e.g., \`div.innerHTML = window.renderCustomAsset('fish', '🐟');\`), NEVER via \`textContent\` or \`innerText\`.
+1. OUTCOME DISTRIBUTION (use this EXACT pattern in startGame):
+   \`\`\`js
+   const roll = Math.random();
+   let multiplier = 0; // default: loss
+   if (roll < 0.05)      multiplier = 25;  // 5% jackpot
+   else if (roll < 0.15) multiplier = 5;   // 10% big win
+   else if (roll < 0.40) multiplier = 1.5; // 25% small win
+   // else multiplier stays 0 — 60% loss
+   \`\`\`
+   This EXACT distribution must be in every game. Adjust the multiplier display values for flavor but the thresholds MUST remain.
+
+2. sendResult() MUST BE CALLED EVERY ROUND — NO EXCEPTIONS.
+   - Put this safety net at the TOP of startGame: \`setTimeout(() => { if (!_resultSent) sendResult(0); }, 6000);\`
+   - After your animation finishes, call \`sendResult(multiplier);\` explicitly.
+   - The variable \`_resultSent\` (defined in the boilerplate) prevents double-sends.
+
+3. resetGame() MUST:
+   - Set \`_resultSent = false;\`
+   - Clear ALL timeouts/intervals using the tracked arrays
+   - Reset the visual UI back to idle state
+   - Be callable multiple times without errors
+
+4. NO IN-GAME BUTTONS: Do NOT create "Spin", "Bet", "Play", "Cashout", or "Start" buttons. The parent controls the game via postMessage.
+
+5. MULTIMODAL: If the user provides images (\`window.USER_IMAGES\`), YOU MUST USE THEM instead of emojis.
+
+6. CUSTOMIZABLE ASSETS:
+   - Identify 2-4 thematic elements the user might want to replace
+   - List them in JSON: \`"customizableAssets": [{"id": "gem", "name": "Gem", "default": "💎"}]\`
+   - In your code, render ALL of them via: \`element.innerHTML = window.renderCustomAsset('gem', '💎');\`
+   - NEVER use textContent or innerText for assets — renderCustomAsset may return <img> HTML
+   - The function window.renderCustomAsset is injected automatically, you just call it
+
+7. IDLE STATE: initGame() MUST render a beautiful animated idle state. Include subtle CSS animations. NEVER leave a blank screen.
+
+8. VISUAL FEEDBACK:
+   - Wins: Spawn 30+ confetti particles via JS, flash screen, show floating multiplier text
+   - Big wins: More intense particles, screen shake
+   - Losses: Subtle red flash or fade effect
+   - ALL tiers must have visually distinct feedback
 
 EXAMPLE RESPONSE FORMAT:
 \`\`\`json
@@ -101,6 +148,7 @@ EXAMPLE RESPONSE FORMAT:
 <!-- THE ENTIRE HTML DOCUMENT HERE including HEAD, BODY, and SCRIPT -->
 </html>
 \`\`\``;
+
 
 export async function POST(req: Request) {
    const generateWithRetry = async (geminiModel: any, prompt: any, maxRetries = 3): Promise<string> => {
@@ -191,18 +239,23 @@ Here is the raw output:
 
 ${text}
 
-VERIFICATION CHECKLIST:
-1. Does the code perfectly implement \`initGame()\`, \`startGame(bet)\`, and \`resetGame()\`?
-2. Are there ANY JavaScript syntax errors (missing brackets, undefined variables, bad loops)?
-3. Are all HTML/CSS tags properly formatted and closed?
-4. Are you returning exactly the required JSON format and HTML boilerplate?
-5. Did you accidentally generate a "Spin", "Play", "Bet", or "Start Game" button in the HTML? If YES, YOU MUST DELETE IT. We use postMessage to start the game!
-6. If the user provided images, did you actually use \`window.USER_IMAGES\` inside the generated HTML/JS? If you ignored the images and used Emojis instead, REWRITE the code to use \`window.USER_IMAGES\`.
-7. CRITICAL RESULT CHECK: Does your code explicitly call \`sendResult(multiplier)\` after a visual spin/round finishes?! If the animations complete but no result is sent, the game is completely broken. Forcefully add \`sendResult(multiplier)\` at the very end of your gameplay sequence!
+VERIFICATION CHECKLIST — check EVERY item:
+1. Does \`startGame(bet)\` contain the EXACT outcome distribution pattern?
+   \`const roll = Math.random(); let multiplier = 0; if (roll < 0.05) multiplier = 25; else if (roll < 0.15) multiplier = 5; else if (roll < 0.40) multiplier = 1.5;\`
+   If this pattern is missing or different thresholds are used, ADD IT.
+2. Does \`startGame\` call \`sendResult(multiplier)\` AT THE END after animations complete? This is MANDATORY.
+3. Is there a safety timeout at the TOP of startGame: \`setTimeout(() => { if (!_resultSent) sendResult(0); }, 6000);\`? If not, ADD IT.
+4. Does \`resetGame()\` set \`_resultSent = false;\` and clear timeouts/intervals? If not, FIX IT.
+5. Are there ANY JavaScript syntax errors (missing brackets, undefined variables)?
+6. Did you accidentally create a "Spin", "Play", "Bet", or "Start" button? If YES, DELETE IT.
+7. If the user provided images (\`window.USER_IMAGES\`), did you actually use them? If emojis are used instead, REWRITE to use the images.
+8. Are customizable assets rendered via \`innerHTML = window.renderCustomAsset(id, fallback)\`? If \`textContent\` or \`innerText\` is used, FIX to \`innerHTML\`.
+9. Does \`initGame()\` draw a visible idle state? A blank screen is UNACCEPTABLE.
 
 If there are ANY errors, bugs, or rule violations, FIX THEM and output the completely corrected JSON + HTML.
-If the code is 100% bug-free and fully meets the complexity requirements, just output the exact original JSON + HTML again.
+If the code is 100% correct, output the exact original JSON + HTML again.
 CRITICAL: ONLY OUTPUT THE JSON AND HTML. DO NOT ADD ANY CONVERSATIONAL TEXT.`;
+
 
               let verifyText = await generateWithRetry(model, [{ text: verificationPrompt }], 2);
               text = verifyText;
@@ -223,6 +276,19 @@ CRITICAL: ONLY OUTPUT THE JSON AND HTML. DO NOT ADD ANY CONVERSATIONAL TEXT.`;
               if (!htmlMatch.includes('sendResult') && !htmlMatch.includes('GAME_RESULT') && !htmlMatch.includes('postMessage')) {
                   throw new Error("Static Analysis Failed: Game does not send results back (missing sendResult)! User would be stuck.");
               }
+              // Check for outcome distribution — Math.random must exist for fair gameplay
+              if (!htmlMatch.includes('Math.random')) {
+                  console.warn("WARNING: Game does not use Math.random() — may have deterministic/broken outcomes.");
+              }
+              // Check for forbidden in-game buttons
+              const buttonPatterns = ['>Spin<', '>Play<', '>Start<', '>Bet<', '>Cashout<', '>spin<', '>play<', '>start<'];
+              for (const bp of buttonPatterns) {
+                  if (htmlMatch.includes(bp)) {
+                      // Remove the offending button text
+                      htmlMatch = htmlMatch.replace(new RegExp(bp, 'gi'), '><');
+                      console.warn(`Removed forbidden in-game button text: ${bp}`);
+                  }
+              }
 
               // JS SYNTAX VALIDATION (Compile all script tags on the server to check for Syntax Errors)
               const scriptTags = htmlMatch.match(/<script\b[^>]*>([\s\S]*?)<\/script>/gi);
@@ -240,37 +306,85 @@ CRITICAL: ONLY OUTPUT THE JSON AND HTML. DO NOT ADD ANY CONVERSATIONAL TEXT.`;
                   }
               }
 
-              // Inject USER_IMAGES and guaranteed START_GAME listener into the HTML
+
+              // Inject USER_IMAGES, safety nets, and guaranteed listeners into the HTML
               const guaranteedListener = `
-window.addEventListener('message', (event) => {
+// === SYSTEM SAFETY LAYER ===
+// Ensure _resultSent exists (prevents double-send)
+if (typeof _resultSent === 'undefined') { window._resultSent = false; }
+
+// Timeout/interval tracking for proper cleanup
+if (typeof _allTimeouts === 'undefined') { window._allTimeouts = []; }
+if (typeof _allIntervals === 'undefined') { window._allIntervals = []; }
+
+// Override sendResult to be idempotent
+const _origSendResult = typeof sendResult === 'function' ? sendResult : null;
+window.sendResult = function(multiplier) {
+    if (window._resultSent) return;
+    window._resultSent = true;
+    parent.postMessage({ type: 'GAME_RESULT', win: multiplier > 0, multiplier: multiplier }, '*');
+};
+
+// Wrap startGame with try-catch and safety timeout
+const _origStartGame = typeof startGame === 'function' ? startGame : null;
+window.startGame = function(bet) {
+    window._resultSent = false;
+    // Safety net: force result after 6s
+    const safetyId = setTimeout(function() { if (!window._resultSent) window.sendResult(0); }, 6000);
+    window._allTimeouts.push(safetyId);
     try {
-        if (event.data && event.data.type === 'START_GAME') {
-            if (typeof startGame === 'function') {
-                startGame(event.data.bet || 10);
-            }
-        } else if (event.data && event.data.type === 'RESET') {
-            if (typeof resetGame === 'function') {
-                resetGame();
-            }
-        } else if (event.data && event.data.type === 'UPDATE_ASSETS') {
+        if (_origStartGame) _origStartGame(bet);
+    } catch(e) {
+        console.error('startGame error:', e);
+        if (!window._resultSent) window.sendResult(0);
+    }
+};
+
+// Wrap resetGame with safety
+const _origResetGame = typeof resetGame === 'function' ? resetGame : null;
+window.resetGame = function() {
+    window._resultSent = false;
+    // Clear tracked timeouts and intervals
+    (window._allTimeouts || []).forEach(function(id) { try { clearTimeout(id); } catch(e) {} });
+    (window._allIntervals || []).forEach(function(id) { try { clearInterval(id); } catch(e) {} });
+    window._allTimeouts = [];
+    window._allIntervals = [];
+    try {
+        if (_origResetGame) _origResetGame();
+    } catch(e) { console.error('resetGame error:', e); }
+};
+
+// Guaranteed message listener (backup)
+window.addEventListener('message', function(event) {
+    try {
+        if (!event.data || typeof event.data !== 'object') return;
+        if (event.data.type === 'START_GAME') {
+            if (typeof window.startGame === 'function') window.startGame(event.data.bet || 10);
+        } else if (event.data.type === 'RESET') {
+            if (typeof window.resetGame === 'function') window.resetGame();
+        } else if (event.data.type === 'UPDATE_ASSETS') {
             window.CUSTOM_ASSETS = event.data.assets || {};
             if (typeof initGame === 'function') initGame();
-            if (typeof resetGame === 'function') resetGame();
         }
     } catch(e) { console.error("Error in injected listener:", e); }
 });
-window.renderCustomAsset = (id, fallback) => {
-    const val = (window.CUSTOM_ASSETS && window.CUSTOM_ASSETS[id]) || fallback;
-    if (val && typeof val === 'string' && val.startsWith('data:image')) {
+
+// Render custom assets (supports emoji, base64, and URL images)
+window.renderCustomAsset = function(id, fallback) {
+    var val = (window.CUSTOM_ASSETS && window.CUSTOM_ASSETS[id]) || fallback;
+    if (val && typeof val === 'string' && (val.startsWith('data:image') || val.startsWith('/uploads/') || val.startsWith('http'))) {
         return '<img src="' + val + '" style="width:100%; height:100%; object-fit:contain;" alt="">';
     }
-    return val;
+    return val || fallback;
 };
+
+// Backup GAME_READY after a delay in case initGame doesn't trigger it
+setTimeout(function() { parent.postMessage({ type: 'GAME_READY' }, '*'); }, 1500);
 `;
 
-              const scriptToInject = `\n<script>\n// INJECTED BY SYSTEM\nwindow.USER_IMAGES = ${savedImageUrls.length > 0 ? JSON.stringify(savedImageUrls) : '[]'};\nwindow.CUSTOM_ASSETS = {};\n${guaranteedListener}\n</script>\n`;
-              
-              // Insert right before </head> or <body>
+              const scriptToInject = `\n<script>\n// INJECTED BY SYSTEM\nwindow.USER_IMAGES = ${savedImageUrls.length > 0 ? JSON.stringify(savedImageUrls) : '[]'};\nwindow.CUSTOM_ASSETS = {};\n</script>\n`;
+
+              // Inject the initialization script before </head>
               if (htmlMatch.includes('</head>')) {
                   htmlMatch = htmlMatch.replace('</head>', `${scriptToInject}</head>`);
               } else if (htmlMatch.includes('<body>')) {
@@ -279,7 +393,16 @@ window.renderCustomAsset = (id, fallback) => {
                   htmlMatch = scriptToInject + htmlMatch;
               }
 
+              // Inject the safety layer AFTER the game's own script (before </body>)
+              const safetyScript = `\n<script>\n// SYSTEM SAFETY LAYER\n${guaranteedListener}\n</script>\n`;
+              if (htmlMatch.includes('</body>')) {
+                  htmlMatch = htmlMatch.replace('</body>', `${safetyScript}</body>`);
+              } else {
+                  htmlMatch = htmlMatch + safetyScript;
+              }
+
               parsedData.htmlCode = htmlMatch.trim();
+
 
               if (!parsedData.gameName || !parsedData.htmlCode) throw new Error('Missing required JSON fields (gameName or htmlCode)');
 

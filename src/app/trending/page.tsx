@@ -169,29 +169,33 @@ export default function TrendingPage() {
                         ref={scrollRef}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="flex gap-5 pb-12 pt-6 px-2 overflow-x-auto scrollbar-hide snap-x scroll-smooth -mx-2"
+                        className="flex gap-5 pb-8 pt-6 px-4 md:px-6 overflow-x-auto scrollbar-hide snap-x scroll-smooth -mx-4 md:-mx-6 relative z-10"
                     >
 
                         {trendingGames.slice(0, 12).map((game, index) => (
                             <div 
                                 key={index} 
-                                className="relative group min-w-[170px] md:min-w-[210px] flex-shrink-0 snap-start cursor-pointer transition-all hover:scale-[1.05] active:scale-95 z-10 hover:z-20"
-                                onClick={() => playNow(game.name)}
+                                className="min-w-[170px] md:min-w-[210px] flex-shrink-0 snap-start"
                             >
-                                <GameCard
-                                    name={game.name}
-                                    image={game.image}
-                                    rtp={game.rtp}
-                                    provider={game.provider}
-                                />
-                                <div className="absolute top-3 right-3 z-30 flex flex-col gap-1.5 items-end pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity">
-                                    <div className="bg-black/80 backdrop-blur-xl px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-2 shadow-2xl">
-                                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                        <span className="text-[11px] font-black text-white">{game.recentPlayers} LIVE</span>
-                                    </div>
-                                    <div className="bg-[#00b9f0]/30 backdrop-blur-xl px-2.5 py-1 rounded-lg border border-[#00b9f0]/40 flex items-center gap-1.5 shadow-2xl">
-                                        <Users size={12} className="text-[#00b9f0]" />
-                                        <span className="text-[10px] font-extrabold text-white whitespace-nowrap">~{game.weeklyAvg} AVG</span>
+                                <div 
+                                    className="relative group cursor-pointer transition-all duration-300 hover:scale-[1.05] active:scale-95 z-10 hover:z-20 w-full h-full"
+                                    onClick={() => playNow(game.name)}
+                                >
+                                    <GameCard
+                                        name={game.name}
+                                        image={game.image}
+                                        rtp={game.rtp}
+                                        provider={game.provider}
+                                    />
+                                    <div className="absolute top-3 right-3 z-30 flex flex-col gap-1.5 items-end pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity">
+                                        <div className="bg-black/80 backdrop-blur-xl px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-2 shadow-2xl">
+                                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                            <span className="text-[11px] font-black text-white">{game.recentPlayers} LIVE</span>
+                                        </div>
+                                        <div className="bg-[#00b9f0]/30 backdrop-blur-xl px-2.5 py-1 rounded-lg border border-[#00b9f0]/40 flex items-center gap-1.5 shadow-2xl">
+                                            <Users size={12} className="text-[#00b9f0]" />
+                                            <span className="text-[10px] font-extrabold text-white whitespace-nowrap">~{game.weeklyAvg} AVG</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
