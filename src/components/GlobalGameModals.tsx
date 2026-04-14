@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { recordGameActivity } from "@/utils/gameBridge";
+import { recordGameActivity, recordGameSession } from "@/utils/gameBridge";
 import { User } from "@supabase/supabase-js";
 import { usePathname } from "next/navigation";
 
@@ -31,6 +31,7 @@ import CustomSlotsModal from "@/components/CustomSlotsModal";
 import CustomPlinkoModal from "@/components/CustomPlinkoModal";
 import CustomMinesModal from "@/components/CustomMinesModal";
 import CustomCrashModal from "@/components/CustomCrashModal";
+import CustomScratchModal from "@/components/CustomScratchModal";
 import AIGameModal from "@/components/AIGameModal";
 
 // Other modals
@@ -61,6 +62,7 @@ export default function GlobalGameModals() {
     const [isCustomPlinkoOpen, setIsCustomPlinkoOpen] = useState(false);
     const [isCustomMinesOpen, setIsCustomMinesOpen] = useState(false);
     const [isCustomCrashOpen, setIsCustomCrashOpen] = useState(false);
+    const [isCustomScratchOpen, setIsCustomScratchOpen] = useState(false);
     const [isAIGameOpen, setIsAIGameOpen] = useState(false);
 
     const [isCreatorAppOpen, setIsCreatorAppOpen] = useState(false);
@@ -159,11 +161,12 @@ export default function GlobalGameModals() {
             
             if (typeof data === 'object' && data !== null) {
                 setActiveCustomGame(data);
-                if (data.type === 'ai_generated' || data.type === 'manual_template') setIsAIGameOpen(true);
+                if (data.type === 'ai_generated' || data.type === 'manual_template' || data.type === 'slot_engine') setIsAIGameOpen(true);
                 else if (data.type === 'slots') setIsCustomSlotsOpen(true);
                 else if (data.type === 'plinko') setIsCustomPlinkoOpen(true);
                 else if (data.type === 'mines') setIsCustomMinesOpen(true);
                 else if (data.type === 'crash') setIsCustomCrashOpen(true);
+                else if (data.type === 'scratch') setIsCustomScratchOpen(true);
                 // Record activity for custom game
                 recordGameActivity(label);
                 return;
@@ -200,7 +203,18 @@ export default function GlobalGameModals() {
             window.dispatchEvent(new CustomEvent('open_game', { detail: gameToOpen }));
         }
 
-        return () => window.removeEventListener('open_game', handleOpenGame);
+        const handleGameSessionComplete = ((e: CustomEvent) => {
+            const detail = e.detail;
+            if (detail) {
+                recordGameSession(detail);
+            }
+        }) as EventListener;
+        window.addEventListener('game_session_complete', handleGameSessionComplete);
+
+        return () => {
+             window.removeEventListener('open_game', handleOpenGame);
+             window.removeEventListener('game_session_complete', handleGameSessionComplete);
+        };
     }, [pathname]);
 
 
@@ -240,6 +254,7 @@ export default function GlobalGameModals() {
             <CustomPlinkoModal isOpen={isCustomPlinkoOpen} onClose={() => setIsCustomPlinkoOpen(false)} gameData={activeCustomGame} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
             <CustomMinesModal isOpen={isCustomMinesOpen} onClose={() => setIsCustomMinesOpen(false)} gameData={activeCustomGame} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
             <CustomCrashModal isOpen={isCustomCrashOpen} onClose={() => setIsCustomCrashOpen(false)} gameData={activeCustomGame} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <CustomScratchModal isOpen={isCustomScratchOpen} onClose={() => setIsCustomScratchOpen(false)} gameData={activeCustomGame} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
             
             {activeCustomGame && (
                 <AIGameModal isOpen={isAIGameOpen} onClose={() => setIsAIGameOpen(false)} gameData={activeCustomGame} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />

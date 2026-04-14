@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scratch Card Engine</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a111a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: white;
+    user-select: none;
+  }
+
+  .game-title {
+    font-size: 18px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    text-align: center;
+    opacity: 0.9;
+  }
+
+  .card-container {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 3px solid rgba(255,255,255,0.15);
+    box-shadow: 0 0 40px rgba(0,0,0,0.5), 0 0 80px rgba(245,158,11,0.1);
+    background: #0d1520;
+  }
+
+  .symbols-grid {
+    display: grid;
+    gap: 0;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .symbol-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    border: 1px solid rgba(255,255,255,0.05);
+    background: #0d1520;
+    transition: all 0.3s;
+  }
+
+  .symbol-cell img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+  }
+
+  .symbol-cell.winner {
+    animation: winPulse 0.6s ease infinite alternate;
+    background: rgba(245,158,11,0.15);
+    border-color: rgba(245,158,11,0.4);
+  }
+
+  @keyframes winPulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.12); }
+  }
+
+  #scratchCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    z-index: 10;
+    border-radius: 17px;
+  }
+
+  .result-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s;
+    border-radius: 17px;
+  }
+
+  .result-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .result-overlay.win {
+    background: radial-gradient(circle, rgba(245,158,11,0.3) 0%, rgba(0,0,0,0.7) 70%);
+  }
+
+  .result-overlay.lose {
+    background: radial-gradient(circle, rgba(100,116,139,0.2) 0%, rgba(0,0,0,0.7) 70%);
+  }
+
+  .result-text {
+    font-size: 32px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-shadow: 0 0 30px currentColor;
+    margin-bottom: 8px;
+  }
+
+  .result-amount {
+    font-size: 20px;
+    font-weight: 700;
+    opacity: 0.8;
+  }
+
+  .hint {
+    position: absolute;
+    bottom: -30px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  #revealBtn {
+    position: absolute;
+    bottom: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    padding: 6px 16px;
+    border-radius: 100px;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s;
+    z-index: 30;
+    white-space: nowrap;
+  }
+
+  .particles {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+  <div class="game-title" id="gameTitle">Scratch Card</div>
+
+  <div style="position:relative">
+    <div class="card-container" id="cardContainer">
+      <div class="symbols-grid" id="symbolsGrid"></div>
+      <canvas id="scratchCanvas"></canvas>
+      <div class="result-overlay" id="resultOverlay">
+        <div class="result-text" id="resultText"></div>
+        <div class="result-amount" id="resultAmount"></div>
+      </div>
+    </div>
+    <div class="hint" id="hint">Scratch the card to reveal symbols!</div>
+    <button id="revealBtn">✨ Reveal All ✨</button>
+  </div>
+
+  <canvas class="particles" id="particles"></canvas>
+
+<script>
+(function() {
+  'use strict';
+
+  let config = null;
+  let grid = [];
+  let isWin = false;
+  let winAmount = 0;
+  let winningSymbolId = null;
+  let scratching = false;
+  let revealed = false;
+  let scratchPercent = 0;
+  let moveCount = 0;
+
+  const titleEl = document.getElementById('gameTitle');
+  const container = document.getElementById('cardContainer');
+  const symbolsGrid = document.getElementById('symbolsGrid');
+  const canvas = document.getElementById('scratchCanvas');
+  const ctx = canvas.getContext('2d');
+  const overlay = document.getElementById('resultOverlay');
+  const resultText = document.getElementById('resultText');
+  const resultAmount = document.getElementById('resultAmount');
+  const hint = document.getElementById('hint');
+  const revealBtn = document.getElementById('revealBtn');
+  const pCanvas = document.getElementById('particles');
+  const pCtx = pCanvas.getContext('2d');
+
+  function resizeParticles() {
+    pCanvas.width = window.innerWidth;
+    pCanvas.height = window.innerHeight;
+  }
+  resizeParticles();
+  window.addEventListener('resize', resizeParticles);
+
+  let particles = [];
+  function spawnWinParticles() {
+    const accent = config?.theme?.accentColor || '#f59e0b';
+    for (let i = 0; i < 60; i++) {
+      particles.push({
+        x: Math.random() * pCanvas.width,
+        y: pCanvas.height + 20,
+        vx: (Math.random() - 0.5) * 6,
+        vy: -(Math.random() * 8 + 4),
+        size: Math.random() * 6 + 3,
+        color: Math.random() > 0.5 ? accent : '#ffd700',
+        life: 1,
+        decay: Math.random() * 0.015 + 0.008,
+        gravity: 0.1
+      });
+    }
+  }
+
+  function updateParticles() {
+    pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+    particles = particles.filter(p => p.life > 0);
+    particles.forEach(p => {
+      p.x += p.vx; p.vy += p.gravity; p.y += p.vy; p.life -= p.decay;
+      pCtx.globalAlpha = p.life; pCtx.fillStyle = p.color;
+      pCtx.beginPath(); pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2); pCtx.fill();
+    });
+    pCtx.globalAlpha = 1;
+    if (particles.length > 0) requestAnimationFrame(updateParticles);
+  }
+
+  function applyConfig(cfg) {
+    const rows = cfg.rows || 3;
+    const cols = cfg.cols || 3;
+    const w = cols * 80;
+    const h = rows * 80;
+
+    container.style.width = w + 'px';
+    container.style.height = h + 'px';
+    symbolsGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    symbolsGrid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+
+    if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+    }
+    
+    if (cfg.theme) {
+      if (cfg.theme.gameName) titleEl.textContent = cfg.theme.gameName;
+      if (cfg.theme.backgroundColor) document.body.style.background = cfg.theme.backgroundColor;
+    }
+
+    const structureChanged = !config || config.rows !== cfg.rows || config.cols !== cfg.cols || JSON.stringify(config.symbols) !== JSON.stringify(cfg.symbols);
+    config = cfg;
+    
+    if (structureChanged) resetGame();
+    else if (scratchPercent === 0) drawFoil();
+  }
+
+  function generateGrid() {
+    if (!config) return;
+    const rows = config.rows || 3, cols = config.cols || 3, symbols = config.symbols || [];
+    const shouldWin = Math.random() < (config.winProbability || 0.3);
+    grid = []; isWin = false; winAmount = 0; winningSymbolId = null;
+
+    if (shouldWin && symbols.length > 0) {
+      const winIdx = Math.floor(Math.random() * symbols.length);
+      const winSym = symbols[winIdx];
+      isWin = true; winAmount = winSym.payout || 1; winningSymbolId = winSym.id;
+      const flat = new Array(rows * cols).fill(-1);
+      const pos = [];
+      while (pos.length < 3) {
+        const p = Math.floor(Math.random() * flat.length);
+        if (!pos.includes(p)) pos.push(p);
+      }
+      pos.forEach(p => flat[p] = winIdx);
+      for (let i = 0; i < flat.length; i++) {
+        if (flat[i] === -1) flat[i] = Math.floor(Math.random() * symbols.length);
+      }
+      for (let r = 0; r < rows; r++) grid[r] = flat.slice(r * cols, (r + 1) * cols);
+    } else {
+      for (let r = 0; r < rows; r++) {
+        grid[r] = [];
+        for (let c = 0; c < cols; c++) grid[r][c] = Math.floor(Math.random() * symbols.length);
+      }
+    }
+  }
+
+  function renderSymbols() {
+    symbolsGrid.innerHTML = '';
+    const rows = config?.rows || 3, cols = config?.cols || 3, symbols = config?.symbols || [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'symbol-cell';
+        const syIdx = grid[r]?.[c] ?? 0;
+        const sym = symbols[syIdx];
+        if (sym) {
+          if (sym.image && (sym.image.startsWith('data:') || sym.image.startsWith('http'))) {
+            const img = document.createElement('img'); img.src = sym.image; cell.appendChild(img);
+          } else { cell.textContent = sym.image || '❓'; }
+        }
+        symbolsGrid.appendChild(cell);
+      }
+    }
+  }
+
+  function drawFoil() {
+    const w = canvas.width, h = canvas.height;
+    if (w === 0 || h === 0) return;
+    ctx.globalCompositeOperation = 'source-over';
+    const accent = config?.theme?.accentColor || '#f59e0b';
+    const grd = ctx.createLinearGradient(0, 0, w, h);
+    grd.addColorStop(0, accent); grd.addColorStop(1, '#1a2c38');
+    ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    for (let i = 0; i < 20; i++) {
+      ctx.beginPath(); ctx.arc(Math.random() * w, Math.random() * h, Math.random() * 20, 0, 2 * Math.PI); ctx.fill();
+    }
+    ctx.fillStyle = 'white'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('SCRATCH HERE', w / 2, h / 2);
+  }
+
+  function scratch(x, y) {
+    if (revealed) return;
+    ctx.globalCompositeOperation = 'destination-out';
+    const size = config?.brushSize || 40;
+    ctx.beginPath(); ctx.arc(x, y, size / 2, 0, Math.PI * 2); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    moveCount++;
+    if (moveCount >= 5) { moveCount = 0; checkProgress(); }
+  }
+
+  function checkProgress() {
+    try {
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let trans = 0;
+      for (let i = 3; i < data.length; i += 4) { if (data[i] === 0) trans++; }
+      scratchPercent = trans / (data.length / 4);
+      if (scratchPercent > 0.05) { revealBtn.style.opacity = '1'; revealBtn.style.pointerEvents = 'auto'; }
+      if (scratchPercent > 0.45) revealAll();
+    } catch(e) {}
+  }
+
+  function revealAll() {
+    if (revealed) return; revealed = true;
+    revealBtn.style.opacity = '0'; revealBtn.style.pointerEvents = 'none';
+    canvas.style.transition = 'opacity 0.5s'; canvas.style.opacity = '0';
+    setTimeout(showResult, 600);
+  }
+
+  function showResult() {
+    overlay.classList.add('show');
+    if (isWin) {
+      overlay.classList.add('win'); resultText.textContent = 'YOU WIN!';
+      resultAmount.textContent = winAmount + 'x PAYOUT';
+      spawnWinParticles(); updateParticles();
+    } else {
+      overlay.classList.add('lose'); resultText.textContent = 'TRY AGAIN';
+    }
+    parent.postMessage({ type: 'SCRATCH_RESULT', win: isWin, multiplier: isWin ? winAmount : 0, winningSymbol: winningSymbolId }, '*');
+  }
+
+  function resetGame() {
+    revealed = false; scratchPercent = 0; moveCount = 0;
+    revealBtn.style.opacity = '0'; revealBtn.style.pointerEvents = 'none';
+    overlay.classList.remove('show', 'win', 'lose');
+    canvas.style.transition = 'none'; canvas.style.opacity = '1';
+    generateGrid(); renderSymbols(); setTimeout(drawFoil, 50);
+  }
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: (cx - rect.left) * (canvas.width / rect.width), y: (cy - rect.top) * (canvas.height / rect.height) };
+  }
+
+  canvas.addEventListener('mousedown', (e) => { scratching = true; const p = getPos(e); scratch(p.x, p.y); });
+  window.addEventListener('mousemove', (e) => { if (scratching) { const p = getPos(e); scratch(p.x, p.y); } });
+  window.addEventListener('mouseup', () => scratching = false);
+  canvas.addEventListener('touchstart', (e) => { e.preventDefault(); scratching = true; const p = getPos(e); scratch(p.x, p.y); }, {passive:false});
+  canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (scratching) { const p = getPos(e); scratch(p.x, p.y); } }, {passive:false});
+  revealBtn.addEventListener('click', revealAll);
+
+  window.addEventListener('message', (e) => {
+    if (e.data.type === 'SCRATCH_CONFIG') applyConfig(e.data.config);
+    if (e.data.type === 'START_GAME') resetGame();
+    if (e.data.type === 'RESET') resetGame();
+  });
+
+  parent.postMessage({ type: 'GAME_READY', engine: 'scratch' }, '*');
+})();
+</script>
+</body>
+</html>

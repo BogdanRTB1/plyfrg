@@ -137,8 +137,17 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
                 // Ensure path has data before accessing logic
                 if (path.length > 0) {
-                    // Determine multiplier - logic simplified for determinism/demo
-                    const randomBucketForDemo = Math.floor(Math.random() * MULTIPLIERS.length);
+                    // Determine multiplier - Rigged in favor of the house
+                    const r = Math.random();
+                    let randomBucketForDemo = 8;
+                    if (r < 0.001) randomBucketForDemo = Math.random() < 0.5 ? 0 : 16;
+                    else if (r < 0.005) randomBucketForDemo = Math.random() < 0.5 ? 1 : 15;
+                    else if (r < 0.01) randomBucketForDemo = Math.random() < 0.5 ? 2 : 14;
+                    else if (r < 0.03) randomBucketForDemo = Math.random() < 0.5 ? 3 : 13;
+                    else if (r < 0.08) randomBucketForDemo = Math.random() < 0.5 ? 4 : 12;
+                    else if (r < 0.15) randomBucketForDemo = Math.random() < 0.5 ? 5 : 11;
+                    else if (r < 0.30) randomBucketForDemo = Math.random() < 0.5 ? 6 : 10;
+                    else randomBucketForDemo = [7,8,9][Math.floor(Math.random() * 3)];
                     const multiplier = MULTIPLIERS[randomBucketForDemo];
 
                     const winAmount = betAmount * multiplier;

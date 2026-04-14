@@ -37,8 +37,8 @@ export default function GameCard({ name, image, rtp = "99.0%", provider = "PlayF
                     RTP {rtp}
                 </div>
 
-                <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-[#0f212e] via-[#0f212e]/80 to-transparent flex flex-col justify-end h-3/4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-                    <button className="w-full py-2 bg-[#00b9f0] text-[#0f212e] text-xs font-bold rounded shadow-lg translate-y-4 group-hover:translate-y-0 transition-transform duration-300 hover:bg-[#38bdf8]">Play Now</button>
+                <div className="absolute inset-x-0 -bottom-1 p-4 pb-5 bg-gradient-to-t from-[#0f212e] via-[#0f212e]/90 to-transparent flex flex-col justify-end h-3/4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none">
+                    <button className="w-full py-2 bg-[#00b9f0] text-[#0f212e] text-xs font-bold rounded shadow-lg translate-y-4 group-hover:translate-y-0 transition-transform duration-300 hover:bg-[#38bdf8] pointer-events-auto">Play Now</button>
                 </div>
             </div>
             <div className="p-4 border-t border-white/5 group-hover:border-[#00b9f0]/20 transition-colors bg-[#0f212e] flex-1">

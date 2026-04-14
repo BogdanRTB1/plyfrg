@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, Users, Presentation, Target, DollarSign, Activity, Gamepad2, Edit, Layers, Play, Sparkles } from 'lucide-react';
+import { TrendingUp, Users, Presentation, Target, DollarSign, Activity, Gamepad2, Edit, Layers, Play, Sparkles, Clock, Trash2, Eye } from 'lucide-react';
 import EditCreatorModal from '@/components/EditCreatorModal';
 import CreatorGameStudio from '@/components/CreatorGameStudio';
 import { createClient } from '@/utils/supabase/client';
@@ -10,8 +10,11 @@ import { createClient } from '@/utils/supabase/client';
 export default function CreatorStudioPage() {
     const [creatorData, setCreatorData] = useState<any>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'studio'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'studio' | 'games' | 'finances'>('dashboard');
     const [publishedGames, setPublishedGames] = useState<any[]>([]);
+    const [earnings, setEarnings] = useState<any[]>([]);
+    const [gamePlays, setGamePlays] = useState<any[]>([]);
+    const [profileViews, setProfileViews] = useState<any[]>([]);
 
     useEffect(() => {
         const checkCreatorStatus = async () => {
@@ -72,6 +75,66 @@ export default function CreatorStudioPage() {
         return () => window.removeEventListener('storage', loadPublishedGames);
     }, [creatorData]);
 
+    // Load earnings
+    useEffect(() => {
+        const loadEarnings = () => {
+             if (creatorData) {
+                  try {
+                      const data = localStorage.getItem('creator_earnings');
+                      if (data) {
+                          const allEarnings = JSON.parse(data);
+                          const myEarnings = allEarnings.filter((e: any) => 
+                              e.creatorId === (creatorData.id || creatorData.name) || 
+                              e.creatorName === creatorData.name
+                          );
+                          setEarnings(myEarnings);
+                      }
+                  } catch (e) {
+                      console.error(e);
+                  }
+             }
+        };
+        loadEarnings();
+        window.addEventListener('storage', loadEarnings);
+        return () => window.removeEventListener('storage', loadEarnings);
+    }, [creatorData]);
+
+    // Load game plays
+    useEffect(() => {
+        const loadGamePlays = () => {
+             if (creatorData) {
+                  try {
+                      const data = localStorage.getItem('creator_game_plays');
+                      if (data) {
+                          const allPlays = JSON.parse(data);
+                          const myPlays = allPlays.filter((p: any) => 
+                              p.creatorId === (creatorData.id || creatorData.name)
+                          );
+                          setGamePlays(myPlays);
+                      }
+                  } catch (e) {
+                      console.error(e);
+                  }
+
+                  try {
+                      const vdata = localStorage.getItem('creator_profile_views');
+                      if (vdata) {
+                          const allViews = JSON.parse(vdata);
+                          const myViews = allViews.filter((v: any) => 
+                              v.creatorId === (creatorData.id || creatorData.name) || v.creatorName === creatorData.name
+                          );
+                          setProfileViews(myViews);
+                      }
+                  } catch (e) {
+                      console.error(e);
+                  }
+             }
+        };
+        loadGamePlays();
+        window.addEventListener('storage', loadGamePlays);
+        return () => window.removeEventListener('storage', loadGamePlays);
+    }, [creatorData]);
+
     if (!creatorData) {
         return (
             <div className="flex flex-col items-center justify-center h-full text-white bg-[#050B14]">
@@ -81,16 +144,67 @@ export default function CreatorStudioPage() {
         );
     }
 
-    // Mock Chart Data for Revenue & Users
-    const monthlyStats = [
-        { label: "Jan", revenue: 45, players: 30 },
-        { label: "Feb", revenue: 65, players: 45 },
-        { label: "Mar", revenue: 35, players: 35 },
-        { label: "Apr", revenue: 80, players: 60 },
-        { label: "May", revenue: 95, players: 80 },
-        { label: "Jun", revenue: 70, players: 55 },
-        { label: "Jul", revenue: 100, players: 90 }, // Current month mapping to 100% height
-    ];
+    // Dynamic Chart Data for Revenue
+    const currentMonthStr = new Date().toISOString().substring(0, 7);
+    const thisMonthEarnings = earnings.filter(e => e.date && e.date.startsWith(currentMonthStr) && e.currency === 'FC');
+    const totalThisMonth = thisMonthEarnings.reduce((acc, curr) => acc + (curr.usdValue || curr.amount * 0.90), 0);
+
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const groupedEarnings = {} as Record<string, number>;
+    earnings.forEach(e => {
+        if (!e.date || e.currency !== 'FC') return;
+        const monthIndex = new Date(e.date).getMonth();
+        const valueInUsd = e.usdValue || e.amount * 0.90;
+        groupedEarnings[months[monthIndex]] = (groupedEarnings[months[monthIndex]] || 0) + valueInUsd;
+    });
+
+    const groupedPlayers = {} as Record<string, Set<string>>;
+    gamePlays.forEach(p => {
+        if (!p.date) return;
+        const monthIndex = new Date(p.date).getMonth();
+        const monthLabel = months[monthIndex];
+        if (!groupedPlayers[monthLabel]) groupedPlayers[monthLabel] = new Set();
+        groupedPlayers[monthLabel].add(p.playerId);
+    });
+
+    const currentMonthIdx = new Date().getMonth();
+    const startMonthIdx = Math.max(0, currentMonthIdx - 5); // display up to 6 months
+    const monthlyStats = [];
+    
+    let maxRev = 0;
+    let maxPlayers = 0;
+    for (let i = startMonthIdx; i <= currentMonthIdx; i++) {
+        if ((groupedEarnings[months[i]] || 0) > maxRev) maxRev = groupedEarnings[months[i]];
+        const pCount = groupedPlayers[months[i]]?.size || 0;
+        if (pCount > maxPlayers) maxPlayers = pCount;
+    }
+
+    for (let i = startMonthIdx; i <= currentMonthIdx; i++) {
+        const rev = groupedEarnings[months[i]] || 0;
+        const pCount = groupedPlayers[months[i]]?.size || 0;
+        monthlyStats.push({
+            label: months[i],
+            revenue: maxRev > 0 ? (rev / maxRev) * 100 : (i === currentMonthIdx ? 5 : 0),
+            players: maxPlayers > 0 ? (pCount / maxPlayers) * 100 : (i === currentMonthIdx ? 15 : 0)
+        });
+    }
+
+    if (monthlyStats.length === 0) {
+        monthlyStats.push({ label: months[currentMonthIdx], revenue: 5, players: 15 });
+    }
+
+    // Dynamic Active Players
+    const thisMonthPlays = gamePlays.filter(p => p.date && p.date.startsWith(currentMonthStr));
+    const uniquePlayersThisMonth = new Set(thisMonthPlays.map(p => p.playerId)).size;
+
+    // Dynamic Profile Views & Conversion
+    const thisMonthViews = profileViews.filter(v => v.date && v.date.startsWith(currentMonthStr));
+    const viewsThisMonthCount = thisMonthViews.length;
+    let conversionRate = 0;
+    if (viewsThisMonthCount > 0) {
+        conversionRate = (uniquePlayersThisMonth / viewsThisMonthCount) * 100;
+        if (conversionRate > 100) conversionRate = 100; // Cap it gracefully for testing edge-cases
+    }
 
     return (
         <div className="flex-1 h-full overflow-y-auto bg-[#050B14] relative custom-scrollbar z-0 p-6 lg:p-12 pb-32">
@@ -153,6 +267,27 @@ export default function CreatorStudioPage() {
                             <motion.div layoutId="studioTabIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-400 shadow-[0_0_10px_#a855f7]" />
                         )}
                     </button>
+                    <button
+                        onClick={() => setActiveTab('games')}
+                        className={`px-8 py-4 font-bold text-sm tracking-widest uppercase transition-colors relative flex items-center gap-2 ${activeTab === 'games' ? 'text-[#00b9f0]' : 'text-slate-400 hover:text-white'}`}
+                    >
+                        <Layers size={16} /> My Games
+                        {publishedGames.length > 0 && (
+                            <span className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center ${activeTab === 'games' ? 'bg-[#00b9f0] text-black' : 'bg-white/10 text-white'}`}>{publishedGames.length}</span>
+                        )}
+                        {activeTab === 'games' && (
+                            <motion.div layoutId="studioTabIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00b9f0] shadow-[0_0_10px_#00b9f0]" />
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('finances')}
+                        className={`px-8 py-4 font-bold text-sm tracking-widest uppercase transition-colors relative flex items-center gap-2 ${activeTab === 'finances' ? 'text-emerald-400' : 'text-slate-400 hover:text-white'}`}
+                    >
+                        <DollarSign size={16} /> Finances
+                        {activeTab === 'finances' && (
+                            <motion.div layoutId="studioTabIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-400 shadow-[0_0_10px_#10b981]" />
+                        )}
+                    </button>
                 </div>
 
                 <AnimatePresence mode="wait">
@@ -181,10 +316,10 @@ export default function CreatorStudioPage() {
                                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Est. Earnings</h3>
                                     </div>
                                     <div className="relative z-10">
-                                        <span className="text-4xl font-black text-white">$12,450.00</span>
+                                        <span className="text-4xl font-black text-white">${totalThisMonth.toFixed(2)}</span>
                                         <div className="flex items-center gap-1 text-emerald-400 text-sm font-bold mt-2">
                                             <TrendingUp size={16} />
-                                            <span>+14.5% this month</span>
+                                            <span>Current Month</span>
                                         </div>
                                     </div>
                                 </div>
@@ -198,10 +333,10 @@ export default function CreatorStudioPage() {
                                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Active Players</h3>
                                     </div>
                                     <div className="relative z-10">
-                                        <span className="text-4xl font-black text-white">4,821</span>
+                                        <span className="text-4xl font-black text-white">{uniquePlayersThisMonth}</span>
                                         <div className="flex items-center gap-1 text-emerald-400 text-sm font-bold mt-2">
                                             <TrendingUp size={16} />
-                                            <span>+420 new players</span>
+                                            <span>Current Month</span>
                                         </div>
                                     </div>
                                 </div>
@@ -215,10 +350,10 @@ export default function CreatorStudioPage() {
                                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Profile Views</h3>
                                     </div>
                                     <div className="relative z-10">
-                                        <span className="text-4xl font-black text-white">18.2K</span>
+                                        <span className="text-4xl font-black text-white">{viewsThisMonthCount >= 1000 ? (viewsThisMonthCount / 1000).toFixed(1) + 'K' : viewsThisMonthCount}</span>
                                         <div className="flex items-center gap-1 text-pink-400 text-sm font-bold mt-2">
                                             <Activity size={16} />
-                                            <span>High engagement rate</span>
+                                            <span>Current Month</span>
                                         </div>
                                     </div>
                                 </div>
@@ -232,10 +367,10 @@ export default function CreatorStudioPage() {
                                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Conversion</h3>
                                     </div>
                                     <div className="relative z-10">
-                                        <span className="text-4xl font-black text-white">8.4%</span>
+                                        <span className="text-4xl font-black text-white">{conversionRate.toFixed(1)}%</span>
                                         <div className="flex items-center gap-1 text-emerald-400 text-sm font-bold mt-2">
                                             <TrendingUp size={16} />
-                                            <span>+1.2% versus last week</span>
+                                            <span>Real-time tracking</span>
                                         </div>
                                     </div>
                                 </div>
@@ -347,6 +482,213 @@ export default function CreatorStudioPage() {
                                     </div>
                                 </motion.div>
                             </div>
+                        </motion.div>
+                    ) : activeTab === 'finances' ? (
+                        <motion.div
+                            key="finances"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className="space-y-6"
+                        >
+                            {/* Payout Header */}
+                            <div className="bg-[#0b1622]/80 backdrop-blur-xl rounded-[32px] p-8 border border-white/10 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+                                 <div>
+                                      <h2 className="text-3xl font-black text-white tracking-tight">Available Balance</h2>
+                                      <p className="text-slate-400 font-medium">Earnings ready for withdrawal.</p>
+                                 </div>
+                                 <div className="flex items-center gap-6">
+                                      <span className="text-5xl font-black text-emerald-400">${totalThisMonth.toFixed(2)}</span>
+                                      <button 
+                                          onClick={() => {
+                                              if (totalThisMonth < 100) {
+                                                   alert('Minimum $100 payout is required.');
+                                              } else {
+                                                   alert('Withdrawal request initialized! Processing...');
+                                              }
+                                          }}
+                                          disabled={totalThisMonth < 100}
+                                          className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black uppercase tracking-widest rounded-xl transition-colors shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                                      >
+                                          Withdraw
+                                      </button>
+                                 </div>
+                            </div>
+                            
+                            {/* Table Breakdown */}
+                            <div className="bg-[#0b1622]/80 backdrop-blur-xl rounded-[32px] p-8 border border-white/10">
+                                 <h2 className="text-xl font-black text-white tracking-tight mb-6">Game Performance</h2>
+                                 <div className="w-full overflow-x-auto">
+                                      <table className="w-full text-left border-collapse">
+                                           <thead>
+                                                <tr className="border-b border-white/10">
+                                                     <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Game Name</th>
+                                                     <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Total Earnings</th>
+                                                     <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Unique Players</th>
+                                                </tr>
+                                           </thead>
+                                           <tbody>
+                                                {publishedGames.map(game => {
+                                                     const gEarn = earnings.filter(e => e.gameId === game.id);
+                                                     const gTotal = gEarn.reduce((acc, curr) => acc + (curr.usdValue || curr.amount * 0.90), 0);
+                                                     const gPlays = gamePlays.filter(p => p.gameId === game.id);
+                                                     const gUnique = new Set(gPlays.map(p => p.playerId)).size;
+                                                     return (
+                                                         <tr key={game.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                                              <td className="p-4 flex items-center gap-3 text-sm font-bold text-white">
+                                                                   <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 text-lg" style={{ background: `${game.themeColor || '#00b9f0'}20` }}>
+                                                                       {game.themeEmoji || '🎮'}
+                                                                   </div>
+                                                                   {game.name}
+                                                              </td>
+                                                              <td className="p-4 text-sm font-mono text-emerald-400">${gTotal.toFixed(2)}</td>
+                                                              <td className="p-4 text-sm font-bold text-slate-300">{gUnique}</td>
+                                                         </tr>
+                                                     )
+                                                })}
+                                                {publishedGames.length === 0 && (
+                                                     <tr>
+                                                          <td colSpan={3} className="p-8 text-center text-slate-500 text-sm">No games published yet.</td>
+                                                     </tr>
+                                                )}
+                                           </tbody>
+                                      </table>
+                                 </div>
+                            </div>
+                        </motion.div>
+                    ) : activeTab === 'games' ? (
+                        <motion.div
+                            key="games"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className="space-y-6"
+                        >
+                            {/* Header */}
+                            <div className="bg-[#0b1622]/90 backdrop-blur-xl rounded-[32px] p-8 border border-white/10 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-[#00b9f0]/10 rounded-full blur-[100px] pointer-events-none" />
+                                <div className="flex items-center justify-between relative z-10">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-14 h-14 rounded-2xl bg-[#00b9f0]/20 flex items-center justify-center text-[#00b9f0] border border-[#00b9f0]/30">
+                                            <Gamepad2 size={28} />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-3xl font-black text-white tracking-tight">My Games</h2>
+                                            <p className="text-slate-400 text-sm font-medium">
+                                                {publishedGames.length > 0
+                                                    ? `${publishedGames.length} game${publishedGames.length !== 1 ? 's' : ''} live in the casino`
+                                                    : 'No games published yet. Create one in the Game Studio!'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setActiveTab('studio')}
+                                        className="px-6 py-3 bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white font-bold text-sm rounded-xl hover:brightness-110 transition-all shadow-lg shadow-purple-500/20 flex items-center gap-2"
+                                    >
+                                        <Sparkles size={16} /> Create New Game
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Games Grid */}
+                            {publishedGames.length > 0 ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                                    {publishedGames.map((game: any) => (
+                                        <motion.div
+                                            key={game.id}
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            className="group relative bg-[#0b1622]/80 rounded-2xl overflow-hidden border border-white/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl flex flex-col backdrop-blur-xl"
+                                            style={{ boxShadow: `0 0 0 0 transparent` }}
+                                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = `${game.themeColor || '#a855f7'}50`; (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 30px ${game.themeColor || '#a855f7'}20`; }}
+                                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = ''; (e.currentTarget as HTMLElement).style.boxShadow = ''; }}
+                                        >
+                                            <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                                                <div className="absolute inset-0 bg-[#152a3a] overflow-hidden">
+                                                    {game.coverImage ? (
+                                                        <img src={game.coverImage} alt={game.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" style={{ display: 'block' }} />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-5xl">{game.themeEmoji || '🎮'}</div>
+                                                    )}
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a111a] via-transparent to-transparent pointer-events-none" />
+                                                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-green-500/20 text-green-400 text-[10px] font-bold px-2 py-1 rounded-full border border-green-500/30 backdrop-blur-sm">
+                                                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                                                        LIVE
+                                                    </div>
+                                                    {game.type === 'slot_engine' && (
+                                                        <div className="absolute top-2 left-2 bg-purple-500/20 text-purple-400 text-[10px] font-bold px-2 py-1 rounded-full border border-purple-500/30 backdrop-blur-sm">
+                                                            🎰 SLOT
+                                                        </div>
+                                                    )}
+                                                    {game.type === 'crash' && (
+                                                        <div className="absolute top-2 left-2 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-1 rounded-full border border-emerald-500/30 backdrop-blur-sm">
+                                                            🚀 CRASH
+                                                        </div>
+                                                    )}
+                                                    {game.type === 'scratch' && (
+                                                        <div className="absolute top-2 left-2 bg-amber-500/20 text-amber-400 text-[10px] font-bold px-2 py-1 rounded-full border border-amber-500/30 backdrop-blur-sm">
+                                                            🎟️ SCRATCH
+                                                        </div>
+                                                    )}
+                                                    {(game.type === 'ai_generated' || game.type === 'manual_template') && (
+                                                        <div className="absolute top-2 left-2 bg-cyan-500/20 text-cyan-400 text-[10px] font-bold px-2 py-1 rounded-full border border-cyan-500/30 backdrop-blur-sm">
+                                                            ✨ AI
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="p-4 flex-1 flex flex-col">
+                                                <h4 className="text-white font-black text-sm truncate mb-1">{game.name}</h4>
+                                                <p className="text-slate-500 text-[11px] truncate mb-3 flex-1">{game.gameDescription || 'Custom game'}</p>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                                                        <Clock size={10} />
+                                                        {new Date(game.publishedAt).toLocaleDateString()}
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: game }))}
+                                                            className="text-slate-600 hover:text-[#00b9f0] transition-colors p-1.5 rounded hover:bg-[#00b9f0]/10"
+                                                            title="Play"
+                                                        >
+                                                            <Play size={14} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                if (confirm('Delete this game?')) {
+                                                                    const data = localStorage.getItem('custom_published_games');
+                                                                    if (data) {
+                                                                        const allGames = JSON.parse(data);
+                                                                        const filtered = allGames.filter((g: any) => g.id !== game.id);
+                                                                        localStorage.setItem('custom_published_games', JSON.stringify(filtered));
+                                                                        window.dispatchEvent(new Event('storage'));
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className="text-slate-600 hover:text-red-400 transition-colors p-1.5 rounded hover:bg-red-500/10"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="bg-[#0b1622]/80 backdrop-blur-xl rounded-[32px] p-16 border border-white/10 flex flex-col items-center justify-center text-center">
+                                    <div className="w-20 h-20 rounded-2xl bg-white/5 flex items-center justify-center text-4xl mb-6 border border-white/10">🎮</div>
+                                    <h3 className="text-xl font-black text-white mb-2">No Games Published Yet</h3>
+                                    <p className="text-slate-400 text-sm mb-6 max-w-md">Head over to the Game Studio to create and customize your first game. Once published, it will appear here and in the Casino Lobby!</p>
+                                    <button
+                                        onClick={() => setActiveTab('studio')}
+                                        className="px-8 py-3 bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white font-bold text-sm rounded-xl hover:brightness-110 transition-all shadow-lg shadow-purple-500/20"
+                                    >
+                                        Open Game Studio
+                                    </button>
+                                </div>
+                            )}
                         </motion.div>
                     ) : (
                         <motion.div

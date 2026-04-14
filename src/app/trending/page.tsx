@@ -40,6 +40,12 @@ export default function TrendingPage() {
     ];
 
     useEffect(() => {
+        if (!loading && scrollRef.current) {
+            scrollRef.current.scrollLeft = 0;
+        }
+    }, [loading]);
+
+    useEffect(() => {
         const fetchStats = async () => {
             try {
                 const supabase = createClient();
@@ -103,8 +109,7 @@ export default function TrendingPage() {
     };
 
     const playNow = (gameName: string) => {
-        localStorage.setItem('open_game_on_load', gameName);
-        router.push('/');
+        window.dispatchEvent(new CustomEvent('open_game', { detail: gameName }));
     };
 
     const risingStars = trendingGames.slice(0, 3).map(g => ({
@@ -121,7 +126,7 @@ export default function TrendingPage() {
     ];
 
     return (
-        <div className="flex-1 h-full overflow-y-auto bg-[#050505] relative custom-scrollbar p-6 md:p-10 pb-32 z-0">
+        <div className="flex-1 h-full overflow-y-auto bg-[#050505] relative custom-scrollbar p-6 md:px-16 lg:px-24 md:py-10 pb-32 z-0">
             <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -169,16 +174,16 @@ export default function TrendingPage() {
                         ref={scrollRef}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="flex gap-5 pb-8 pt-6 px-4 md:px-6 overflow-x-auto scrollbar-hide snap-x scroll-smooth -mx-4 md:-mx-6 relative z-10"
+                        className="flex gap-5 pb-8 pt-6 overflow-x-auto scrollbar-hide relative z-10"
                     >
 
                         {trendingGames.slice(0, 12).map((game, index) => (
                             <div 
                                 key={index} 
-                                className="min-w-[170px] md:min-w-[210px] flex-shrink-0 snap-start"
+                                className="min-w-[170px] md:min-w-[210px] flex-shrink-0"
                             >
                                 <div 
-                                    className="relative group cursor-pointer transition-all duration-300 hover:scale-[1.05] active:scale-95 z-10 hover:z-20 w-full h-full"
+                                    className={`relative group cursor-pointer transition-all duration-300 hover:scale-[1.05] active:scale-95 z-10 hover:z-20 w-full h-full ${index === 0 ? 'origin-left' : ''}`}
                                     onClick={() => playNow(game.name)}
                                 >
                                     <GameCard

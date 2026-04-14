@@ -53,26 +53,39 @@ function NotificationItem({ n, markOneAsRead, formatDate }: { n: any, markOneAsR
 }
 
 const CreatorLink = ({ user, supabase, onNav }: any) => {
-    const [isVisible, setIsVisible] = useState(false);
+    const [creatorName, setCreatorName] = useState<string | null>(() => {
+        // Read from cache immediately to avoid delay
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('creator_display_name') || null;
+        }
+        return null;
+    });
+
     useEffect(() => {
         if (!user) return;
         const check = async () => {
-            const { data } = await supabase.from('creators').select('id').eq('id', user.id).single();
-            setIsVisible(!!data);
+            const { data } = await supabase.from('creators').select('id, display_name').eq('id', user.id).single();
+            if (data?.display_name) {
+                setCreatorName(data.display_name);
+                localStorage.setItem('creator_display_name', data.display_name);
+            } else {
+                setCreatorName(null);
+                localStorage.removeItem('creator_display_name');
+            }
         };
         check();
     }, [user, supabase]);
 
-    if (!isVisible) return null;
+    if (!creatorName) return null;
 
     return (
         <Link
-            href="/creator-studio"
+            href={`/creators/${encodeURIComponent(creatorName)}`}
             className="flex items-center gap-3 px-3 py-2.5 text-[#00b9f0] hover:text-[#00b9f0] hover:bg-[#00b9f0]/5 rounded-lg transition-colors text-sm font-bold border border-[#00b9f0]/10 mt-1"
             onClick={onNav}
         >
-            <LayoutDashboard size={16} />
-            <span>Creator Studio</span>
+            <UserIcon size={16} />
+            <span>Creator Profile</span>
         </Link>
     );
 };

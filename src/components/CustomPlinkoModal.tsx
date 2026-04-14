@@ -25,6 +25,10 @@ export default function CustomPlinkoModal({ isOpen, onClose, gameData, diamonds,
 
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
+
+    // Session Tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
     const [history, setHistory] = useState<number[]>([]);
     const [dropping, setDropping] = useState(false);
     const [pins, setPins] = useState<{ x: number; y: number }[]>([]);
@@ -145,14 +149,31 @@ export default function CustomPlinkoModal({ isOpen, onClose, gameData, diamonds,
 
     useEffect(() => {
         if (!isOpen) {
+            // Save session to history if any bets were made
+            if (sessionWagered > 0) {
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: gameData?.name || "Custom Game", 
+                        gameImage: gameData?.coverImage || "/images/game-placeholder.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
+                // Reset session
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
+
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;
             }
             setDropping(false);
             setBallPath([]);
+        
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout, currencyType, gameData]);
 
     if (!isOpen || !gameData) return null;
     if (typeof document === "undefined") return null;

@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, HelpCircle, Ticket, Mail, Send, Check, ChevronDown, ChevronUp, Search, ArrowLeft, Sparkles, Zap, Shield, FileText } from "lucide-react";
+import { MessageSquare, HelpCircle, Ticket, Mail, Send, Check, ChevronDown, ChevronUp, Search, ArrowLeft, Sparkles, Zap, Shield, FileText, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { createClient } from "@/utils/supabase/client";
 
 interface Message {
     id: string;
     text: string;
     sender: 'user' | 'support' | 'system';
     timestamp: Date;
+    is_ai?: boolean;
 }
 
 export default function SupportContent() {
@@ -19,10 +21,145 @@ export default function SupportContent() {
     ]);
     const [newMessage, setNewMessage] = useState("");
     const [isTyping, setIsTyping] = useState(false);
+    const [ticketId, setTicketId] = useState<string | null>(null);
+    const [ticketStatus, setTicketStatus] = useState<'ai' | 'admin'>('ai');
+    const [aiMessageCount, setAiMessageCount] = useState(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const supabase = createClient();
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    const fetchMessages = async (tId: string) => {
+        const { data } = await supabase
+            .from('support_messages')
+            .select('*')
+            .eq('ticket_id', tId)
+            .order('created_at', { ascending: true });
+        
+        if (data) {
+            setMessages(data.map(m => ({
+                id: m.id,
+                text: m.content,
+                sender: m.sender_id ? 'user' : 'support',
+                timestamp: new Date(m.created_at),
+                is_ai: m.is_ai
+            })));
+        }
+    };
+
+    const [allTickets, setAllTickets] = useState<any[]>([]);
+
+    const fetchAllTickets = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase
+            .from('support_tickets')
+            .select('*')
+            .eq('user_id', user.id)
+            .neq('status', 'closed')
+            .order('updated_at', { ascending: false });
+        if (data) setAllTickets(data);
+    };
+
+    useEffect(() => {
+        if (view === 'tickets') fetchAllTickets();
+    }, [view]);
+
+    useEffect(() => {
+        const initSupport = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // Check for active ticket
+            const { data: tickets } = await supabase
+                .from('support_tickets')
+                .select('*')
+                .eq('user_id', user.id)
+                .neq('status', 'closed')
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (tickets && tickets.length > 0) {
+                setTicketId(tickets[0].id);
+                setTicketStatus(tickets[0].status === 'ai_handling' ? 'ai' : 'admin');
+                fetchMessages(tickets[0].id);
+            }
+        };
+        initSupport();
+    }, []);
+
+    useEffect(() => {
+        if (!ticketId) return;
+
+        let channel: any;
+
+        const setupSubscription = async () => {
+             const { data: { user } } = await supabase.auth.getUser();
+             if (!user) return;
+
+             channel = supabase
+                .channel(`ticket-${ticketId}`)
+                .on('postgres_changes', { 
+                    event: 'INSERT', 
+                    schema: 'public', 
+                    table: 'support_messages',
+                    filter: `ticket_id=eq.${ticketId}`
+                }, (payload) => {
+                    const m = payload.new;
+                    setMessages(prev => {
+                        // Avoid duplicates from optimistic UI
+                        if (prev.some(msg => msg.id === m.id || (msg.text === m.content && msg.sender === (m.sender_id ? 'user' : 'support') && msg.id.startsWith('temp-')))) {
+                            // Replace temp message with real one to get correct ID
+                            return prev.map(msg => 
+                                (msg.text === m.content && msg.id.startsWith('temp-')) 
+                                ? { ...msg, id: m.id, timestamp: new Date(m.created_at) } 
+                                : msg
+                            );
+                        }
+                        return [...prev, {
+                            id: m.id,
+                            text: m.content,
+                            sender: m.sender_id ? (m.sender_id === user.id ? 'user' : 'support') : 'support',
+                            timestamp: new Date(m.created_at),
+                            is_ai: m.is_ai
+                        }];
+                    });
+                })
+                .subscribe();
+        };
+
+        setupSubscription();
+
+        return () => {
+            if (channel) supabase.removeChannel(channel);
+        };
+    }, [ticketId]);
+
+    const getAIResponse = (text: string) => {
+        const input = text.toLowerCase();
+        
+        if (input.includes("hello") || input.includes("hi") || input.includes("hey")) {
+            return "Hello! I'm the PlayForges AI Assistant. How can I help you today? You can ask about deposits, games, or your account.";
+        }
+        if (input.includes("deposit") || input.includes("money") || input.includes("add funds") || input.includes("top up")) {
+            return "To deposit, click on your Wallet in the header. We support crypto (BTC, ETH, LTC) and card payments. Minimum deposit is $10. Funds are usually credited within 10 minutes.";
+        }
+        if (input.includes("withdrawal") || input.includes("payout") || input.includes("cash out")) {
+            return "Withdrawals are processed within 24 hours. Minimum withdrawal is $10. Make sure your KYC is verified in Settings to avoid delays.";
+        }
+        if (input.includes("creator") || input.includes("influencer") || input.includes("partner")) {
+            return "Creators earn 50% commission on house profit from their games. You can apply in the 'Become a Creator' section by connecting your social media accounts.";
+        }
+        if (input.includes("rigged") || input.includes("fair") || input.includes("scam") || input.includes("luck")) {
+            return "All our games use Provably Fair technology based on SHA-256 hashing. This means you can verify the fairness of every single round yourself! Check the 'Fairness' link in the footer.";
+        }
+        if (input.includes("human") || input.includes("admin") || input.includes("person") || input.includes("help me") || input.includes("problem") || input.includes("issue") || input.includes("stuck")) {
+            return "TRANSFER_TO_ADMIN";
+        }
+        
+        return "I understand your concern. Could you provide a bit more detail? I'm trained to help with deposits, technical issues, creator tools, and game fairness.";
     };
 
     useEffect(() => {
@@ -31,29 +168,132 @@ export default function SupportContent() {
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim()) return;
+        const messageText = newMessage.trim();
+        if (!messageText || isTyping) return;
 
-        const userMsg: Message = {
-            id: Date.now().toString(),
-            text: newMessage,
-            sender: 'user',
-            timestamp: new Date()
-        };
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            toast.error("Please login to use live chat");
+            return;
+        }
 
-        setMessages(prev => [...prev, userMsg]);
-        setNewMessage("");
         setIsTyping(true);
+        let currentTicketId = ticketId;
+        
+        try {
+            if (!currentTicketId) {
+                const { data: newTicket, error: ticketErr } = await supabase
+                    .from('support_tickets')
+                    .insert({ user_id: user.id, status: 'ai_handling', subject: 'Live Chat Session' })
+                    .select()
+                    .single();
+                
+                if (ticketErr) throw ticketErr;
+                if (newTicket) {
+                    currentTicketId = newTicket.id;
+                    setTicketId(newTicket.id);
+                }
+            }
 
-        setTimeout(() => {
-            const supportMsg: Message = {
-                id: (Date.now() + 1).toString(),
-                text: "Thank you for your message. An agent will be with you shortly.",
-                sender: 'support',
+            if (!currentTicketId) throw new Error("Could not create support ticket");
+
+            // Save User Message
+            const { error: msgErr } = await supabase.from('support_messages').insert({
+                ticket_id: currentTicketId,
+                sender_id: user.id,
+                content: messageText,
+                is_ai: false
+            });
+
+            if (msgErr) throw msgErr;
+
+            // Optimistic UI for immediate feedback
+            const tempId = `temp-${Date.now()}`;
+            setMessages(prev => [...prev, {
+                id: tempId,
+                text: messageText,
+                sender: 'user',
                 timestamp: new Date()
-            };
-            setMessages(prev => [...prev, supportMsg]);
+            }]);
+
+            setNewMessage("");
+
+            // AI Logic
+            setTimeout(async () => {
+                let responseText = "";
+                let isTransition = false;
+
+                if (ticketStatus === 'ai') {
+                    const aiResponse = getAIResponse(messageText);
+                    if (aiResponse === "TRANSFER_TO_ADMIN" || aiMessageCount >= 3) {
+                        responseText = "I've analyzed your request and it seems you need expert assistance. I have created a support ticket for you. An administrator will respond within 30 minutes.";
+                        isTransition = true;
+                        setTicketStatus('admin');
+                        toast.success("Support ticket created successfully!");
+                        
+                        await supabase.from('support_tickets')
+                            .update({ status: 'open', updated_at: new Date().toISOString() })
+                            .eq('id', currentTicketId);
+                    } else {
+                        responseText = aiResponse;
+                        setAiMessageCount(prev => prev + 1);
+                    }
+                } else {
+                    responseText = "Your message has been added to the ticket. Our team will get back to you soon. Current avg. response time: 30 minutes.";
+                }
+
+                // Save AI/Support Message
+                const { data: aiMsg } = await supabase.from('support_messages').insert({
+                    ticket_id: currentTicketId,
+                    content: responseText,
+                    is_ai: ticketStatus === 'ai' && !isTransition,
+                    sender_id: null
+                }).select().single();
+
+                // If real-time is slow, add AI message optimistically too
+                if (aiMsg) {
+                    setMessages(prev => {
+                        if (prev.some(m => m.id === aiMsg.id)) return prev;
+                        return [...prev, {
+                            id: aiMsg.id,
+                            text: aiMsg.content,
+                            sender: 'support',
+                            timestamp: new Date(aiMsg.created_at),
+                            is_ai: aiMsg.is_ai
+                        }];
+                    });
+                }
+
+                setIsTyping(false);
+            }, 1200);
+
+        } catch (err: any) {
+            console.error("Chat Error:", err);
+            toast.error(err.message || "Failed to send message. Please try again.");
             setIsTyping(false);
-        }, 1500);
+        }
+    };
+
+    const closeTicket = async () => {
+        if (!ticketId) return;
+        
+        const { error } = await supabase
+            .from('support_tickets')
+            .update({ status: 'closed', updated_at: new Date().toISOString() })
+            .eq('id', ticketId);
+        
+        if (!error) {
+            setTicketId(null);
+            setTicketStatus('ai');
+            setAiMessageCount(0);
+            setMessages([{ id: '1', text: 'Welcome to PlayForges Support! How can we help you today?', sender: 'support', timestamp: new Date() }]);
+            setView('home');
+            toast.success("Support session ended.");
+            // Force fetch tickets for history refresh if open
+            fetchAllTickets();
+        } else {
+            toast.error("Failed to close ticket.");
+        }
     };
 
     const faqs = [
@@ -137,9 +377,9 @@ export default function SupportContent() {
                                             <MessageSquare size={28} />
                                         </div>
                                         <h3 className="text-2xl font-bold text-white mb-2">Live Chat</h3>
-                                        <p className="text-[#00b9f0]/80 font-medium mb-4">Wait time: &lt; 1 min</p>
+                                        <p className="text-[#00b9f0]/80 font-medium mb-4">Avg. response: 30 min</p>
                                         <p className="text-slate-300 text-sm leading-relaxed pb-8">
-                                            Connect instantly with our support team for urgent issues.
+                                            Chat with our AI assistant or open a ticket for our admin team.
                                         </p>
                                     </div>
                                     <div className="absolute bottom-6 right-6 opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
@@ -189,7 +429,7 @@ export default function SupportContent() {
                                     </div>
                                     <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
                                         <Zap size={16} />
-                                        <span>Average Response: 2m</span>
+                                        <span>Average Response: 30m</span>
                                     </div>
                                 </motion.div>
                             </div>
@@ -212,16 +452,28 @@ export default function SupportContent() {
                                 >
                                     <ArrowLeft size={20} />
                                 </button>
-                                <div>
+                                <div className="flex-1">
                                     <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                                        Live Support
+                                        Support Session
                                         <span className="flex h-3 w-3 relative">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
                                         </span>
                                     </h2>
-                                    <p className="text-slate-400 text-sm">Connected with <span className="text-white font-bold">Agent Michael</span></p>
+                                    <p className="text-slate-400 text-sm">Status: <span className={ticketStatus === 'ai' ? "text-blue-400 font-bold" : "text-amber-400 font-bold"}>{ticketStatus === 'ai' ? "AI Assistant" : "Ticket Created (Admin)"}</span></p>
                                 </div>
+                                {ticketId && (
+                                    <button 
+                                        onClick={() => {
+                                            if (confirm("Are you sure you want to close this support ticket?")) {
+                                                closeTicket();
+                                            }
+                                        }}
+                                        className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-xs font-bold transition-all border border-red-500/20"
+                                    >
+                                        Close Ticket
+                                    </button>
+                                )}
                             </div>
 
                             <div className="flex-1 bg-[#1a1a1a]/80 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden flex flex-col shadow-2xl relative">
@@ -276,10 +528,10 @@ export default function SupportContent() {
                                         />
                                         <button
                                             type="submit"
-                                            disabled={!newMessage.trim()}
+                                            disabled={!newMessage.trim() || isTyping}
                                             className="p-3 bg-[#00b9f0] text-[#050505] rounded-xl hover:bg-[#38bdf8] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-[#00b9f0]/20 shrink-0"
                                         >
-                                            <Send size={20} />
+                                            {isTyping ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
                                         </button>
                                     </form>
                                     <div className="text-center mt-2">
@@ -363,19 +615,60 @@ export default function SupportContent() {
                                     </button>
                                     <h2 className="text-3xl font-black text-white">Support Tickets</h2>
                                 </div>
-                                <button className="bg-amber-500 hover:bg-amber-400 text-black px-6 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-lg shadow-amber-500/20">
+                                <button 
+                                    onClick={() => {
+                                        setTicketId(null);
+                                        setTicketStatus('ai');
+                                        setMessages([{ id: '1', text: 'Welcome back! How can we help you today?', sender: 'support', timestamp: new Date() }]);
+                                        setView('chat');
+                                    }}
+                                    className="bg-amber-500 hover:bg-amber-400 text-black px-6 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-lg shadow-amber-500/20"
+                                >
                                     Create New Ticket
                                 </button>
                             </div>
 
-                            <div className="bg-[#1a1a1a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl min-h-[400px] flex flex-col items-center justify-center text-center p-8">
-                                <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6 text-slate-600">
-                                    <FileText size={48} />
-                                </div>
-                                <h3 className="text-2xl font-bold text-white mb-2">No Active Tickets</h3>
-                                <p className="text-slate-500 max-w-md">
-                                    You don&apos;t have any open support tickets at the moment. If you need assistance, you can start a chat or create a new ticket.
-                                </p>
+                            <div className="bg-[#1a1a1a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl min-h-[400px] flex flex-col p-4">
+                                {allTickets.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {allTickets.map(t => (
+                                            <button
+                                                key={t.id}
+                                                onClick={() => {
+                                                    setTicketId(t.id);
+                                                    setTicketStatus(t.status === 'ai_handling' ? 'ai' : 'admin');
+                                                    fetchMessages(t.id);
+                                                    setView('chat');
+                                                }}
+                                                className="w-full text-left p-6 bg-[#0a111a] hover:bg-[#152a3a] border border-white/5 rounded-2xl transition-all flex items-center justify-between group"
+                                            >
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-[10px] font-bold text-slate-500 font-mono">#{t.id.slice(0, 8)}</span>
+                                                    <h4 className="text-white font-bold">{t.subject}</h4>
+                                                    <p className="text-xs text-slate-500">Updated {new Date(t.updated_at).toLocaleDateString()}</p>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    <span className={`text-[10px] px-3 py-1 rounded-full font-bold uppercase ${t.status === 'open' ? 'bg-amber-500/20 text-amber-500' : t.status === 'ai_handling' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-500'}`}>
+                                                        {t.status}
+                                                    </span>
+                                                    <div className="p-2 bg-white/5 rounded-lg group-hover:bg-[#00b9f0] group-hover:text-black transition-colors">
+                                                        <MessageSquare size={16} />
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="flex-1 flex flex-col items-center justify-center text-center">
+                                        <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6 text-slate-600">
+                                            <FileText size={48} />
+                                        </div>
+                                        <h3 className="text-2xl font-bold text-white mb-2">No Active Tickets</h3>
+                                        <p className="text-slate-500 max-w-md">
+                                            You don&apos;t have any open support tickets at the moment. If you need assistance, you can start a chat or create a new ticket.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     )}

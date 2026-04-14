@@ -16,6 +16,10 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
     const [mineCount, setMineCount] = useState(3);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
 
+    // Session Tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'EXPLODED' | 'WON'>('IDLE');
     const [multiplier, setMultiplier] = useState(1.00);
     const [nextMultiplier, setNextMultiplier] = useState(1.00);
@@ -34,6 +38,8 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         setGameState('PLAYING');
         setMultiplier(1.00);
@@ -100,6 +106,8 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
             setForgesCoins((prev: number) => prev + winAmount);
         }
 
+        setSessionPayout(prev => prev + winAmount);
+
         // Reveal remaining grid
         const finalGrid = grid.map(cell => ({ ...cell, revealed: true }));
         setGrid(finalGrid);
@@ -116,10 +124,27 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
 
     useEffect(() => {
         if (!isOpen) {
+            // Save session to history if any bets were made
+            if (sessionWagered > 0) {
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: gameData?.name || "Custom Game", 
+                        gameImage: gameData?.coverImage || "/images/game-placeholder.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
+                // Reset session
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
+
             setGameState('IDLE');
             setGrid(Array(25).fill({ isMine: false, revealed: false }));
+        
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout, currencyType, gameData]);
 
     if (!isOpen || !gameData) return null;
     if (typeof document === "undefined") return null;

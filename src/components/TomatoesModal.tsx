@@ -35,6 +35,10 @@ export default function TomatoesModal({ isOpen, onClose, diamonds, setDiamonds, 
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC', mult: number } | null>(null);
 
+    // Session Tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const [gameState, setGameState] = useState<'IDLE' | 'THROWING' | 'FINISHED'>('IDLE');
     const [resultTarget, setResultTarget] = useState<number | null>(null);
 
@@ -47,6 +51,8 @@ export default function TomatoesModal({ isOpen, onClose, diamonds, setDiamonds, 
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         setGameState('THROWING');
         setResultTarget(null);
@@ -93,6 +99,8 @@ export default function TomatoesModal({ isOpen, onClose, diamonds, setDiamonds, 
             } else {
                 setForgesCoins((prev: number) => prev + winAmount);
             }
+
+        setSessionPayout(prev => prev + winAmount);
 
             if (target.mult >= 1.5) {
                 confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });

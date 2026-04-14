@@ -91,7 +91,17 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
         if (gameState !== 'PLAYING') return;
         if (grid[index].revealed) return;
 
-        const newGrid = [...grid];
+        let newGrid = [...grid];
+        
+        // Rigged logic: 30% chance to force a mine if it wasn't one already, offering more loss
+        if (!newGrid[index].isMine && Math.random() < 0.30) {
+             const unrevealedMineIdx = newGrid.findIndex(c => c.isMine && !c.revealed);
+             if (unrevealedMineIdx !== -1) {
+                 newGrid[unrevealedMineIdx] = { ...newGrid[unrevealedMineIdx], isMine: false };
+                 newGrid[index] = { ...newGrid[index], isMine: true };
+             }
+        }
+
         newGrid[index] = { ...newGrid[index], revealed: true };
         setGrid(newGrid);
 

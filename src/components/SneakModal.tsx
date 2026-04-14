@@ -27,6 +27,10 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC', mult: number } | null>(null);
 
+    // Session Tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const [gameState, setGameState] = useState<'IDLE' | 'HOLDING' | 'CAUGHT' | 'ESCAPED'>('IDLE');
     const [multiplier, setMultiplier] = useState(1.00);
 
@@ -49,6 +53,8 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         bustTimeRef.current = generateBustTimeSeconds();
         timeStartRef.current = performance.now();
@@ -98,6 +104,8 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
             setForgesCoins((prev: number) => prev + winAmount);
         }
 
+        setSessionPayout(prev => prev + winAmount);
+
         confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
     };
 
@@ -110,10 +118,26 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
 
     useEffect(() => {
         if (!isOpen) {
+            // Save session to history if any bets were made
+            if (sessionWagered > 0) {
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: "Secret Sneak", 
+                        gameImage: "/images/game-secret-sneak.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
+
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
             setGameState('IDLE');
+        
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout, currencyType]);
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;

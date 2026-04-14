@@ -19,6 +19,10 @@ export default function BombModal({ isOpen, onClose, diamonds, setDiamonds, forg
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
 
+    // Session Tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'EXPLODED' | 'WON'>('IDLE');
     const [multiplier, setMultiplier] = useState(1.00);
     const [timeLeft, setTimeLeft] = useState(10.0);
@@ -35,6 +39,8 @@ export default function BombModal({ isOpen, onClose, diamonds, setDiamonds, forg
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         setGameState('PLAYING');
         setMultiplier(1.00);
@@ -102,6 +108,8 @@ export default function BombModal({ isOpen, onClose, diamonds, setDiamonds, forg
             setForgesCoins((prev: number) => prev + winAmount);
         }
 
+        setSessionPayout(prev => prev + winAmount);
+
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     };
 
@@ -114,10 +122,26 @@ export default function BombModal({ isOpen, onClose, diamonds, setDiamonds, forg
 
     useEffect(() => {
         if (!isOpen) {
+            // Save session to history if any bets were made
+            if (sessionWagered > 0) {
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: "Defuse", 
+                        gameImage: "/images/game-bomb-v2.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
+
             if (timerRef.current) clearInterval(timerRef.current);
             setGameState('IDLE');
+        
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout, currencyType]);
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;

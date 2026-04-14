@@ -32,19 +32,19 @@ export const recordGameSession = async (report: GameReport) => {
         user_id: user?.id || null
     };
 
+    // Always update Local Fallback for instant UI response and safety
+    const localHist = JSON.parse(localStorage.getItem('playforges_history') || '[]');
+    localHist.unshift({
+        ...historyEntry,
+        id: Math.random().toString(36).substr(2, 9),
+        created_at: new Date().toISOString()
+    });
+    localStorage.setItem('playforges_history', JSON.stringify(localHist.slice(0, 50)));
+
     if (user) {
         // Save to Supabase
         const { error } = await supabase.from('user_history').insert([historyEntry]);
         if (error) console.error("History Save Error:", error.message);
-    } else {
-        // Local Fallback
-        const localHist = JSON.parse(localStorage.getItem('playforges_history') || '[]');
-        localHist.unshift({
-            ...historyEntry,
-            id: Math.random().toString(36).substr(2, 9),
-            created_at: new Date().toISOString()
-        });
-        localStorage.setItem('playforges_history', JSON.stringify(localHist.slice(0, 50)));
     }
 
     // Always fire update event for UI

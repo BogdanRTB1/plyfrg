@@ -63,9 +63,11 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
     const currentMultiplierRef = useRef(1.00);
 
     const generateCrashPoint = () => {
+        const roll = Math.random();
+        if (roll < 0.25) return 1.00; // 25% chance of instant loss
         // Simple hash logic for crash point: E = 100 / (rand * 100) -> 1% chance instacrash, mean ~2.0
         const e = 100 / (Math.random() * 100 + 1);
-        return Math.max(1.00, e * 0.99); // 1% house edge
+        return Math.max(1.00, e * 0.80); // 20% house edge on the remainder
     };
 
     const startGame = () => {

@@ -87,7 +87,28 @@ export default function CreatorProfilePage() {
                     if (followState) setIsFollowing(true);
                 }
                 
-                setUniquePlayers(Math.floor(Math.random() * 5000) + 150);
+                try {
+                    const views = JSON.parse(localStorage.getItem('creator_profile_views') || '[]');
+                    let pid = localStorage.getItem('temp_player_id');
+                    if (!pid) { pid = 'user_' + Math.random().toString(36).substring(2,11); localStorage.setItem('temp_player_id', pid); }
+                    views.push({
+                        creatorId: dbCreator.id,
+                        creatorName: dbCreator.display_name,
+                        viewerId: pid,
+                        date: new Date().toISOString()
+                    });
+                    localStorage.setItem('creator_profile_views', JSON.stringify(views));
+                } catch (e) {}
+
+                // Load unique players matching this creator
+                try {
+                    const plays = JSON.parse(localStorage.getItem('creator_game_plays') || '[]');
+                    const creatorPlays = plays.filter((p: any) => p.creatorId === dbCreator.id || p.creatorName === dbCreator.display_name);
+                    const uniqueIds = new Set(creatorPlays.map((p: any) => p.playerId));
+                    setUniquePlayers(uniqueIds.size);
+                } catch (e) {
+                    setUniquePlayers(0);
+                }
 
                 // Load custom created games
                 const aiGamesStr = localStorage.getItem('custom_published_games');

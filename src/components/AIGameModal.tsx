@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Zap, Sparkles, Maximize2, Minimize2, Play } from "lucide-react";
+import { X, Trophy, Zap, Sparkles, Play, Loader2 } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
 import FavoriteToggle from "./FavoriteToggle";
+import { recordGameSession } from "@/utils/gameBridge";
 
 interface AIGameModalProps {
     isOpen: boolean;
@@ -14,11 +15,14 @@ interface AIGameModalProps {
     gameData: {
         id: string;
         name: string;
+        creatorId?: string;
         creatorName: string;
         themeEmoji: string;
         themeColor: string;
         gameDescription: string;
-        htmlCode: string;
+        htmlCode?: string;      // Legacy AI-generated games
+        slotConfig?: any;       // New slot engine games
+        type?: string;          // 'slot_engine' | 'ai_generated' | 'manual_template'
     };
     diamonds: number;
     setDiamonds: (fn: (prev: number) => number) => void;
@@ -92,7 +96,28 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC', multiplier: number } | null>(null);
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'RESULT'>('IDLE');
     const [gameReady, setGameReady] = useState(false);
+    const configSentRef = useRef(false);
     const iframeRef = useRef<HTMLIFrameElement>(null);
+    
+    // Session tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
+    // Determine which mode this game uses
+    const isSlotEngine = gameData?.type === 'slot_engine' && gameData?.slotConfig;
+    const iframeSrc = isSlotEngine ? '/engines/slot-engine.html' : undefined;
+    const iframeSrcDoc = !isSlotEngine ? (gameData?.htmlCode || '') : undefined;
+
+    // Send slot config to engine when ready
+    const sendSlotConfig = useCallback(() => {
+        if (isSlotEngine && gameData?.slotConfig && iframeRef.current?.contentWindow && !configSentRef.current) {
+            iframeRef.current.contentWindow.postMessage({
+                type: 'SLOT_CONFIG',
+                config: gameData.slotConfig
+            }, '*');
+            configSentRef.current = true;
+        }
+    }, [isSlotEngine, gameData]);
 
     // Listen for postMessage from iframe
     const handleMessage = useCallback((event: MessageEvent) => {
@@ -102,14 +127,19 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
         switch (data.type) {
             case 'GAME_READY':
                 setGameReady(true);
+                // For slot engine games, send config
+                if (isSlotEngine) {
+                    setTimeout(() => sendSlotConfig(), 100);
+                }
                 break;
             case 'PLAY_SOUND':
                 if (data.soundType) playSynthSound(data.soundType);
                 break;
             case 'GAME_RESULT':
                 setGameState('RESULT');
+                let winAmount = 0;
                 if (data.win && data.multiplier > 0) {
-                    const winAmount = betAmount * data.multiplier;
+                    winAmount = betAmount * data.multiplier;
                     setLastWin({ amount: winAmount, currency: currencyType, multiplier: data.multiplier });
                     if (currencyType === 'GC') {
                         setDiamonds((prev: number) => prev + winAmount);
@@ -142,17 +172,6 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                         }, 250);
                     } else if (effect === 'stars') {
                         confetti({ particleCount: 100, spread: 100, origin: { y: 0.6 }, shapes: ['star'], colors: ['#FFE400', '#FFBD00', '#E89400', '#FFCA6C', '#FDFFB8'] });
-                    } else if (effect === 'snow') {
-                        const duration = 3000;
-                        const animationEnd = Date.now() + duration;
-                        let skew = 1;
-                        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-                        const interval: any = setInterval(function () {
-                            const timeLeft = animationEnd - Date.now();
-                            if (timeLeft <= 0) return clearInterval(interval);
-                            skew = Math.max(0.8, skew - 0.001);
-                            confetti({ particleCount: 1, startVelocity: 0, ticks: 100, zIndex: 100, origin: { x: Math.random(), y: (Math.random() * skew) - 0.2 }, colors: ['#ffffff'], shapes: ['circle'], gravity: randomInRange(0.4, 0.6), scalar: randomInRange(0.4, 1), drift: randomInRange(-0.4, 0.4) });
-                        }, 20);
                     } else if (effect === 'coins') {
                         confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, zIndex: 100, shapes: ['circle'], colors: ['#FFD700', '#FDB931', '#F5A623', '#F8E71C'] });
                     }
@@ -160,9 +179,52 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                     // Lost
                     setLastWin(null);
                 }
+
+                // --- CREATOR EARNINGS LOGIC ---
+                const netLoss = betAmount - winAmount;
+                if (netLoss > 0 && gameData.creatorId && currencyType === 'FC') {
+                    try {
+                        const earnings = JSON.parse(localStorage.getItem('creator_earnings') || '[]');
+                        earnings.push({
+                            id: Math.random().toString(36).substring(2, 11),
+                            creatorId: gameData.creatorId,
+                            creatorName: gameData.creatorName,
+                            gameId: gameData.id,
+                            gameName: gameData.name,
+                            amount: netLoss * 0.5,
+                            currency: currencyType,
+                            usdValue: (netLoss * 0.5) * 0.90,
+                            date: new Date().toISOString()
+                        });
+                        localStorage.setItem('creator_earnings', JSON.stringify(earnings));
+                    } catch (e) {
+                        console.error('Error saving creator earnings:', e);
+                    }
+                }
+
+                // --- ACTIVE PLAYERS TRACKING ---
+                if (gameData.creatorId) {
+                    try {
+                        const plays = JSON.parse(localStorage.getItem('creator_game_plays') || '[]');
+                        let pid = localStorage.getItem('temp_player_id');
+                        if (!pid) { pid = 'user_' + Math.random().toString(36).substring(2,11); localStorage.setItem('temp_player_id', pid); }
+                        plays.push({
+                            creatorId: gameData.creatorId,
+                            gameId: gameData.id,
+                            playerId: pid,
+                            date: new Date().toISOString()
+                        });
+                        localStorage.setItem('creator_game_plays', JSON.stringify(plays));
+                    } catch (e) {}
+                }
+
+                // --- SESSION TRACKING ---
+                setSessionWagered(prev => prev + betAmount);
+                setSessionPayout(prev => prev + winAmount);
+
                 break;
         }
-    }, [betAmount, currencyType, setDiamonds, setForgesCoins]);
+    }, [betAmount, currencyType, setDiamonds, setForgesCoins, isSlotEngine, sendSlotConfig]);
 
     useEffect(() => {
         window.addEventListener('message', handleMessage);
@@ -171,14 +233,30 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
 
     useEffect(() => {
         if (!isOpen) {
+            // Save session to history if any bets were made
+            if (sessionWagered > 0) {
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: gameData?.name || "AI Game", 
+                        gameImage: (gameData as any)?.coverImage || "/images/game-placeholder.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
             setGameState('IDLE');
             setGameReady(false);
+            configSentRef.current = false;
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout, currencyType, gameData]);
 
-    const startGame = () => {
+    const startGame = async () => {
         if (balance < betAmount || betAmount <= 0 || !gameReady) return;
 
+        // Deduct bet
         if (currencyType === 'GC') {
             setDiamonds((prev: number) => prev - betAmount);
         } else {
@@ -187,11 +265,40 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
 
         setGameState('PLAYING');
 
-        // Send START_GAME to iframe
-        iframeRef.current?.contentWindow?.postMessage(
-            { type: 'START_GAME', bet: betAmount },
-            '*'
-        );
+        if (isSlotEngine && gameData?.slotConfig) {
+            // ─── SLOT ENGINE MODE: Call server API for RNG ───────────
+            try {
+                const res = await fetch('/api/spin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ config: gameData.slotConfig, bet: betAmount })
+                });
+                if (!res.ok) throw new Error(`API returned ${res.status}`);
+                const spinResult = await res.json();
+                
+                // Send result to engine for animation
+                iframeRef.current?.contentWindow?.postMessage({
+                    type: 'START_GAME',
+                    spinResult,
+                    bet: betAmount
+                }, '*');
+            } catch (err) {
+                console.error('Spin API error:', err);
+                // Refund on error
+                if (currencyType === 'GC') {
+                    setDiamonds((prev: number) => prev + betAmount);
+                } else {
+                    setForgesCoins((prev: number) => prev + betAmount);
+                }
+                setGameState('IDLE');
+            }
+        } else {
+            // ─── LEGACY MODE: Send START_GAME to iframe ─────────────
+            iframeRef.current?.contentWindow?.postMessage(
+                { type: 'START_GAME', bet: betAmount },
+                '*'
+            );
+        }
     };
 
     // Safety: auto-recover if game gets stuck in PLAYING for too long
@@ -200,7 +307,6 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
         const stuckTimer = setTimeout(() => {
             if (gameState === 'PLAYING') {
                 console.warn('Game stuck in PLAYING state — auto-recovering');
-                // Refund the bet
                 if (currencyType === 'GC') {
                     setDiamonds((prev: number) => prev + betAmount);
                 } else {
@@ -208,7 +314,6 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                 }
                 setGameState('IDLE');
                 setLastWin(null);
-                // Force reset the iframe
                 iframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
             }
         }, 12000);
@@ -217,11 +322,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
 
     const resetGame = () => {
         setGameState('IDLE');
-        iframeRef.current?.contentWindow?.postMessage(
-            { type: 'RESET' },
-
-            '*'
-        );
+        iframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
     };
 
     const handleBetChange = (amount: number) => {
@@ -261,6 +362,9 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                     <div className="text-xs text-slate-400 bg-black/20 rounded-lg px-3 py-2 border border-white/5">
                         <Sparkles className="inline w-3 h-3 mr-1" style={{ color: accentColor }} />
                         {gameData.gameDescription}
+                        {isSlotEngine && (
+                            <span className="ml-2 bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded text-[9px] font-bold">🎰 SLOT ENGINE</span>
+                        )}
                     </div>
 
                     {/* Currency Toggle */}
@@ -346,7 +450,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                         >
                             <span className="relative z-10 flex gap-2 items-center justify-center">
                                 <Zap size={20} />
-                                {!gameReady ? 'LOADING...' : gameState === 'PLAYING' ? 'PLAYING...' : 'BET'}
+                                {!gameReady ? 'LOADING...' : gameState === 'PLAYING' ? 'SPINNING...' : isSlotEngine ? 'SPIN' : 'BET'}
                             </span>
                         </button>
                     </div>
@@ -363,19 +467,34 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                             <p className="text-slate-400 text-sm font-bold mt-4 uppercase tracking-widest">Loading Game...</p>
                         </div>
                     )}
-                    <iframe
-                        ref={iframeRef}
-                        srcDoc={gameData?.htmlCode || ''}
-                        className="w-full h-full border-0"
-                        sandbox="allow-scripts"
-                        title={gameData.name}
-                        onLoad={() => {
-                            // Give the iframe a moment to initialize
-                            setTimeout(() => {
-                                if (!gameReady) setGameReady(true);
-                            }, 2000);
-                        }}
-                    />
+                    {/* Dual-mode iframe: src for slot engine, srcDoc for legacy */}
+                    {isSlotEngine ? (
+                        <iframe
+                            ref={iframeRef}
+                            src="/engines/slot-engine.html"
+                            className="w-full h-full border-0"
+                            sandbox="allow-scripts"
+                            title={gameData.name}
+                            onLoad={() => {
+                                setTimeout(() => {
+                                    if (!gameReady) setGameReady(true);
+                                }, 2000);
+                            }}
+                        />
+                    ) : (
+                        <iframe
+                            ref={iframeRef}
+                            srcDoc={gameData?.htmlCode || ''}
+                            className="w-full h-full border-0"
+                            sandbox="allow-scripts"
+                            title={gameData.name}
+                            onLoad={() => {
+                                setTimeout(() => {
+                                    if (!gameReady) setGameReady(true);
+                                }, 2000);
+                            }}
+                        />
+                    )}
                 </div>
             </motion.div>
         </div>,

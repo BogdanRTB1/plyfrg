@@ -28,6 +28,10 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC', mult: number } | null>(null);
 
+    // Session Tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'CRACKED'>('IDLE');
     const [currentStep, setCurrentStep] = useState(0);
     const [path, setPath] = useState<('left' | 'right')[]>([]);
@@ -40,6 +44,8 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         // Calculate result
         setGameState('PLAYING');
@@ -90,6 +96,8 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
         } else {
             setForgesCoins((prev: number) => prev + winAmount);
         }
+
+        setSessionPayout(prev => prev + winAmount);
 
         confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
 

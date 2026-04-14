@@ -15,6 +15,10 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
     const [autoCashout, setAutoCashout] = useState<number | string>('');
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC', mult: number } | null>(null);
 
+    // Session Tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'CRASHED'>('IDLE');
     const [cashedOutAt, setCashedOutAt] = useState<number | null>(null);
     const [multiplier, setMultiplier] = useState(1.00);
@@ -39,6 +43,11 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
     const ROCKET_IMAGE = gameData?.config?.rocketImage;
     const CRASH_IMAGE = gameData?.config?.crashImage;
 
+    // Read creator-configured engine params (with fallbacks)
+    const configAcceleration = gameData?.config?.accelerationCurve || 0.08;
+    const configHouseEdge = gameData?.config?.houseEdge || 5;
+    const configMaxMultiplier = gameData?.config?.maxMultiplier || 1000;
+
     // We pre-load images to draw them on canvas
     const [rocketImgObj, setRocketImgObj] = useState<HTMLImageElement | null>(null);
     const [crashImgObj, setCrashImgObj] = useState<HTMLImageElement | null>(null);
@@ -57,8 +66,10 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
     }, [ROCKET_IMAGE, CRASH_IMAGE]);
 
     const generateCrashPoint = () => {
+        const houseEdgeFactor = 1 - (configHouseEdge / 100);
         const e = 100 / (Math.random() * 100 + 1);
-        return Math.max(1.00, e * 0.99);
+        const cp = Math.max(1.00, e * houseEdgeFactor);
+        return Math.min(cp, configMaxMultiplier);
     };
 
     const startGame = () => {
@@ -69,6 +80,8 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         const cp = generateCrashPoint();
         crashPointRef.current = cp;
@@ -90,7 +103,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
         const timeElapsedms = time - timeStartRef.current;
         const timeElapsedSec = timeElapsedms / 1000;
 
-        const nextMultiplier = Math.pow(Math.E, 0.08 * timeElapsedSec);
+        const nextMultiplier = Math.pow(Math.E, configAcceleration * timeElapsedSec);
 
         if (nextMultiplier >= crashPointRef.current) {
             currentMultiplierRef.current = crashPointRef.current;
@@ -152,7 +165,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
 
         for (let i = 0; i <= STEPS; i++) {
             const t = (i / STEPS) * timeElapsedSec;
-            const m = Math.pow(Math.E, 0.08 * t);
+            const m = Math.pow(Math.E, configAcceleration * t);
 
             const x = padding + (t / maxTime) * (w - padding * 2);
             const y = h - padding - ((m - 1) / (maxMult - 1)) * (h - padding * 2);
@@ -191,7 +204,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
             // Draw flying object
             ctx.save();
             ctx.translate(lastX, lastY);
-            const angle = Math.atan2((((Math.pow(Math.E, 0.08 * timeElapsedSec) - 1) / (maxMult - 1)) * (h - padding * 2)), (((timeElapsedSec) / maxTime) * (w - padding * 2)));
+            const angle = Math.atan2((((Math.pow(Math.E, configAcceleration * timeElapsedSec) - 1) / (maxMult - 1)) * (h - padding * 2)), (((timeElapsedSec) / maxTime) * (w - padding * 2)));
 
             if (rocketImgObj) {
                 ctx.rotate(-angle);
@@ -228,6 +241,8 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
             setForgesCoins((prev: number) => prev + winAmount);
         }
 
+        setSessionPayout(prev => prev + winAmount);
+
         confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
     };
 
@@ -240,6 +255,22 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
 
     useEffect(() => {
         if (!isOpen) {
+            // Save session to history if any bets were made
+            if (sessionWagered > 0) {
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: gameData?.name || "Custom Game", 
+                        gameImage: gameData?.coverImage || "/images/game-placeholder.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
+                // Reset session
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
+
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
             setGameState('IDLE');
             setMultiplier(1.00);
@@ -251,8 +282,9 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
             }
         } else {
             setTimeout(() => drawGraph(0, 1.0, false), 100);
+        
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout, currencyType, gameData]);
 
     if (!isOpen || !gameData) return null;
     if (typeof document === "undefined") return null;

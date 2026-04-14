@@ -2,8 +2,26 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Sparkles, Loader2, Bot, Wand2, Save, Upload, ImageIcon, X, Eye, RotateCcw, AlertTriangle, Trash2, Play, Clock, Gamepad2, LayoutTemplate, Palette, Volume2 } from 'lucide-react';
+import {
+  Check, Sparkles, Loader2, Wand2, Save, Upload, ImageIcon, X, Eye,
+  RotateCcw, Trash2, Play, Clock, Gamepad2, Palette, Volume2,
+  Grid3X3, ToggleLeft, ToggleRight, Zap, Settings2, ChevronDown,
+  Rocket, TrendingUp, Gauge, ShieldCheck
+} from 'lucide-react';
+import {
+  SlotConfig, SlotSymbol, GridLayout,
+  GRID_PRESETS, VOLATILITY_PRESETS, DEFAULT_SYMBOLS, DEFAULT_SLOT_CONFIG
+} from '@/types/slotConfig';
+import {
+  CrashConfig, DEFAULT_CRASH_CONFIG,
+  FLYING_OBJECT_PRESETS, ACCELERATION_PRESETS, HOUSE_EDGE_PRESETS
+} from '@/types/crashConfig';
+import {
+  ScratchConfig, ScratchSymbol, DEFAULT_SCRATCH_CONFIG, DEFAULT_SCRATCH_SYMBOLS,
+  GRID_SIZE_PRESETS, BRUSH_SHAPE_PRESETS, WIN_PROBABILITY_PRESETS
+} from '@/types/scratchConfig';
 
+// ─── Sound Helper ──────────────────────────────────────────────────────────
 const playSynthSound = (type: string) => {
     try {
         if (type === 'spin') {
@@ -12,39 +30,18 @@ const playSynthSound = (type: string) => {
             audio.play().catch(() => {});
             return;
         }
-        if (type === 'tumble') {
-            const audio = new Audio('/game sounds/dice.mp3');
-            audio.volume = 0.5;
-            audio.play().catch(() => {});
-            return;
-        }
-
         const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
         if (!AudioContext) return;
         const ctx = new AudioContext();
         if (ctx.state === 'suspended') ctx.resume();
-
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-
-        if (type === 'rise') {
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(80, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 2.0);
-            gain.gain.setValueAtTime(0.1, ctx.currentTime);
-            gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 2.0);
-        } else if (type === 'blip') {
+        if (type === 'blip') {
             osc.type = 'sine';
             osc.frequency.setValueAtTime(600, ctx.currentTime);
             osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
             gain.gain.setValueAtTime(0.1, ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-        } else if (type === 'boom') {
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(100, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.5);
-            gain.gain.setValueAtTime(0.3, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
         } else if (type === 'win') {
             osc.type = 'sine';
             osc.frequency.setValueAtTime(400, ctx.currentTime);
@@ -52,10 +49,7 @@ const playSynthSound = (type: string) => {
             osc.frequency.setValueAtTime(800, ctx.currentTime + 0.2);
             gain.gain.setValueAtTime(0.2, ctx.currentTime);
             gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
-        } else {
-             return;
-        }
-        
+        } else { return; }
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start();
@@ -63,268 +57,280 @@ const playSynthSound = (type: string) => {
     } catch(e) {}
 };
 
+// ─── Win Effects ───────────────────────────────────────────────────────────
+const WIN_EFFECTS = [
+    { id: 'confetti', icon: '🎉', name: 'Confetti' },
+    { id: 'fireworks', icon: '🎆', name: 'Fireworks' },
+    { id: 'stars', icon: '⭐', name: 'Stars' },
+    { id: 'coins', icon: '💰', name: 'Coins' },
+    { id: 'none', icon: '❌', name: 'None' },
+];
+
+type GameType = 'slots' | 'crash' | 'scratch';
+
 interface CreatorGameStudioProps {
     creatorData: any;
     onGoBack: () => void;
 }
 
-const WIN_EFFECTS = [
-    { id: 'confetti', icon: '🎉', name: 'Confetti' },
-    { id: 'fireworks', icon: '🎆', name: 'Fireworks' },
-    { id: 'stars', icon: '⭐', name: 'Stars' },
-    { id: 'snow', icon: '❄️', name: 'Snow' },
-    { id: 'coins', icon: '💰', name: 'Coins' },
-    { id: 'none', icon: '❌', name: 'None' },
-];
-
 export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGameStudioProps) {
-    const [creationMode, setCreationMode] = useState<'ai' | 'template'>('ai');
-    const [selectedTemplate, setSelectedTemplate] = useState('slot');
-    const [aiPrompt, setAiPrompt] = useState('');
-    const [aiImages, setAiImages] = useState<{name: string, data: string}[]>([]);
-    const [aiCustomAssets, setAiCustomAssets] = useState<{id: string, name: string, default: string, current: string}[]>([]);
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [gameName, setGameName] = useState('My Awesome Game');
-    const [gameDescription, setGameDescription] = useState('Click to edit this description...');
-    const [themeEmoji, setThemeEmoji] = useState('🎲');
-    const [themeColor, setThemeColor] = useState('#00b9f0');
-    const [slotSymbols, setSlotSymbols] = useState<string[]>(['🍒', '🍋', '🍉', '⭐', '💎']);
-    const [crashIcons, setCrashIcons] = useState<string[]>(['🚀', '💥']);
-    const [diceIcons, setDiceIcons] = useState<string[]>(['⚀', '⚁', '⚂', '⚃', '⚄', '⚅']);
-    const [minesIcons, setMinesIcons] = useState<string[]>(['💎', '💣']);
-    const [plinkoIcons, setPlinkoIcons] = useState<string[]>(['⚪', '🔴']);
-    const [wheelIcons, setWheelIcons] = useState<string[]>(['🎯', '🎲', '⭐', '💰', '🎁', '🔥']);
-    const [htmlCode, setHtmlCode] = useState('');
+    // ─── Game Type ────────────────────────────────────────────────────────
+    const [gameType, setGameType] = useState<GameType>('slots');
+
+    // ─── Slot Config State ─────────────────────────────────────────────────
+    const [gridLayout, setGridLayout] = useState<GridLayout>('5x3');
+    const [volatility, setVolatility] = useState<'low' | 'medium' | 'high'>('medium');
+    const [symbols, setSymbols] = useState<SlotSymbol[]>([...DEFAULT_SYMBOLS]);
+    const [gameName, setGameName] = useState('My Slot Game');
+    const [gameDescription, setGameDescription] = useState('A custom slot experience');
+    const [accentColor, setAccentColor] = useState('#a855f7');
+    const [backgroundColor, setBackgroundColor] = useState('#0a111a');
+    const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
     const [coverImage, setCoverImage] = useState<string | null>(null);
-    const [isPublishing, setIsPublishing] = useState(false);
+
+    // ─── Feature Toggles ───────────────────────────────────────────────────
+    const [wildEnabled, setWildEnabled] = useState(true);
+    const [wildSymbolId, setWildSymbolId] = useState('sym_w');
+    const [scatterEnabled, setScatterEnabled] = useState(true);
+    const [scatterSymbolId, setScatterSymbolId] = useState('sym_s');
+    const [freeSpinsCount, setFreeSpinsCount] = useState(10);
+    const [progressiveMultiplier, setProgressiveMultiplier] = useState(false);
+    const [tumbleEnabled, setTumbleEnabled] = useState(false);
+
+    // ─── Crash Config State ─────────────────────────────────────────────────
+    const [crashFlyingObject, setCrashFlyingObject] = useState(DEFAULT_CRASH_CONFIG.flyingObject);
+    const [crashFlyingObjectImage, setCrashFlyingObjectImage] = useState<string | null>(null);
+    const [crashCrashImage, setCrashCrashImage] = useState<string | null>(DEFAULT_CRASH_CONFIG.crashImage);
+    const [crashBgImage, setCrashBgImage] = useState<string | null>(DEFAULT_CRASH_CONFIG.backgroundImage);
+    const [crashAccentColor, setCrashAccentColor] = useState(DEFAULT_CRASH_CONFIG.accentColor);
+    const [crashBgColor, setCrashBgColor] = useState(DEFAULT_CRASH_CONFIG.backgroundColor);
+    const [crashGraphColor, setCrashGraphColor] = useState(DEFAULT_CRASH_CONFIG.graphColor);
+    const [crashMaxMultiplier, setCrashMaxMultiplier] = useState(DEFAULT_CRASH_CONFIG.maxMultiplier);
+    const [crashHouseEdge, setCrashHouseEdge] = useState(DEFAULT_CRASH_CONFIG.houseEdge);
+    const [crashAcceleration, setCrashAcceleration] = useState(DEFAULT_CRASH_CONFIG.accelerationCurve);
+    const [crashGameName, setCrashGameName] = useState(DEFAULT_CRASH_CONFIG.theme.gameName);
+    const [crashGameDescription, setCrashGameDescription] = useState(DEFAULT_CRASH_CONFIG.theme.gameDescription);
+    const [crashCoverImage, setCrashCoverImage] = useState<string | null>(null);
+
+    // ─── Scratch Config State ────────────────────────────────────────────
+    const [scratchGridSize, setScratchGridSize] = useState<'3x3' | '4x3' | '5x3'>(DEFAULT_SCRATCH_CONFIG.gridSize);
+    const [scratchSymbols, setScratchSymbols] = useState<ScratchSymbol[]>([...DEFAULT_SCRATCH_SYMBOLS]);
+    const [scratchCoverImage, setScratchCoverImage] = useState<string | null>(null);
+    const [scratchBrushShape, setScratchBrushShape] = useState<'circle' | 'square' | 'star'>(DEFAULT_SCRATCH_CONFIG.brushShape);
+    const [scratchBrushSize, setScratchBrushSize] = useState(DEFAULT_SCRATCH_CONFIG.brushSize);
+    const [scratchWinProbability, setScratchWinProbability] = useState(DEFAULT_SCRATCH_CONFIG.winProbability);
+    const [scratchAccentColor, setScratchAccentColor] = useState(DEFAULT_SCRATCH_CONFIG.theme.accentColor);
+    const [scratchBgColor, setScratchBgColor] = useState(DEFAULT_SCRATCH_CONFIG.theme.backgroundColor);
+    const [scratchGameName, setScratchGameName] = useState(DEFAULT_SCRATCH_CONFIG.theme.gameName);
+    const [scratchGameDescription, setScratchGameDescription] = useState(DEFAULT_SCRATCH_CONFIG.theme.gameDescription);
+    const [scratchLobbyCover, setScratchLobbyCover] = useState<string | null>(null);
+
+    // ─── UI State ──────────────────────────────────────────────────────────
     const [winEffect, setWinEffect] = useState('confetti');
     const [winSound, setWinSound] = useState<string | null>(null);
-    const [gameBackgroundImage, setGameBackgroundImage] = useState<string | null>(null);
+    const [isPublishing, setIsPublishing] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
-    const [showPreview, setShowPreview] = useState(false);
-    const [generationError, setGenerationError] = useState('');
-    const [editingField, setEditingField] = useState<'name' | 'desc' | 'emoji' | null>(null);
-    const [publishedGames, setPublishedGames] = useState<any[]>([]);
-    const [verificationStatus, setVerificationStatus] = useState<'idle' | 'verifying' | 'passed' | 'failed' | 'retrying'>('idle');
-    const [aiRetryCount, setAiRetryCount] = useState(0);
+    const [activeSection, setActiveSection] = useState<'design' | 'grid' | 'paytable' | 'features' | 'preview'>('design');
+    const [crashActiveSection, setCrashActiveSection] = useState<'design' | 'engine' | 'preview'>('design');
+    const [scratchActiveSection, setScratchActiveSection] = useState<'design' | 'paytable' | 'preview'>('design');
+    const [engineReady, setEngineReady] = useState(false);
+    const [crashEngineReady, setCrashEngineReady] = useState(false);
+    const [scratchEngineReady, setScratchEngineReady] = useState(false);
+    const [isTesting, setIsTesting] = useState(false);
 
     const iframeRef = useRef<HTMLIFrameElement>(null);
-    const verifyIframeRef = useRef<HTMLIFrameElement>(null);
+    const crashIframeRef = useRef<HTMLIFrameElement>(null);
+    const scratchIframeRef = useRef<HTMLIFrameElement>(null);
 
-    // Load published games from localStorage
+    // ─── Derived Values ────────────────────────────────────────────────────
+    const gridPreset = GRID_PRESETS[gridLayout];
+    const rows = gridPreset.rows;
+    const cols = gridPreset.cols;
+
+    // ─── Listen for engine messages ────────────────────────────────────────
     useEffect(() => {
-        const loadGames = () => {
-            const data = localStorage.getItem('custom_published_games');
-            if (data) {
-                try {
-                    const allGames = JSON.parse(data);
-                    const myGames = allGames.filter((g: any) => 
-                        g.creatorId === (creatorData.id || creatorData.name) || 
-                        g.creatorName === creatorData.name
-                    );
-                    setPublishedGames(myGames);
-                } catch (e) {
-                    console.error(e);
+        const handleMessage = (event: MessageEvent) => {
+            if (!event.data || typeof event.data !== 'object') return;
+            if (event.data.type === 'GAME_READY') {
+                if (event.data.engine === 'crash') {
+                    setCrashEngineReady(true);
+                } else if (event.data.engine === 'scratch') {
+                    setScratchEngineReady(true);
+                } else {
+                    setEngineReady(true);
                 }
             }
-        };
-        loadGames();
-        window.addEventListener('storage', loadGames);
-        return () => window.removeEventListener('storage', loadGames);
-    }, [creatorData]);
-
-    // Global listener for sounds triggered by games in preview
-    useEffect(() => {
-        const handleGlobalMessage = (event: MessageEvent) => {
-            if (event.data?.type === 'PLAY_SOUND' && event.data.soundType) {
+            if (event.data.type === 'PLAY_SOUND' && event.data.soundType) {
                 playSynthSound(event.data.soundType);
             }
+            if (event.data.type === 'GAME_RESULT' || event.data.type === 'CRASH_RESULT' || event.data.type === 'SCRATCH_RESULT') {
+                setIsTesting(false);
+            }
         };
-        window.addEventListener('message', handleGlobalMessage);
-        return () => window.removeEventListener('message', handleGlobalMessage);
-    }, []);
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, []); // Only register listener once
 
-    const updateCustomAsset = (id: string, newImageBase64: string) => {
-        const updated = aiCustomAssets.map(a => a.id === id ? { ...a, current: newImageBase64 } : a);
-        setAiCustomAssets(updated);
+    // ─── Build Config JSON ─────────────────────────────────────────────────
+    const buildConfig = useCallback((): SlotConfig => {
+        return {
+            gridLayout,
+            rows: gridPreset.rows,
+            cols: gridPreset.cols,
+            symbols,
+            volatility,
+            features: {
+                wildEnabled,
+                wildSymbolId: wildEnabled ? wildSymbolId : undefined,
+                scatterEnabled,
+                scatterSymbolId: scatterEnabled ? scatterSymbolId : undefined,
+                freeSpinsCount,
+                progressiveMultiplier,
+                tumbleEnabled,
+            },
+            theme: {
+                gameName,
+                gameDescription,
+                accentColor,
+                backgroundColor,
+                backgroundImage: backgroundImage || undefined,
+            },
+        };
+    }, [gridLayout, gridPreset, symbols, volatility, wildEnabled, wildSymbolId, scatterEnabled, scatterSymbolId, freeSpinsCount, progressiveMultiplier, tumbleEnabled, gameName, gameDescription, accentColor, backgroundColor, backgroundImage]);
 
-        const assetsObj = updated.reduce((acc, curr) => {
-            acc[curr.id] = curr.current !== curr.default ? curr.current : curr.default;
-            return acc;
-        }, {} as Record<string, string>);
+    // ─── Build Crash Config JSON ──────────────────────────────────────────
+    const buildCrashConfig = useCallback((): CrashConfig => {
+        return {
+            flyingObject: crashFlyingObjectImage || crashFlyingObject,
+            crashImage: crashCrashImage,
+            backgroundImage: crashBgImage,
+            accentColor: crashAccentColor,
+            backgroundColor: crashBgColor,
+            graphColor: crashGraphColor,
+            maxMultiplier: crashMaxMultiplier,
+            houseEdge: crashHouseEdge,
+            accelerationCurve: crashAcceleration,
+            theme: {
+                gameName: crashGameName,
+                gameDescription: crashGameDescription,
+            },
+        };
+    }, [crashFlyingObject, crashFlyingObjectImage, crashCrashImage, crashBgImage, crashAccentColor, crashBgColor, crashGraphColor, crashMaxMultiplier, crashHouseEdge, crashAcceleration, crashGameName, crashGameDescription]);
 
+    // ─── Send config to engine iframe ──────────────────────────────────────
+    const sendConfigToEngine = useCallback(() => {
         if (iframeRef.current?.contentWindow) {
-            iframeRef.current.contentWindow.postMessage({ type: 'UPDATE_ASSETS', assets: assetsObj }, '*');
+            iframeRef.current.contentWindow.postMessage({
+                type: 'SLOT_CONFIG',
+                config: buildConfig()
+            }, '*');
         }
+    }, [buildConfig]);
 
-        setHtmlCode(prev => prev.replace(/window\.CUSTOM_ASSETS\s*=\s*\{.*?\};/, `window.CUSTOM_ASSETS = ${JSON.stringify(assetsObj)};`));
-    };
-
-    const deleteGame = (gameId: string) => {
-        const data = localStorage.getItem('custom_published_games');
-        if (data) {
-            const allGames = JSON.parse(data);
-            const filtered = allGames.filter((g: any) => g.id !== gameId);
-            localStorage.setItem('custom_published_games', JSON.stringify(filtered));
-            // Trigger storage event for other tabs/components
-            window.dispatchEvent(new Event('storage'));
-            setPublishedGames(prev => prev.filter(g => g.id !== gameId));
+    const sendCrashConfigToEngine = useCallback(() => {
+        if (crashIframeRef.current?.contentWindow) {
+            crashIframeRef.current.contentWindow.postMessage({
+                type: 'CRASH_CONFIG',
+                config: buildCrashConfig()
+            }, '*');
         }
-    };
+    }, [buildCrashConfig]);
 
-    const handleAIGenerate = async (retryAttempt = 0) => {
-        if (!aiPrompt.trim()) return;
-        if (retryAttempt === 0) {
-            setIsGenerating(true);
-            setGenerationError('');
-            setAiRetryCount(0);
+    // Update engine on config changes
+    useEffect(() => {
+        if (engineReady) {
+            const timeout = setTimeout(sendConfigToEngine, 100); // Debounce
+            return () => clearTimeout(timeout);
         }
-        setVerificationStatus('idle');
+    }, [engineReady, sendConfigToEngine]);
 
+    useEffect(() => {
+        if (crashEngineReady) {
+            const timeout = setTimeout(sendCrashConfigToEngine, 100); // Debounce
+            return () => clearTimeout(timeout);
+        }
+    }, [crashEngineReady, sendCrashConfigToEngine]);
+
+    // ─── Build Scratch Config JSON ────────────────────────────────────────
+    const buildScratchConfig = useCallback((): ScratchConfig => {
+        const preset = GRID_SIZE_PRESETS[scratchGridSize];
+        return {
+            gridSize: scratchGridSize,
+            rows: preset.rows,
+            cols: preset.cols,
+            symbols: scratchSymbols,
+            coverImage: scratchCoverImage,
+            brushShape: scratchBrushShape,
+            brushSize: scratchBrushSize,
+            winProbability: scratchWinProbability,
+            theme: {
+                gameName: scratchGameName,
+                gameDescription: scratchGameDescription,
+                accentColor: scratchAccentColor,
+                backgroundColor: scratchBgColor,
+            },
+        };
+    }, [scratchGridSize, scratchSymbols, scratchCoverImage, scratchBrushShape, scratchBrushSize, scratchWinProbability, scratchGameName, scratchGameDescription, scratchAccentColor, scratchBgColor]);
+
+    const sendScratchConfigToEngine = useCallback(() => {
+        if (scratchIframeRef.current?.contentWindow) {
+            scratchIframeRef.current.contentWindow.postMessage({
+                type: 'SCRATCH_CONFIG',
+                config: buildScratchConfig()
+            }, '*');
+        }
+    }, [buildScratchConfig]);
+
+    useEffect(() => {
+        if (scratchEngineReady) {
+            const timeout = setTimeout(sendScratchConfigToEngine, 100); // Debounce
+            return () => clearTimeout(timeout);
+        }
+    }, [scratchEngineReady, sendScratchConfigToEngine]);
+
+    // ─── Test Spin ─────────────────────────────────────────────────────────
+    const handleTestSpin = async () => {
+        if (isTesting || !engineReady) return;
+        setIsTesting(true);
+        
         try {
-            const res = await fetch('/api/generate-game', {
+            const res = await fetch('/api/spin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: aiPrompt, images: aiImages.map(img => img.data) })
+                body: JSON.stringify({ config: buildConfig(), bet: 10 })
             });
-
-            const data = await res.json();
-
-            if (data.success && data.data) {
-                const gameData = data.data;
-                setGameName(gameData.gameName || '');
-                setGameDescription(gameData.gameDescription || '');
-                setThemeEmoji(gameData.themeEmoji || '🎮');
-                setThemeColor(gameData.themeColor || '#a855f7');
-                
-                if (gameData.customizableAssets && Array.isArray(gameData.customizableAssets)) {
-                    setAiCustomAssets(gameData.customizableAssets.map((a: any) => ({...a, current: a.default})));
-                } else {
-                    setAiCustomAssets([]);
-                }
-
-                const generatedCode = gameData.htmlCode || '';
-                setHtmlCode(generatedCode);
-                setShowPreview(true);
-                setIsGenerating(false);
-
-                // --- CLIENT-SIDE AUTO-VERIFICATION ---
-                setVerificationStatus('verifying');
-                const verifyResult = await verifyGameViaPostMessage(generatedCode);
-
-                if (verifyResult) {
-                    setVerificationStatus('passed');
-                } else {
-                    // Failed verification
-                    if (retryAttempt < 2) {
-                        setVerificationStatus('retrying');
-                        setAiRetryCount(retryAttempt + 1);
-                        setGenerationError(`Game failed verification (attempt ${retryAttempt + 1}/3). Auto-regenerating...`);
-                        // Small delay then retry
-                        await new Promise(r => setTimeout(r, 1500));
-                        return handleAIGenerate(retryAttempt + 1);
-                    } else {
-                        setVerificationStatus('failed');
-                        setGenerationError('Game failed verification after 3 attempts. You can still preview it manually or try a different prompt.');
-                    }
-                }
-            } else {
-                setGenerationError(data.error || 'Unknown error. Please try again.');
-                setIsGenerating(false);
-            }
-        } catch (error) {
-            console.error("Error calling AI:", error);
-            setGenerationError('Connection error. Please check your internet and try again.');
-            setIsGenerating(false);
+            const result = await res.json();
+            
+            // Send result to engine for animation
+            iframeRef.current?.contentWindow?.postMessage({
+                type: 'START_GAME',
+                spinResult: result,
+                bet: 10
+            }, '*');
+        } catch (err) {
+            console.error('Test spin error:', err);
+            setIsTesting(false);
         }
     };
 
-    /** Multi-round stress-test: loads the game in a hidden iframe, runs 3 rounds, checks for results AND at least one win */
-    const verifyGameViaPostMessage = (code: string): Promise<boolean> => {
-        return new Promise((resolve) => {
-            const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'position:fixed;width:400px;height:500px;top:-9999px;left:-9999px;opacity:0;pointer-events:none;';
-            iframe.sandbox.add('allow-scripts');
-            document.body.appendChild(iframe);
-
-            let resolved = false;
-            let gameReady = false;
-            const TOTAL_ROUNDS = 3;
-            let roundsCompleted = 0;
-            let hasWin = false;
-            let hasLoss = false;
-
-            const cleanup = () => {
-                window.removeEventListener('message', onMessage);
-                try { document.body.removeChild(iframe); } catch(e) {}
-            };
-
-            const finalize = (success: boolean) => {
-                if (resolved) return;
-                resolved = true;
-                cleanup();
-                if (success) {
-                    console.log(`✅ Verification PASSED: ${roundsCompleted} rounds, wins=${hasWin}, losses=${hasLoss}`);
-                } else {
-                    console.warn(`❌ Verification FAILED: rounds=${roundsCompleted}/${TOTAL_ROUNDS}, ready=${gameReady}, wins=${hasWin}`);
-                }
-                resolve(success);
-            };
-
-            const runNextRound = () => {
-                // Send RESET then START_GAME
-                try {
-                    iframe.contentWindow?.postMessage({ type: 'RESET' }, '*');
-                } catch(e) {}
-                setTimeout(() => {
-                    try {
-                        iframe.contentWindow?.postMessage({ type: 'START_GAME', bet: 10 }, '*');
-                    } catch(e) { console.error('Verify postMessage error:', e); }
-                }, 300);
-            };
-
-            const onMessage = (event: MessageEvent) => {
-                if (!event.data || typeof event.data !== 'object') return;
-
-                if (event.data.type === 'GAME_READY') {
-                    gameReady = true;
-                    // Start the first round after a short delay
-                    setTimeout(() => {
-                        try {
-                            iframe.contentWindow?.postMessage({ type: 'START_GAME', bet: 10 }, '*');
-                        } catch(e) {}
-                    }, 500);
-                }
-
-                if (event.data.type === 'GAME_RESULT') {
-                    roundsCompleted++;
-                    const mult = event.data.multiplier;
-                    if (typeof mult === 'number' && mult > 0) hasWin = true;
-                    if (typeof mult === 'number' && mult === 0) hasLoss = true;
-
-                    if (roundsCompleted >= TOTAL_ROUNDS) {
-                        // All rounds done — pass if we got results and at least 1 produces a win somewhere in the distribution
-                        finalize(true);
-                    } else {
-                        // Run next round after a brief pause
-                        setTimeout(runNextRound, 600);
-                    }
-                }
-            };
-
-            window.addEventListener('message', onMessage);
-            iframe.srcdoc = code;
-
-            // Global timeout — 20s is generous for 3 rounds
-            setTimeout(() => {
-                if (!resolved) {
-                    // If we got at least 1 result, accept it; the timeout may just mean a slow animation
-                    finalize(roundsCompleted >= 1);
-                }
-            }, 20000);
-        });
+    // ─── Test Crash Demo ────────────────────────────────────────────────────
+    const handleTestCrash = () => {
+        if (isTesting || !crashEngineReady) return;
+        setIsTesting(true);
+        crashIframeRef.current?.contentWindow?.postMessage({ type: 'START_DEMO' }, '*');
+        // Auto-reset after a reasonable timeout
+        setTimeout(() => setIsTesting(false), 8000);
     };
 
+    // ─── Test Scratch ──────────────────────────────────────────────────────
+    const handleTestScratch = () => {
+        if (isTesting || !scratchEngineReady) return;
+        setIsTesting(true);
+        scratchIframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
+        setTimeout(() => setIsTesting(false), 1000);
+    };
+
+    // ─── File Upload Helpers ───────────────────────────────────────────────
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void, maxWidth = 800) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -335,10 +341,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                     const canvas = document.createElement('canvas');
                     let width = img.width;
                     let height = img.height;
-                    if (width > maxWidth) {
-                        height *= maxWidth / width;
-                        width = maxWidth;
-                    }
+                    if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; }
                     canvas.width = width;
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
@@ -351,368 +354,309 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
         }
     };
 
-    const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void) => {
+    const handleSymbolImageUpload = (symbolId: string, e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            if (file.size > 2 * 1024 * 1024) { // 2MB limit
-                alert("Fișierul audio este prea mare. Limita este de 2MB.");
-                return;
-            }
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                callback(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const handleAiImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []);
-        files.forEach(file => {
             const reader = new FileReader();
             reader.onloadend = () => {
                 const img = new Image();
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    if (width > 800) {
-                        height *= 800 / width;
-                        width = 800;
-                    }
-                    canvas.width = width;
-                    canvas.height = height;
+                    const MAX = 128;
+                    let w = img.width, h = img.height;
+                    if (w > h) { if (w > MAX) { h *= MAX / w; w = MAX; } }
+                    else { if (h > MAX) { w *= MAX / h; h = MAX; } }
+                    canvas.width = w; canvas.height = h;
                     const ctx = canvas.getContext('2d');
-                    ctx?.drawImage(img, 0, 0, width, height);
-                    setAiImages(prev => [...prev, { name: file.name, data: canvas.toDataURL('image/webp', 0.8) }]);
+                    ctx?.drawImage(img, 0, 0, w, h);
+                    const dataUrl = canvas.toDataURL('image/webp', 0.85);
+                    setSymbols(prev => prev.map(s => s.id === symbolId ? { ...s, image: dataUrl } : s));
                 };
                 img.src = reader.result as string;
             };
             reader.readAsDataURL(file);
-        });
+        }
     };
 
-    const removeAiImage = (index: number) => {
-        setAiImages(prev => prev.filter((_, i) => i !== index));
+    const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 2 * 1024 * 1024) { alert("Audio file too large. Limit: 2MB."); return; }
+            const reader = new FileReader();
+            reader.onloadend = () => callback(reader.result as string);
+            reader.readAsDataURL(file);
+        }
     };
 
-    const getGeneratedTemplateHtml = () => {
-        let generatedHtml = '';
-
-        if (selectedTemplate === 'slot') {
-            const symbolsJson = JSON.stringify(slotSymbols);
-            generatedHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: ${gameBackgroundImage ? `url('${gameBackgroundImage}') center/cover no-repeat` : '#06090c'};
-    color: white;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    position: relative;
-  }
-  .bg-glow {
-    position: absolute; inset: 0; opacity: 0.15; pointer-events: none;
-    background: radial-gradient(ellipse at center, ${themeColor}, transparent 70%);
-  }
-  .game-container {
-    position: relative; z-index: 10;
-    display: flex; flex-direction: column; align-items: center; gap: 24px;
-  }
-  .slot-frame {
-    padding: 24px 32px;
-    border-radius: 24px;
-    border: 8px solid ${themeColor}20;
-    background: linear-gradient(to bottom, ${themeColor}40, #0a1114);
-    box-shadow: inset 0 20px 50px rgba(0,0,0,0.8), 0 20px 50px rgba(0,0,0,0.5);
-  }
-  .slot-inner {
-    display: flex; gap: 16px;
-    background: #06090c;
-    padding: 16px 20px;
-    border-radius: 16px;
-    box-shadow: inset 0 5px 15px rgba(0,0,0,0.5);
-    border: 4px solid #0f171c;
-  }
-  .slot-column {
-    width: 180px; height: 260px;
-    background: #121c22;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-    border: 1px solid rgba(255,255,255,0.05);
-    box-shadow: inset 0 5px 15px rgba(0,0,0,0.3);
-  }
-  .slot-column::before, .slot-column::after {
-    content: ''; position: absolute; left: 0; right: 0; z-index: 20; pointer-events: none;
-  }
-  .slot-column::before {
-    top: 0; height: 40%;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
-  }
-  .slot-column::after {
-    bottom: 0; height: 40%;
-    background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
-  }
-  .symbol-wrap {
-    position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 110px;
-    filter: drop-shadow(0 0 15px rgba(255,255,255,0.2));
-    transition: transform 0.3s ease;
-  }
-  .symbol-wrap img {
-    width: 75%; height: 75%; object-fit: contain;
-    filter: drop-shadow(0 0 10px rgba(255,255,255,0.15));
-  }
-  @keyframes spinReel {
-    0% { transform: translateY(0); }
-    100% { transform: translateY(-1000px); }
-  }
-  .reel-strip {
-    display: flex; flex-direction: column; align-items: center;
-    position: absolute; left: 0; right: 0;
-  }
-  .reel-strip .sym-cell {
-    width: 100%; height: 260px; display: flex; align-items: center; justify-content: center;
-    font-size: 110px;
-  }
-  .reel-strip .sym-cell img {
-    width: 75%; height: 75%; object-fit: contain;
-  }
-  .spinning .reel-strip {
-    animation: spinReel 0.25s linear infinite;
-  }
-  .result-text {
-    font-size: 18px; font-weight: 800; height: 28px; text-align: center;
-    letter-spacing: 2px; text-transform: uppercase;
-  }
-  .spin-btn {
-    padding: 16px 48px; border-radius: 12px; border: none;
-    font-weight: 900; font-size: 18px; color: white;
-    text-transform: uppercase; letter-spacing: 3px;
-    cursor: pointer; transition: all 0.2s;
-    background: linear-gradient(to right, ${themeColor}, ${themeColor}aa);
-    box-shadow: 0 0 20px ${themeColor}60;
-  }
-  .spin-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
-  .spin-btn:active { transform: scale(0.97); }
-  .spin-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-</style>
-</head>
-<body>
-  <div class="bg-glow"></div>
-  <div class="game-container">
-    <div class="slot-frame">
-      <div class="slot-inner">
-        <div class="slot-column" id="col0"><div class="symbol-wrap" id="sw0"></div></div>
-        <div class="slot-column" id="col1"><div class="symbol-wrap" id="sw1"></div></div>
-        <div class="slot-column" id="col2"><div class="symbol-wrap" id="sw2"></div></div>
-      </div>
-    </div>
-    <div id="result" class="result-text">Waiting...</div>
-  </div>
-
-  <script>
-    const symbols = ${symbolsJson};
-    const renderSym = (s) => s.startsWith('data:image') ? '<img src="'+s+'">' : s;
-    const cols = [
-      { el: document.getElementById('col0'), sw: document.getElementById('sw0') },
-      { el: document.getElementById('col1'), sw: document.getElementById('sw1') },
-      { el: document.getElementById('col2'), sw: document.getElementById('sw2') }
-    ];
-    const resultEl = document.getElementById('result');
-
-    // Init with random symbols
-    cols.forEach(c => { c.sw.innerHTML = renderSym(symbols[Math.floor(Math.random() * symbols.length)]); });
-
-    let isPlaying = false;
-
-    window.addEventListener('message', (event) => {
-      if (event.data?.type === 'START_GAME') {
-        if (isPlaying) return;
-        isPlaying = true;
-        resultEl.innerHTML = "Spinning...";
-        resultEl.style.color = "white";
-
-        // Create spinning strips
-        cols.forEach(c => {
-          let stripHtml = '';
-          for (let i = 0; i < 8; i++) {
-            stripHtml += '<div class="sym-cell">' + renderSym(symbols[Math.floor(Math.random() * symbols.length)]) + '</div>';
-          }
-          c.sw.innerHTML = '<div class="reel-strip">' + stripHtml + '</div>';
-          c.el.classList.add('spinning');
-        });
-
-        // Determine results
-        const finalResults = [
-          symbols[Math.floor(Math.random() * symbols.length)],
-          symbols[Math.floor(Math.random() * symbols.length)],
-          symbols[Math.floor(Math.random() * symbols.length)]
-        ];
-
-        // 15% win chance
-        if (Math.random() > 0.85) {
-          const target = symbols[Math.floor(Math.random() * symbols.length)];
-          finalResults[0] = target; finalResults[1] = target; finalResults[2] = target;
-        }
-
-        // Stop reels with stagger
-        cols.forEach((c, idx) => {
-          setTimeout(() => {
-            c.el.classList.remove('spinning');
-            c.sw.innerHTML = renderSym(finalResults[idx]);
-
-            if (idx === 2) {
-              const win = finalResults[0] === finalResults[1] && finalResults[1] === finalResults[2];
-              const multiplier = win ? 5.0 : 0;
-              resultEl.innerHTML = win ? "🎰 YOU WIN " + multiplier + "x! 🎰" : "BETTER LUCK NEXT TIME";
-              resultEl.style.color = win ? "${themeColor}" : "#94a3b8";
-              isPlaying = false;
-
-              if (window.parent) {
-                window.parent.postMessage({ type: 'GAME_RESULT', win, multiplier }, '*');
-              }
-            }
-          }, idx * 600 + 800);
-        });
-      }
-    });
-
-    if (window.parent) { window.parent.postMessage({ type: 'GAME_READY' }, '*'); }
-  </script>
-</body>
-</html>`;
-        } else if (selectedTemplate === 'crash') {
-            const iconsJson = JSON.stringify(crashIcons);
-            generatedHtml = `<!DOCTYPE html><html><head><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet"><style>*{box-sizing:border-box}body{margin:0;padding:24px;width:100vw;height:100vh;overflow:hidden;background:${gameBackgroundImage ? `url('${gameBackgroundImage}') center/cover no-repeat` : '#06090c'};color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Inter',sans-serif}.bg-glow{position:absolute;inset:0;opacity:0.15;pointer-events:none;background:radial-gradient(ellipse at center, ${themeColor}, transparent 70%);}.chart-container{width:100%;max-width:650px;height:350px;border-left:4px solid ${themeColor}50;border-bottom:4px solid ${themeColor}50;position:relative;display:flex;align-items:flex-end;margin-bottom:30px;z-index:10}.mult{position:absolute;font-size:4rem;font-weight:900;text-shadow:0 0 20px rgba(0,0,0,0.8);color:${themeColor};top:25%;right:10%;display:flex;align-items:center;gap:12px;}.status{font-size:1.2rem;font-weight:700;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;z-index:10}.rocket{position:absolute;width:64px;height:64px;transform:translate(-50%,50%);display:flex;align-items:center;justify-content:center;font-size:40px;transition:none;filter:drop-shadow(0 0 10px rgba(0,0,0,0.5))}</style></head><body><div class="bg-glow"></div><div style="z-index:10;text-align:center;margin-bottom:20px"><h1 style="font-size:2rem;font-weight:900;margin:0;color:white;text-transform:uppercase;letter-spacing:2px;text-shadow:0 0 10px ${themeColor}50">${gameName}</h1></div><div class="chart-container"><svg viewBox="0 0 100 100" style="width:100%;height:100%;position:absolute;inset:0;overflow:visible;" preserveAspectRatio="none"><path id="line" d="" fill="none" stroke="${themeColor}" stroke-width="4" filter="drop-shadow(0 0 8px ${themeColor})"/></svg><div id="rocket" class="rocket"></div><div class="mult" id="mult">1.00x</div></div><div class="status" id="status">Waiting...</div><script>const icons=${iconsJson};const renderIcon=(i)=>i&&i.startsWith('data:image')?'<img src="'+i+'" style="width:100%;height:100%;object-fit:contain;">':(i||'');let animFrame,crashed=false,mult=1,startTime;const svg=document.getElementById('svg'),line=document.getElementById('line'),multEl=document.getElementById('mult'),statusEl=document.getElementById('status'),rocket=document.getElementById('rocket');rocket.innerHTML=renderIcon(icons[0]);let isPlaying=false;window.addEventListener('message',(e)=>{if(e.data?.type==='START_GAME'){if(isPlaying)return;isPlaying=true;crashed=false;mult=1;line.setAttribute('d','');rocket.innerHTML=renderIcon(icons[0]);rocket.style.display='flex';rocket.style.left='0%';rocket.style.top='100%';multEl.innerHTML='1.00x';multEl.style.color='${themeColor}';statusEl.textContent='Launching...';statusEl.style.color='${themeColor}';const crashAt=1.1+Math.random()*4;startTime=Date.now();function tick(){if(crashed)return;const t=(Date.now()-startTime)/2000;mult=Math.pow(1.06,t*20);if(mult>=crashAt){crashed=true;rocket.style.display='none';multEl.innerHTML='<div style="width:40px;height:40px;display:inline-block">'+renderIcon(icons[1])+'</div> CRASHED';multEl.style.color='#ef4444';statusEl.textContent='Game Over';isPlaying=false;window.parent.postMessage({type:'GAME_RESULT',win:false,multiplier:0},'*');return}multEl.innerHTML=mult.toFixed(2)+'x';const w=100,h=100,pts=[];let lastPX=0,lastPY=h;for(let i=0;i<=t*20;i++){const m=Math.pow(1.06,i);const px=(i/(t*20+10))*100;const py=100-((m-1)/crashAt)*100;pts.push(px+','+py);lastPX=px;lastPY=py}line.setAttribute('d','M'+pts.join(' L'));rocket.style.left=lastPX+'%';rocket.style.top=lastPY+'%';animFrame=requestAnimationFrame(tick)}tick()}});window.parent.postMessage({type:'GAME_READY'},'*');</script></body></html>`;
-            generatedHtml = `<!DOCTYPE html><html><head><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet"><style>*{box-sizing:border-box}body{margin:0;padding:24px;width:100vw;height:100vh;overflow:hidden;background:${gameBackgroundImage ? `url('${gameBackgroundImage}') center/cover no-repeat` : '#06090c'};color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Inter',sans-serif}.bg-glow{position:absolute;inset:0;opacity:0.15;pointer-events:none;background:radial-gradient(ellipse at center, ${themeColor}, transparent 70%);}.chart-container{width:100%;max-width:650px;height:350px;border-left:4px solid ${themeColor}50;border-bottom:4px solid ${themeColor}50;position:relative;display:flex;align-items:flex-end;margin-bottom:30px;z-index:10}.mult{position:absolute;font-size:4rem;font-weight:900;text-shadow:0 0 20px rgba(0,0,0,0.8);color:${themeColor};top:25%;right:10%;display:flex;align-items:center;gap:12px;}.status{font-size:1.2rem;font-weight:700;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;z-index:10}.rocket{position:absolute;width:64px;height:64px;transform:translate(-50%,50%);display:flex;align-items:center;justify-content:center;font-size:40px;transition:none;filter:drop-shadow(0 0 10px rgba(0,0,0,0.5))}.cashout-btn{padding:12px 32px;font-size:1rem;font-weight:900;background:linear-gradient(135deg, ${themeColor}, ${themeColor}80);color:white;border:none;border-radius:12px;cursor:pointer;box-shadow:0 0 20px ${themeColor}50;z-index:20;text-transform:uppercase;letter-spacing:2px;margin-top:20px;display:none; transition: transform 0.1s;}.cashout-btn:active{transform:scale(0.95)}</style></head><body><div class="bg-glow"></div><div class="chart-container"><svg viewBox="0 0 100 100" style="width:100%;height:100%;position:absolute;inset:0;overflow:visible;" preserveAspectRatio="none"><path id="line" d="" fill="none" stroke="${themeColor}" stroke-width="4" filter="drop-shadow(0 0 8px ${themeColor})"/></svg><div id="rocket" class="rocket"></div><div class="mult" id="mult">1.00x</div></div><div class="status" id="status">Waiting...</div><button class="cashout-btn" id="cashoutBtn">Cash Out</button><script>const icons=${iconsJson};const renderIcon=(i)=>i&&i.startsWith('data:image')?'<img src="'+i+'" style="width:100%;height:100%;object-fit:contain;">':(i||'');let animFrame,crashed=false,mult=1,startTime;const svg=document.getElementById('svg'),line=document.getElementById('line'),multEl=document.getElementById('mult'),statusEl=document.getElementById('status'),rocket=document.getElementById('rocket'),cashoutBtn=document.getElementById('cashoutBtn');rocket.innerHTML=renderIcon(icons[0]);let isPlaying=false;cashoutBtn.onclick=()=>{if(!isPlaying||crashed)return;crashed=true;isPlaying=false;cashoutBtn.style.display='none';statusEl.textContent='Cashed Out!';statusEl.style.color='${themeColor}';window.parent.postMessage({type:'GAME_RESULT',win:true,multiplier:mult},'*');};window.addEventListener('message',(e)=>{if(e.data?.type==='START_GAME'){if(isPlaying)return;isPlaying=true;crashed=false;mult=1;line.setAttribute('d','');rocket.innerHTML=renderIcon(icons[0]);rocket.style.display='flex';rocket.style.left='0%';rocket.style.top='100%';multEl.innerHTML='1.00x';multEl.style.color='${themeColor}';statusEl.textContent='Launching...';statusEl.style.color='${themeColor}';cashoutBtn.style.display='block';const crashAt=1.1+Math.random()*4;startTime=Date.now();function tick(){if(crashed)return;const t=(Date.now()-startTime)/2000;mult=Math.pow(1.06,t*20);if(mult>=crashAt){crashed=true;rocket.style.display='none';multEl.innerHTML='<div style="width:40px;height:40px;display:inline-block">'+renderIcon(icons[1])+'</div> CRASHED';multEl.style.color='#ef4444';statusEl.textContent='Game Over';isPlaying=false;cashoutBtn.style.display='none';window.parent.postMessage({type:'GAME_RESULT',win:false,multiplier:0},'*');return}multEl.innerHTML=mult.toFixed(2)+'x';const w=100,h=100,pts=[];let lastPX=0,lastPY=h;for(let i=0;i<=t*20;i++){const m=Math.pow(1.06,i);const px=(i/(t*20+10))*100;const py=100-((m-1)/crashAt)*100;pts.push(px+','+py);lastPX=px;lastPY=py}line.setAttribute('d','M'+pts.join(' L'));rocket.style.left=lastPX+'%';rocket.style.top=lastPY+'%';animFrame=requestAnimationFrame(tick)}tick()}});window.parent.postMessage({type:'GAME_READY'},'*');</script></body></html>`;
-        } else if (selectedTemplate === 'dice') {
-            const facesJson = JSON.stringify(diceIcons);
-            generatedHtml = `<!DOCTYPE html><html><head><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet"><style>*{box-sizing:border-box}body{margin:0;padding:24px;width:100vw;height:100vh;overflow:hidden;background:${gameBackgroundImage ? `url('${gameBackgroundImage}') center/cover no-repeat` : '#06090c'};color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Inter',sans-serif}.bg-glow{position:absolute;inset:0;opacity:0.15;pointer-events:none;background:radial-gradient(ellipse at center, ${themeColor}, transparent 70%);}.die-container{width:160px;height:160px;background:linear-gradient(145deg, rgba(255,255,255,0.1), rgba(0,0,0,0.5));border:4px solid ${themeColor}50;border-radius:32px;display:flex;align-items:center;justify-content:center;font-size:80px;box-shadow:0 20px 50px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.05);z-index:10;transition:transform 0.1s;margin-bottom:30px;overflow:hidden;}.die-container img{width:70%;height:70%;object-fit:contain;filter:drop-shadow(0 10px 10px rgba(0,0,0,0.5))}.status{font-size:1rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;z-index:10}.shaking{animation:shake 0.15s infinite;}@keyframes shake{0%,100%{transform:rotate(0deg) scale(1)}25%{transform:rotate(-15deg) scale(1.1)}75%{transform:rotate(15deg) scale(1.1)}}</style></head><body><div class="bg-glow"></div><div class="die-container" id="die"></div><div class="status" id="status">Waiting...</div><script>const faces=${facesJson};const renderIcon=(i)=>i&&i.startsWith('data:image')?'<img src="'+i+'">':(i||'');const die=document.getElementById('die'),statusEl=document.getElementById('status');if(faces&&faces.length>0)die.innerHTML=renderIcon(faces[0]);let isPlaying=false;window.addEventListener('message',(e)=>{if(e.data?.type==='START_GAME'){if(isPlaying||!faces||faces.length===0)return;isPlaying=true;if(window.parent)window.parent.postMessage({type:'PLAY_SOUND',soundType:'tumble'},'*');statusEl.textContent='Rolling...';statusEl.style.color='white';die.classList.add('shaking');let ticks=0;const iv=setInterval(()=>{die.innerHTML=renderIcon(faces[Math.floor(Math.random()*faces.length)]);ticks++;if(ticks>20){clearInterval(iv);die.classList.remove('shaking');const idx=Math.floor(Math.random()*faces.length);const win=idx>=Math.floor(faces.length/2);const mult=win?(idx+1)*0.5:0;die.innerHTML=renderIcon(faces[idx]);statusEl.textContent=win?'WIN '+mult.toFixed(2)+'x!':'Better luck!';statusEl.style.color=win?'${themeColor}':'#ef4444';isPlaying=false;window.parent.postMessage({type:'GAME_RESULT',win,multiplier:mult},'*');}},60);}});window.parent.postMessage({type:'GAME_READY'},'*');</script></body></html>`;
-        } else if (selectedTemplate === 'mines') {
-            const iconsJson = JSON.stringify(minesIcons);
-            generatedHtml = `<!DOCTYPE html><html><head><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet"><style>*{box-sizing:border-box}body{margin:0;padding:16px;width:100vw;height:100vh;overflow:hidden;background:${gameBackgroundImage ? `url('${gameBackgroundImage}') center/cover no-repeat` : '#06090c'};color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Inter',sans-serif}.bg-glow{position:absolute;inset:0;opacity:0.15;pointer-events:none;background:radial-gradient(ellipse at center, ${themeColor}, transparent 70%);}.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;background:#0c1319;padding:16px;border-radius:24px;box-shadow:inset 0 5px 20px rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.05);z-index:10;margin-bottom:20px}.cell{width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;font-size:1.5rem;transition:all 0.3s;box-shadow:inset 0 0 10px rgba(0,0,0,0.5);cursor:pointer;}.cell:hover:not(.disabled){background:rgba(255,255,255,0.1)}.cell.disabled{pointer-events:none}.cell.revealed{background:${themeColor}20;box-shadow:0 0 15px ${themeColor}40}.cell.bomb{background:#ef444430;box-shadow:0 0 15px #ef444440}.cell img{width:70%;height:70%;object-fit:contain;filter:drop-shadow(0 5px 5px rgba(0,0,0,0.5))}.status{font-size:1rem;font-weight:700;color:#94a3b8;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;z-index:10}.mult-display{font-size:2rem;font-weight:900;color:${themeColor};margin-bottom:20px;z-index:10}.cashout-btn{padding:12px 32px;font-size:1rem;font-weight:900;background:linear-gradient(135deg, ${themeColor}, ${themeColor}80);color:white;border:none;border-radius:12px;cursor:pointer;box-shadow:0 0 20px ${themeColor}50;z-index:10;text-transform:uppercase;letter-spacing:2px;transition:transform 0.1s;display:none;}.cashout-btn:active{transform:scale(0.95)}</style></head><body><div class="bg-glow"></div><div class="mult-display" id="mult">1.00x</div><div class="grid" id="grid"></div><div class="status" id="status">Waiting for bet...</div><button class="cashout-btn" id="cashoutBtn">Cash Out</button><script>const icons=${iconsJson};const renderIcon=(i)=>i&&i.startsWith('data:image')?'<img src="'+i+'">':(i||'');const gemIcon=icons[0],bombIcon=icons[1];const grid=document.getElementById('grid'),statusEl=document.getElementById('status'),multEl=document.getElementById('mult'),cashoutBtn=document.getElementById('cashoutBtn');let board=[],revealed=[],gameActive=false,mult=1,initBet=0,gemsCount=0;for(let i=0;i<25;i++){const c=document.createElement('div');c.className='cell disabled';grid.appendChild(c);c.onclick=()=>reveal(i);}window.addEventListener('message',(e)=>{if(e.data?.type==='START_GAME'){if(gameActive)return;gameActive=true;revealed=[];mult=1;gemsCount=0;multEl.textContent='1.00x';statusEl.textContent='Pick a tile!';statusEl.style.color='white';cashoutBtn.style.display='none';board=Array(25).fill('gem');for(let i=0;i<5;i++)board[i]='bomb';board.sort(()=>Math.random()-0.5);Array.from(grid.children).forEach(c=>{c.className='cell';c.innerHTML='';});}});function reveal(i){if(!gameActive||revealed.includes(i))return;revealed.push(i);const cell=grid.children[i];cell.classList.add('disabled');if(board[i]==='bomb'){if(window.parent)window.parent.postMessage({type:'PLAY_SOUND',soundType:'boom'},'*');cell.className='cell bomb disabled';cell.innerHTML=renderIcon(bombIcon);gameActive=false;statusEl.textContent='BOOM! You hit a mine';statusEl.style.color='#ef4444';cashoutBtn.style.display='none';Array.from(grid.children).forEach((c,idx)=>{if(!revealed.includes(idx)){c.className='cell disabled '+(board[idx]==='bomb'?'bomb':'revealed');c.innerHTML=renderIcon(board[idx]==='bomb'?bombIcon:gemIcon);}});setTimeout(()=>{window.parent.postMessage({type:'GAME_RESULT',win:false,multiplier:0},'*');}, 1500);}else{if(window.parent)window.parent.postMessage({type:'PLAY_SOUND',soundType:'blip'},'*');cell.className='cell revealed disabled';cell.innerHTML=renderIcon(gemIcon);gemsCount++;mult=parseFloat((1+gemsCount*0.25).toFixed(2));multEl.textContent=mult.toFixed(2)+'x';cashoutBtn.style.display='block';if(gemsCount>=20){cashout();}}}cashoutBtn.onclick=cashout;function cashout(){if(!gameActive||gemsCount===0)return;gameActive=false;statusEl.textContent='PAID OUT '+mult.toFixed(2)+'x!';statusEl.style.color='${themeColor}';cashoutBtn.style.display='none';Array.from(grid.children).forEach(c=>c.classList.add('disabled'));window.parent.postMessage({type:'GAME_RESULT',win:true,multiplier:mult},'*');}window.parent.postMessage({type:'GAME_READY'},'*');</script></body></html>`;
-        } else if (selectedTemplate === 'plinko') {
-            const iconsJson = JSON.stringify(plinkoIcons);
-            generatedHtml = `<!DOCTYPE html><html><head><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet"><style>*{box-sizing:border-box}body{margin:0;padding:16px;width:100vw;height:100vh;overflow:hidden;background:${gameBackgroundImage ? `url('${gameBackgroundImage}') center/cover no-repeat` : '#06090c'};color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Inter',sans-serif}.bg-glow{position:absolute;inset:0;opacity:0.15;pointer-events:none;background:radial-gradient(ellipse at center, ${themeColor}, transparent 70%);}.board{display:flex;flex-direction:column;align-items:center;gap:18px;z-index:10;position:relative;margin-bottom:30px;margin-top:20px;}.row{display:flex;gap:35px;}.peg{width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,0.2);box-shadow:0 0 8px rgba(255,255,255,0.1)}.mults{display:flex;gap:12px;margin-top:15px}.mb{padding:10px 14px;font-size:16px;font-weight:900;border-radius:8px;background:${themeColor}40;color:${themeColor};box-shadow:0 0 15px rgba(0,0,0,0.4)}.status{font-size:1.2rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;z-index:10}.ball{position:absolute;width:32px;height:32px;border-radius:50%;top:0;left:50%;transform:translate(-50%, -150%);transition:transform 0.12s linear;opacity:0;display:flex;align-items:center;justify-content:center;font-size:24px;filter:drop-shadow(0 0 12px ${themeColor});z-index:20;}.ball img{width:100%;height:100%;object-fit:contain;}</style></head><body><div class="bg-glow"></div><div class="board" id="board"></div><div class="status" id="status">Waiting...</div><script>const icons=${iconsJson};const renderIcon=(i)=>i&&i.startsWith('data:image')?'<img src="'+i+'">':(i||'');const board=document.getElementById('board'),statusEl=document.getElementById('status');for(let r=1;r<=8;r++){const row=document.createElement('div');row.className='row';for(let c=0;c<r;c++){const peg=document.createElement('div');peg.className='peg';row.appendChild(peg);}board.appendChild(row);}const multsC=document.createElement('div');multsC.className='mults';const multVals=[10,5,2,1,0.5,1,2,5,10];multVals.forEach(m=>{const d=document.createElement('div');d.className='mb';d.textContent=m+'x';multsC.appendChild(d);});board.appendChild(multsC);const ball=document.createElement('div');ball.className='ball';ball.innerHTML=renderIcon(icons[0]);board.appendChild(ball);let isPlaying=false;window.addEventListener('message',(e)=>{if(e.data?.type==='START_GAME'){if(isPlaying)return;isPlaying=true;statusEl.textContent='Dropping...';statusEl.style.color='white';ball.style.transition='none';ball.style.transform='translate(-50%, -150%)';ball.style.opacity='1';setTimeout(()=>{ball.style.transition='transform 0.12s linear';let step=1;let pos=0;const iv=setInterval(()=>{let move=Math.random()>0.5?1:-1;pos+=move;if(window.parent)window.parent.postMessage({type:'PLAY_SOUND',soundType:'blip'},'*');ball.style.transform=\`translate(calc(-50% + \${pos*17.5}px), \${step*32}px)\`;step++;if(step>8){clearInterval(iv);const idx=Math.min(Math.max(Math.floor(pos/2)+4,0),8);const wonMult=multVals[idx];statusEl.textContent=wonMult>=1?wonMult+'x WIN!':'Better luck!';statusEl.style.color=wonMult>=1?'${themeColor}':'#ef4444';setTimeout(()=>{ball.style.opacity='0';isPlaying=false;window.parent.postMessage({type:'GAME_RESULT',win:wonMult>0,multiplier:wonMult},'*');},1000);}},120);},50);}});window.parent.postMessage({type:'GAME_READY'},'*');</script></body></html>`;
-        } else if (selectedTemplate === 'wheel') {
-            const segsJson = JSON.stringify(wheelIcons);
-            generatedHtml = `<!DOCTYPE html><html><head><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet"><style>*{box-sizing:border-box}body{margin:0;padding:24px;width:100vw;height:100vh;overflow:hidden;background:${gameBackgroundImage ? `url('${gameBackgroundImage}') center/cover no-repeat` : '#06090c'};color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Inter',sans-serif}.bg-glow{position:absolute;inset:0;opacity:0.15;pointer-events:none;background:radial-gradient(ellipse at center, ${themeColor}, transparent 70%);}.wheel-container{width:380px;height:380px;position:relative;margin-bottom:40px;z-index:10}canvas{width:100%;height:100%;border-radius:50%;box-shadow:0 0 60px rgba(0,0,0,0.8);border:12px solid #0c1319;transition:transform 3s cubic-bezier(0.25,1,0.5,1);}.marker{position:absolute;top:-16px;left:50%;transform:translateX(-50%);width:30px;height:38px;background:white;clip-path:polygon(50% 100%, 0 0, 100% 0);z-index:20;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.6))}.status{font-size:1.2rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;z-index:10}</style></head><body><div class="bg-glow"></div><div class="wheel-container"><div class="marker"></div><canvas id="wheel" width="500" height="500"></canvas></div><div class="status" id="status">Waiting...</div><script>const segs=${segsJson};const canvas=document.getElementById('wheel');const ctx=canvas.getContext('2d');const statusEl=document.getElementById('status');let isPlaying=false;let currentRot=0;const colors=['${themeColor}','#1e293b'];function draw(){ctx.clearRect(0,0,500,500);const n=segs.length;const arc=2*Math.PI/n;for(let i=0;i<n;i++){ctx.beginPath();ctx.moveTo(250,250);ctx.arc(250,250,240,i*arc,(i+1)*arc);ctx.fillStyle=colors[i%2];ctx.fill();ctx.save();ctx.translate(250+165*Math.cos((i+0.5)*arc),250+165*Math.sin((i+0.5)*arc));ctx.rotate((i+0.5)*arc);ctx.font='bold 40px Inter';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='white';const txt=segs[i]||'';if(txt.startsWith('data:image')){const img=new Image();img.src=txt;ctx.drawImage(img,-30,-30,60,60);}else{ctx.fillText(txt,0,0);}ctx.restore()}ctx.beginPath();ctx.arc(250,250,35,0,2*Math.PI);ctx.fillStyle='#0c1319';ctx.fill();ctx.beginPath();ctx.arc(250,250,15,0,2*Math.PI);ctx.fillStyle='${themeColor}';ctx.fill();}draw();window.addEventListener('message',(e)=>{if(e.data?.type==='START_GAME'){if(isPlaying)return;isPlaying=true;if(window.parent)window.parent.postMessage({type:'PLAY_SOUND',soundType:'spin'},'*');statusEl.textContent='Spinning...';statusEl.style.color='white';const spins=5;const extraRot=Math.random()*360;currentRot+=spins*360+extraRot;canvas.style.transform=\`rotate(\${-currentRot}deg)\`;setTimeout(()=>{const finalRot=currentRot%360;const n=segs.length;const arcDeg=360/n;const landedIdx=Math.floor(finalRot/arcDeg);const wonTxt=segs[segs.length - 1 - landedIdx];const win=wonTxt!=='1x'&&wonTxt!=='0.5x'&&wonTxt!=='LOSS'&&wonTxt!=='LOSE'&&wonTxt!=='0x';statusEl.textContent=win?'WIN!':'Better luck!';statusEl.style.color=win?'${themeColor}':'#ef4444';isPlaying=false;const mMatch=wonTxt&&typeof wonTxt==='string'?wonTxt.match(/([0-9.]+)x/):null;const mult=mMatch?parseFloat(mMatch[1]):(win?2.0:0);window.parent.postMessage({type:'GAME_RESULT',win,multiplier:mult},'*');},3000);}});window.parent.postMessage({type:'GAME_READY'},'*');setTimeout(()=>{draw();},500);</script></body></html>`;
-        } else {
-        }
-
-        generatedHtml = generatedHtml
-            .replace('isPlaying = true;\n        resultEl.innerHTML = "Spinning...";', 'isPlaying = true;\n        if(window.parent)window.parent.postMessage({type:"PLAY_SOUND",soundType:"spin"},"*");\n        resultEl.innerHTML = "Spinning...";')
-            .replace("isPlaying=true;crashed=false;", "isPlaying=true;crashed=false;")
-            .replace("isPlaying=true;statusEl.textContent='Rolling...';", "isPlaying=true;if(window.parent)window.parent.postMessage({type:'PLAY_SOUND',soundType:'tumble'},'*');statusEl.textContent='Rolling...';")
-            .replace("if(board[i]==='bomb'){cell.className='cell bomb disabled';", "if(board[i]==='bomb'){if(window.parent)window.parent.postMessage({type:'PLAY_SOUND',soundType:'boom'},'*');cell.className='cell bomb disabled';")
-            .replace("}else{cell.className='cell revealed disabled';", "}else{if(window.parent)window.parent.postMessage({type:'PLAY_SOUND',soundType:'blip'},'*');cell.className='cell revealed disabled';")
-            .replace("let move=Math.random()>0.5?1:-1;pos+=move;", "let move=Math.random()>0.5?1:-1;pos+=move;if(window.parent)window.parent.postMessage({type:'PLAY_SOUND',soundType:'blip'},'*');")
-            .replace("isPlaying=true;statusEl.textContent='Spinning...';", "isPlaying=true;if(window.parent)window.parent.postMessage({type:'PLAY_SOUND',soundType:'spin'},'*');statusEl.textContent='Spinning...';")
-            .replace("document.getElementById('status').textContent='Simulating...';", "if(window.parent)window.parent.postMessage({type:'PLAY_SOUND',soundType:'tumble'},'*');document.getElementById('status').textContent='Simulating...';");
-
-        return generatedHtml;
-    };
-
-
-
-    const handlePublish = () => {
-        const finalHtml = creationMode === 'template' ? getGeneratedTemplateHtml() : htmlCode;
-
-        if (!gameName.trim() || !finalHtml) {
-            alert("Please provide a Game Name and generate a game before publishing.");
-            return;
-        }
-
-        if (!coverImage) {
-            alert("Vă rugăm să încărcați un banner (imagine de copertă) înainte de a posta jocul.");
-            return;
-        }
-
-        const existingGamesStr = localStorage.getItem('custom_published_games');
-        const existingGames = existingGamesStr ? JSON.parse(existingGamesStr) : [];
-        if (existingGames.some((g: any) => g.name.toLowerCase() === gameName.trim().toLowerCase())) {
-            alert("Există deja un joc postat cu acest nume. Vă rugăm să alegeți un nume unic.");
-            return;
-        }
-
-        setIsPublishing(true);
-
-        setTimeout(() => {
-            const newGame = {
-                id: (creationMode === 'template' ? 'tpl_game_' : 'ai_game_') + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-                creatorId: creatorData.id || creatorData.name,
-                creatorName: creatorData.name,
-                type: creationMode === 'template' ? 'manual_template' : 'ai_generated',
-                name: gameName,
-                coverImage: coverImage || null,
-                themeEmoji: themeEmoji,
-                themeColor: themeColor,
-                htmlCode: finalHtml,
-                winEffect: winEffect,
-                winSound: winSound,
-                publishedAt: new Date().toISOString()
+    // ─── Apply Volatility Preset ───────────────────────────────────────────
+    const applyVolatility = (vol: 'low' | 'medium' | 'high') => {
+        setVolatility(vol);
+        const preset = VOLATILITY_PRESETS[vol];
+        setSymbols(prev => prev.map((sym, i) => {
+            const tier = i / (prev.length - 1); // 0=lowest, 1=highest
+            const scale = 1 + tier * 2; // multiply for rare symbols
+            return {
+                ...sym,
+                payouts: {
+                    3: Math.round(preset.baseMultipliers[3] * scale * 10) / 10,
+                    4: Math.round(preset.baseMultipliers[4] * scale * 10) / 10,
+                    5: Math.round(preset.baseMultipliers[5] * scale * 10) / 10,
+                },
             };
+        }));
+    };
 
-            const existingGamesStr = localStorage.getItem('custom_published_games');
-            const existingGames = existingGamesStr ? JSON.parse(existingGamesStr) : [];
-            localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...existingGames]));
-
-            // Trigger storage event so lobby refreshes immediately
+    // ─── Delete Game ───────────────────────────────────────────────────────
+    const deleteGame = (gameId: string) => {
+        const data = localStorage.getItem('custom_published_games');
+        if (data) {
+            const allGames = JSON.parse(data);
+            const filtered = allGames.filter((g: any) => g.id !== gameId);
+            localStorage.setItem('custom_published_games', JSON.stringify(filtered));
             window.dispatchEvent(new Event('storage'));
+        }
+    };
 
-            // Update local state
-            setPublishedGames(prev => [newGame, ...prev]);
+    // ─── Publish ───────────────────────────────────────────────────────────
+    const handlePublish = () => {
+        if (gameType === 'slots') {
+            if (!gameName.trim()) { alert("Please provide a game name."); return; }
+            if (!coverImage) { alert("Please upload a cover image before publishing."); return; }
 
-            setIsPublishing(false);
-            setIsSuccess(true);
+            const existingStr = localStorage.getItem('custom_published_games');
+            const existing = existingStr ? JSON.parse(existingStr) : [];
+            if (existing.some((g: any) => g.name.toLowerCase() === gameName.trim().toLowerCase())) {
+                alert("A game with this name already exists. Please choose a unique name.");
+                return;
+            }
+
+            setIsPublishing(true);
 
             setTimeout(() => {
-                // Reset form for next game
-                setAiPrompt('');
-                setGameName('');
-                setGameDescription('');
-                setThemeEmoji('');
-                setThemeColor('#a855f7');
-                setHtmlCode('');
-                setCoverImage(null);
-                setShowPreview(false);
-                setIsSuccess(false);
-            }, 2500);
-        }, 1500);
+                const slotConfig = buildConfig();
+                const newGame = {
+                    id: 'slot_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    creatorId: creatorData.id || creatorData.name,
+                    creatorName: creatorData.name,
+                    type: 'slot_engine',
+                    name: gameName,
+                    gameDescription,
+                    coverImage,
+                    themeEmoji: '🎰',
+                    themeColor: accentColor,
+                    slotConfig,
+                    winEffect,
+                    winSound,
+                    publishedAt: new Date().toISOString()
+                };
+
+                const gamesStr = localStorage.getItem('custom_published_games');
+                const games = gamesStr ? JSON.parse(gamesStr) : [];
+                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
+                window.dispatchEvent(new Event('storage'));
+                setIsPublishing(false);
+                setIsSuccess(true);
+
+                setTimeout(() => {
+                    setGameName('My Slot Game');
+                    setGameDescription('A custom slot experience');
+                    setCoverImage(null);
+                    setIsSuccess(false);
+                }, 2500);
+            }, 1500);
+        } else if (gameType === 'crash') {
+            // Crash publish
+            if (!crashGameName.trim()) { alert("Please provide a game name."); return; }
+            if (!crashCoverImage) { alert("Please upload a cover image before publishing."); return; }
+
+            const existingStr = localStorage.getItem('custom_published_games');
+            const existing = existingStr ? JSON.parse(existingStr) : [];
+            if (existing.some((g: any) => g.name.toLowerCase() === crashGameName.trim().toLowerCase())) {
+                alert("A game with this name already exists. Please choose a unique name.");
+                return;
+            }
+
+            setIsPublishing(true);
+
+            setTimeout(() => {
+                const crashConfig = buildCrashConfig();
+                const newGame = {
+                    id: 'crash_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    creatorId: creatorData.id || creatorData.name,
+                    creatorName: creatorData.name,
+                    type: 'crash',
+                    name: crashGameName,
+                    gameDescription: crashGameDescription,
+                    coverImage: crashCoverImage,
+                    themeEmoji: '🚀',
+                    themeColor: crashGraphColor,
+                    config: {
+                        ...crashConfig,
+                        rocketImage: crashFlyingObjectImage || null,
+                    },
+                    winEffect,
+                    winSound,
+                    publishedAt: new Date().toISOString()
+                };
+
+                const gamesStr = localStorage.getItem('custom_published_games');
+                const games = gamesStr ? JSON.parse(gamesStr) : [];
+                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
+                window.dispatchEvent(new Event('storage'));
+                setIsPublishing(false);
+                setIsSuccess(true);
+
+                setTimeout(() => {
+                    setCrashGameName('My Crash Game');
+                    setCrashGameDescription('A thrilling multiplier experience');
+                    setCrashCoverImage(null);
+                    setIsSuccess(false);
+                }, 2500);
+            }, 1500);
+        } else if (gameType === 'scratch') {
+            // Scratch publish
+            if (!scratchGameName.trim()) { alert("Please provide a game name."); return; }
+            if (!scratchLobbyCover) { alert("Please upload a cover image before publishing."); return; }
+
+            const existingStr = localStorage.getItem('custom_published_games');
+            const existing = existingStr ? JSON.parse(existingStr) : [];
+            if (existing.some((g: any) => g.name.toLowerCase() === scratchGameName.trim().toLowerCase())) {
+                alert("A game with this name already exists. Please choose a unique name.");
+                return;
+            }
+
+            setIsPublishing(true);
+
+            setTimeout(() => {
+                const scratchConfig = buildScratchConfig();
+                const newGame = {
+                    id: 'scratch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    creatorId: creatorData.id || creatorData.name,
+                    creatorName: creatorData.name,
+                    type: 'scratch',
+                    name: scratchGameName,
+                    gameDescription: scratchGameDescription,
+                    coverImage: scratchLobbyCover,
+                    themeEmoji: '🎟️',
+                    themeColor: scratchAccentColor,
+                    scratchConfig,
+                    winEffect,
+                    winSound,
+                    publishedAt: new Date().toISOString()
+                };
+
+                const gamesStr = localStorage.getItem('custom_published_games');
+                const games = gamesStr ? JSON.parse(gamesStr) : [];
+                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
+                window.dispatchEvent(new Event('storage'));
+                setIsPublishing(false);
+                setIsSuccess(true);
+
+                setTimeout(() => {
+                    setScratchGameName('My Scratch Card');
+                    setScratchGameDescription('Scratch to reveal and win!');
+                    setScratchLobbyCover(null);
+                    setIsSuccess(false);
+                }, 2500);
+            }, 1500);
+        }
     };
 
-    // Using srcDoc on the iframe directly instead of data URI to preserve origin
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full space-y-6"
+    // ─── Toggle Component ──────────────────────────────────────────────────
+    const Toggle = ({ enabled, onToggle, label }: { enabled: boolean; onToggle: () => void; label: string }) => (
+        <button
+            onClick={onToggle}
+            className={`flex items-center gap-3 w-full p-3 rounded-xl border transition-all duration-300 ${enabled
+                ? 'bg-gradient-to-r from-[#a855f7]/10 to-purple-600/5 border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.1)]'
+                : 'bg-[#0a111a]/50 border-white/5 hover:border-white/10'
+            }`}
         >
+            {enabled ? <ToggleRight size={20} className="text-purple-400 shrink-0" /> : <ToggleLeft size={20} className="text-slate-600 shrink-0" />}
+            <span className={`text-sm font-bold ${enabled ? 'text-white' : 'text-slate-500'}`}>{label}</span>
+        </button>
+    );
+
+    // ─── Section Nav ───────────────────────────────────────────────────────
+    const sections = [
+        { id: 'design', icon: <Palette size={16} />, label: 'Design' },
+        { id: 'grid', icon: <Grid3X3 size={16} />, label: 'Grid' },
+        { id: 'paytable', icon: <Zap size={16} />, label: 'Paytable' },
+        { id: 'features', icon: <Settings2 size={16} />, label: 'Features' },
+        { id: 'preview', icon: <Eye size={16} />, label: 'Preview' },
+    ] as const;
+
+    // ════════════════════════════════════════════════════════════════════════
+    // RENDER
+    // ════════════════════════════════════════════════════════════════════════
+    return (
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full space-y-6">
             <div className="bg-[#0b1622]/90 backdrop-blur-xl rounded-[32px] p-6 sm:p-8 border border-white/10 relative overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)]">
 
-                {/* Header */}
+                {/* ─── Header ─────────────────────────────────────────────── */}
                 <div className="flex justify-between items-center mb-6">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 rounded-xl bg-fuchsia-500/20 flex items-center justify-center text-fuchsia-400">
-                                <Sparkles size={24} />
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${gameType === 'crash' ? 'bg-emerald-500/20 text-emerald-400' : gameType === 'scratch' ? 'bg-amber-500/20 text-amber-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                                {gameType === 'crash' ? <Rocket size={24} /> : gameType === 'scratch' ? <Sparkles size={24} /> : <Sparkles size={24} />}
                             </div>
-                            <h2 className="text-3xl font-black text-white tracking-tight">AI Game Studio</h2>
+                            <h2 className="text-3xl font-black text-white tracking-tight">Game Creator Studio</h2>
                         </div>
-                        <p className="text-slate-400 font-medium">Describe any game idea and AI will build it from scratch — unique code, unique mechanics, unique visuals.</p>
+                        <p className="text-slate-400 font-medium">Choose a game type and customize every detail — then publish to the casino lobby.</p>
                     </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                    <button
+                        onClick={() => setGameType('slots')}
+                        className={`relative group p-5 rounded-2xl border-2 transition-all duration-300 text-left overflow-hidden ${
+                            gameType === 'slots'
+                                ? 'border-purple-500 bg-gradient-to-br from-purple-500/10 to-purple-600/5 shadow-[0_0_30px_rgba(168,85,247,0.15)]'
+                                : 'border-white/10 bg-[#0a111a] hover:border-white/20 hover:bg-white/[0.02]'
+                        }`}
+                    >
+                        {gameType === 'slots' && <div className="absolute top-3 right-3"><Check size={16} className="text-purple-400" /></div>}
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${gameType === 'slots' ? 'bg-purple-500/20' : 'bg-white/5'}`}>🎰</div>
+                            <div>
+                                <h3 className={`text-lg font-black ${gameType === 'slots' ? 'text-white' : 'text-slate-300'}`}>Slot Machine</h3>
+                                <p className="text-xs text-slate-500">Classic reels & paytable</p>
+                            </div>
+                        </div>
+                    </button>
+                    <button
+                        onClick={() => setGameType('crash')}
+                        className={`relative group p-5 rounded-2xl border-2 transition-all duration-300 text-left overflow-hidden ${
+                            gameType === 'crash'
+                                ? 'border-emerald-500 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 shadow-[0_0_30px_rgba(16,185,129,0.15)]'
+                                : 'border-white/10 bg-[#0a111a] hover:border-white/20 hover:bg-white/[0.02]'
+                        }`}
+                    >
+                        {gameType === 'crash' && <div className="absolute top-3 right-3"><Check size={16} className="text-emerald-400" /></div>}
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${gameType === 'crash' ? 'bg-emerald-500/20' : 'bg-white/5'}`}>🚀</div>
+                            <div>
+                                <h3 className={`text-lg font-black ${gameType === 'crash' ? 'text-white' : 'text-slate-300'}`}>Crash Game</h3>
+                                <p className="text-xs text-slate-500">Multiplier rises — cash out!</p>
+                            </div>
+                        </div>
+                    </button>
+                    <button
+                        onClick={() => setGameType('scratch')}
+                        className={`relative group p-5 rounded-2xl border-2 transition-all duration-300 text-left overflow-hidden ${
+                            gameType === 'scratch'
+                                ? 'border-amber-500 bg-gradient-to-br from-amber-500/10 to-amber-600/5 shadow-[0_0_30px_rgba(245,158,11,0.15)]'
+                                : 'border-white/10 bg-[#0a111a] hover:border-white/20 hover:bg-white/[0.02]'
+                        }`}
+                    >
+                        {gameType === 'scratch' && <div className="absolute top-3 right-3"><Check size={16} className="text-amber-400" /></div>}
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${gameType === 'scratch' ? 'bg-amber-500/20' : 'bg-white/5'}`}>🎟️</div>
+                            <div>
+                                <h3 className={`text-lg font-black ${gameType === 'scratch' ? 'text-white' : 'text-slate-300'}`}>Scratch Card</h3>
+                                <p className="text-xs text-slate-500">Scratch to reveal & win!</p>
+                            </div>
+                        </div>
+                    </button>
                 </div>
 
                 {isSuccess ? (
@@ -721,843 +665,1237 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                             <Check size={48} />
                         </div>
                         <h3 className="text-3xl font-black text-white mb-2 tracking-tight">Game Published!</h3>
-                        <p className="text-slate-400 max-w-md">Your AI-crafted game is now live in the Casino Lobby. Players can play it and you&apos;ll earn a cut!</p>
+                        <p className="text-slate-400 max-w-md">{gameType === 'crash' ? 'Your crash game is now live! Players can bet and ride the multiplier.' : gameType === 'scratch' ? 'Your scratch card is now live! Players can scratch and win prizes.' : 'Your slot game is now live in the Casino Lobby. Players can spin and you\'ll earn a cut!'}</p>
                     </div>
                 ) : (
                     <div className="space-y-6">
 
-                        {/* MY PUBLISHED GAMES */}
-                        {publishedGames.length > 0 && (
-                            <div>
-                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-4 border-b border-white/5 pb-2 flex items-center gap-2">
-                                    <Gamepad2 size={16} className="text-[#00b9f0]" />
-                                    My Published Games
-                                    <span className="ml-auto text-xs text-slate-500 font-mono">{publishedGames.length} game{publishedGames.length !== 1 ? 's' : ''}</span>
-                                </h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {publishedGames.map((game: any) => (
-                                        <motion.div
-                                            key={game.id}
-                                            initial={{ opacity: 0, scale: 0.9 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            className="group relative bg-[#0a111a] rounded-2xl overflow-hidden border border-white/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl flex flex-col"
-                                            style={{ boxShadow: `0 0 0 0 transparent`, borderColor: undefined }}
-                                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = `${game.themeColor || '#a855f7'}50`; (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 30px ${game.themeColor || '#a855f7'}20`; }}
-                                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = ''; (e.currentTarget as HTMLElement).style.boxShadow = ''; }}
-                                        >
-                                            {/* Cover */}
-                                            <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                                                <div className="absolute inset-0 bg-[#152a3a] overflow-hidden">
-                                                    {game.coverImage ? (
-                                                        <img src={game.coverImage} alt={game.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" style={{ display: 'block' }} />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-5xl">{game.themeEmoji || '🎮'}</div>
-                                                    )}
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a111a] via-transparent to-transparent pointer-events-none" />
-                                                    
-                                                    {/* Status badge */}
-                                                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-green-500/20 text-green-400 text-[10px] font-bold px-2 py-1 rounded-full border border-green-500/30 backdrop-blur-sm">
-                                                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                                                        LIVE
-                                                    </div>
-                                                </div>
-                                            </div>
 
-                                            {/* Info */}
-                                            <div className="p-4">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <h4 className="text-white font-black text-sm truncate">{game.name}</h4>
-                                                </div>
-                                                <p className="text-slate-500 text-[11px] truncate mb-3">{game.gameDescription || 'AI-generated game'}</p>
-                                                
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                                                        <Clock size={10} />
-                                                        {new Date(game.publishedAt).toLocaleDateString()}
-                                                    </div>
-                                                    <button
-                                                        onClick={() => {
-                                                            if (confirm('Delete this game? It will be removed from the lobby.')) {
-                                                                deleteGame(game.id);
-                                                            }
-                                                        }}
-                                                        className="text-slate-600 hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </motion.div>
-                                    ))}
-                                </div>
-                            </div>
+                        {/* ─── Section Navigation ─────────────────────────────── */}
+                        {gameType === 'slots' && (
+                        <div className="flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
+                            {sections.map((s) => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => setActiveSection(s.id)}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${activeSection === s.id
+                                        ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg shadow-purple-500/20'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                >
+                                    {s.icon}
+                                    {s.label}
+                                </button>
+                            ))}
+                        </div>
                         )}
 
-                        {/* CREATION MODE TOGGLE */}
-                        <div className="flex bg-[#0a111a] rounded-xl p-1 border border-white/10 w-fit">
-                            <button
-                                onClick={() => { setCreationMode('ai'); setShowPreview(false); setHtmlCode(''); }}
-                                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${creationMode === 'ai' ? 'bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white shadow-lg shadow-fuchsia-500/20' : 'text-slate-400 hover:text-white'}`}
-                            >
-                                <Sparkles size={16} />
-                                AI Game Creator
-                            </button>
-                            <button
-                                onClick={() => { setCreationMode('template'); setShowPreview(false); setHtmlCode(''); }}
-                                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${creationMode === 'template' ? 'bg-[#152a3a] border border-white/10 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-                            >
-                                <LayoutTemplate size={16} />
-                                Manual Templates
-                            </button>
+                        {gameType === 'crash' && (
+                        <div className="flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
+                            {[
+                                { id: 'design', icon: <Palette size={16} />, label: 'Design & Assets' },
+                                { id: 'engine', icon: <Gauge size={16} />, label: 'Engine Params' },
+                                { id: 'preview', icon: <Eye size={16} />, label: 'Preview & Publish' },
+                            ].map((s) => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => setCrashActiveSection(s.id as any)}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${crashActiveSection === s.id
+                                        ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-lg shadow-emerald-500/20'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                >
+                                    {s.icon}
+                                    {s.label}
+                                </button>
+                            ))}
                         </div>
+                        )}
 
-                        {/* STEP 1: Builder */}
-                        <div>
-                            {creationMode === 'ai' ? (
-                                <>
-                                    <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-3 border-b border-white/5 pb-2 flex items-center gap-2">
-                                        <span className="w-6 h-6 rounded-full bg-fuchsia-500/20 flex items-center justify-center text-[10px] font-black text-fuchsia-400">1</span>
-                                        Describe Your Game
-                                    </h3>
+                        {gameType === 'scratch' && (
+                        <div className="flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
+                            {[
+                                { id: 'design', icon: <Palette size={16} />, label: 'Design & Symbols' },
+                                { id: 'paytable', icon: <Zap size={16} />, label: 'Paytable & Odds' },
+                                { id: 'preview', icon: <Eye size={16} />, label: 'Preview & Publish' },
+                            ].map((s) => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => setScratchActiveSection(s.id as any)}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${scratchActiveSection === s.id
+                                        ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-lg shadow-amber-500/20'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                >
+                                    {s.icon}
+                                    {s.label}
+                                </button>
+                            ))}
+                        </div>
+                        )}
 
-                            <div className="relative bg-gradient-to-b from-[#1a1025] to-[#0a141d] rounded-2xl p-6 border border-fuchsia-500/20 shadow-[0_0_30px_rgba(217,70,239,0.1)]">
-                                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 pointer-events-none mix-blend-screen rounded-2xl"></div>
+                        {/* ════════════════════════════════════════════════════ */}
+                        {/* SLOTS SECTIONS                                      */}
+                        {/* ════════════════════════════════════════════════════ */}
 
-                                <div className="flex items-start gap-4 relative z-10">
-                                    <Bot className="w-10 h-10 text-fuchsia-400 shrink-0 drop-shadow-[0_0_15px_rgba(217,70,239,0.5)]" />
-                                    <div className="flex-1 space-y-4">
+                        {/* ════════════════════════════════════════════════════ */}
+                        {/* SECTION: Design & Theme                            */}
+                        {/* ════════════════════════════════════════════════════ */}
+                        {gameType === 'slots' && activeSection === 'design' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Palette size={16} className="text-purple-400" /> Appearance & Branding
+                                </h3>
+                                
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Name & Description */}
+                                    <div className="space-y-4">
                                         <div>
-                                            <p className="text-white font-bold mb-1">What kind of game do you want to create?</p>
-                                            <p className="text-slate-500 text-xs">Be specific! Describe the theme, mechanics, difficulty, and visual style you want.</p>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Game Title</label>
+                                            <input type="text" value={gameName} onChange={(e) => setGameName(e.target.value)}
+                                                className="w-full bg-[#0a111a] border border-white/10 focus:border-purple-400 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:ring-2 focus:ring-purple-400/20 transition-all" />
                                         </div>
-
-                                        <textarea
-                                            value={aiPrompt}
-                                            onChange={(e) => setAiPrompt(e.target.value)}
-                                            placeholder="e.g. 'A space-themed dice game where you roll cosmic dice and match constellation symbols. High risk, high reward with up to 50x multipliers. Neon purple and blue color scheme.'"
-                                            className="w-full h-28 bg-black/40 border border-fuchsia-500/30 rounded-xl p-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-400/20 resize-none transition-all text-sm"
-                                        />
-
-                                        {/* IMAGE UPLOAD UI */}
-                                        <div className="flex flex-col gap-2 border border-white/5 rounded-xl p-3 bg-black/20">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest"><ImageIcon size={14} className="inline mr-1"/> Upload Assets (Optional)</span>
-                                                <label className="text-xs bg-fuchsia-500/20 text-fuchsia-400 px-3 py-1 rounded-lg cursor-pointer hover:bg-fuchsia-500/30 transition-colors font-bold flex items-center gap-1">
-                                                    <Upload size={14} /> Add Image
-                                                    <input type="file" accept="image/*" multiple className="hidden" onChange={handleAiImageUpload} />
-                                                </label>
-                                            </div>
-                                            {aiImages.length > 0 && (
-                                                <div className="flex gap-2 overflow-x-auto py-2 scrollbar-thin scrollbar-thumb-white/10">
-                                                    {aiImages.map((img, idx) => (
-                                                        <div key={idx} className="relative w-16 h-16 rounded-md overflow-hidden shrink-0 border border-white/10 group">
-                                                            <img src={img.data} alt={img.name} className="w-full h-full object-cover" />
-                                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                                <button onClick={() => removeAiImage(idx)} className="text-red-400 hover:text-red-300 bg-red-500/20 p-1 rounded">
-                                                                    <X size={14} />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Description</label>
+                                            <input type="text" value={gameDescription} onChange={(e) => setGameDescription(e.target.value)}
+                                                className="w-full bg-[#0a111a] border border-white/10 focus:border-purple-400 rounded-xl px-4 py-3 text-white text-sm focus:outline-none transition-all" />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Accent Color</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={accentColor} onChange={(e) => setAccentColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-sm">{accentColor}</span>
                                                 </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Background</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-sm">{backgroundColor}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Background Image & Cover */}
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Game Background Image</label>
+                                            <label className="flex items-center justify-center gap-2 bg-[#0a111a] rounded-xl h-28 border border-dashed border-purple-400/30 hover:border-purple-400 hover:bg-purple-400/5 cursor-pointer transition-all relative overflow-hidden group">
+                                                {backgroundImage ? (
+                                                    <>
+                                                        <img src={backgroundImage} alt="bg" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500" />
+                                                        <span className="relative z-10 text-xs text-white font-bold bg-purple-500/80 px-4 py-2 rounded-lg backdrop-blur">Change Background</span>
+                                                    </>
+                                                ) : (
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <Upload size={18} className="text-slate-500 group-hover:text-purple-400 transition-colors" />
+                                                        <span className="text-[11px] text-slate-400 font-bold">Upload Background</span>
+                                                    </div>
+                                                )}
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setBackgroundImage)} />
+                                            </label>
+                                            {backgroundImage && (
+                                                <button className="text-[10px] text-slate-500 hover:text-red-400 mt-1 transition-colors" onClick={() => setBackgroundImage(null)}>Remove</button>
                                             )}
                                         </div>
-
-                                        {generationError && (
-                                            <div className="flex items-center gap-2 text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-                                                <AlertTriangle size={14} />
-                                                {generationError}
-                                            </div>
-                                        )}
-
-                                        <button
-                                            onClick={() => handleAIGenerate()}
-                                            disabled={isGenerating || !aiPrompt.trim()}
-                                            className={`py-3 px-8 rounded-xl font-bold flex items-center gap-2 transition-all ${isGenerating || !aiPrompt.trim() ? 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed' : 'bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white hover:scale-105 hover:shadow-[0_0_30px_rgba(217,70,239,0.4)]'}`}
-                                        >
-                                            {isGenerating ? <><Loader2 className="animate-spin" size={18} /> Generating Game Code...</> : verificationStatus === 'verifying' ? <><Loader2 className="animate-spin" size={18} /> Verifying Game...</> : verificationStatus === 'retrying' ? <><Loader2 className="animate-spin" size={18} /> Retrying ({aiRetryCount}/3)...</> : <><Wand2 size={18} /> Generate Game</>}
-                                        </button>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+                                                Lobby Cover Image <span className="text-red-400">*</span>
+                                            </label>
+                                            <label className="relative w-full aspect-video rounded-xl bg-[#0a111a] border border-dashed border-white/20 flex flex-col items-center justify-center overflow-hidden hover:border-purple-400 group cursor-pointer transition-all block">
+                                                {coverImage ? (
+                                                    <>
+                                                        <img src={coverImage} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
+                                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                            <span className="text-white font-bold bg-white/10 px-4 py-2 rounded-lg border border-white/20 backdrop-blur-md">Change</span>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <ImageIcon size={24} className="text-slate-500 group-hover:text-purple-400 mb-1 transition-colors" />
+                                                        <span className="text-xs text-slate-400 font-bold">Upload Cover</span>
+                                                        <span className="text-[10px] text-red-400/80 mt-1 font-bold">Required to publish</span>
+                                                    </>
+                                                )}
+                                                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => handleFileUpload(e, setCoverImage)} />
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                                </>
-                            ) : (
-                                <>
-                                    <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-3 border-b border-white/5 pb-2 flex items-center gap-2">
-                                        <span className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-[10px] font-black text-blue-400">1</span>
-                                        Visual Editor
-                                    </h3>
 
-                                    <div className="relative bg-[#0d1821] rounded-2xl p-6 lg:p-10 border border-white/10 flex flex-col items-center">
-                                        
-                                        {/* Editor Toolbar */}
-                                        <div className="w-full max-w-2xl bg-black/40 rounded-2xl p-4 border border-white/10 flex flex-wrap items-center justify-between gap-4 mb-10 shadow-lg">
-                                            <div className="flex items-center gap-2 bg-white/5 p-1 rounded-xl overflow-x-auto max-w-full pb-2 scrollbar-thin scrollbar-thumb-white/10">
-                                                {['slot', 'crash', 'dice', 'mines', 'plinko', 'wheel'].map((temp) => (
-                                                    <button
-                                                        key={temp}
-                                                        onClick={() => setSelectedTemplate(temp)}
-                                                        className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 whitespace-nowrap ${selectedTemplate === temp ? 'bg-blue-500/20 text-blue-400' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-                                                    >
-                                                        {temp === 'slot' && <LayoutTemplate size={14} />}
-                                                        {temp === 'crash' && <Play size={14} />}
-                                                        {['dice', 'mines', 'plinko', 'wheel'].includes(temp) && <Gamepad2 size={14} />}
-                                                        {temp}
-                                                    </button>
+                                {/* Victory Celebration */}
+                                <div className="bg-gradient-to-br from-[#0a111a] to-[#160b1e] border border-purple-500/20 rounded-2xl p-5 mt-4">
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <Sparkles size={16} className="text-amber-400" />
+                                            <span className="text-xs font-black text-white uppercase tracking-widest">Victory Celebration</span>
+                                        </div>
+                                        <label className={`text-[10px] font-bold px-3 py-2 rounded-xl cursor-pointer transition-all border ${winSound ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-purple-500/10 text-purple-400 border-purple-500/30 hover:bg-purple-500/20'}`}>
+                                            <span className="flex items-center gap-1.5"><Volume2 size={12} />{winSound ? 'Audio Ready' : 'Add Sound'}</span>
+                                            <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleAudioUpload(e, setWinSound)} />
+                                        </label>
+                                    </div>
+                                    <div className="grid grid-cols-5 gap-2">
+                                        {WIN_EFFECTS.map(effect => (
+                                            <button key={effect.id} onClick={() => setWinEffect(effect.id)}
+                                                className={`flex flex-col items-center justify-center py-3 rounded-xl border transition-all ${winEffect === effect.id ? 'bg-gradient-to-b from-purple-500/20 to-purple-600/10 border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'bg-black/30 border-white/5 hover:bg-white/5'}`}>
+                                                <span className={`text-xl mb-1 ${winEffect === effect.id ? 'scale-110' : 'opacity-60'}`}>{effect.icon}</span>
+                                                <span className={`text-[9px] font-bold uppercase ${winEffect === effect.id ? 'text-white' : 'text-slate-500'}`}>{effect.name}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {winSound && <button className="text-[10px] text-slate-500 hover:text-red-400 mt-2" onClick={() => setWinSound(null)}>Remove Audio</button>}
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ════════════════════════════════════════════════════ */}
+                        {/* SECTION: Grid Layout                                */}
+                        {/* ════════════════════════════════════════════════════ */}
+                        {gameType === 'slots' && activeSection === 'grid' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Grid3X3 size={16} className="text-blue-400" /> Grid Layout
+                                </h3>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {(Object.entries(GRID_PRESETS) as [GridLayout, typeof GRID_PRESETS['3x3']][]).map(([key, preset]) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => setGridLayout(key)}
+                                            className={`relative p-6 rounded-2xl border-2 transition-all duration-300 text-left overflow-hidden group ${gridLayout === key
+                                                ? 'border-purple-500 bg-gradient-to-br from-purple-500/10 to-purple-600/5 shadow-[0_0_30px_rgba(168,85,247,0.15)]'
+                                                : 'border-white/10 bg-[#0a111a] hover:border-white/20 hover:bg-white/[0.02]'
+                                            }`}
+                                        >
+                                            {gridLayout === key && <div className="absolute top-3 right-3"><Check size={16} className="text-purple-400" /></div>}
+                                            
+                                            {/* Mini grid preview */}
+                                            <div className="flex gap-1 mb-4">
+                                                {Array.from({ length: preset.cols }).map((_, c) => (
+                                                    <div key={c} className="flex flex-col gap-1">
+                                                        {Array.from({ length: preset.rows }).map((_, r) => (
+                                                            <div key={r} className={`w-4 h-4 rounded-sm transition-all ${gridLayout === key ? 'bg-purple-500/40' : 'bg-white/10 group-hover:bg-white/15'}`} />
+                                                        ))}
+                                                    </div>
                                                 ))}
                                             </div>
                                             
-                                            <div className="flex items-center gap-4">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest"><Palette size={14} className="inline mr-1"/> Color</span>
-                                                    <input
-                                                        type="color"
-                                                        value={themeColor}
-                                                        onChange={(e) => setThemeColor(e.target.value)}
-                                                        className="w-8 h-8 rounded border border-white/20 cursor-pointer bg-transparent"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {/* Visual Canvas - REAL IN-GAME PREVIEW */}
-                                        <div className="w-full max-w-5xl relative perspective-1000 mt-8">
-                                            
-                                            <div className="text-center mb-6">
-                                                <h4 className="text-xl font-black text-white uppercase tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">In-Game LIVE Editor</h4>
-                                                <p className="text-sm text-[#00b9f0] font-bold">CLICK direct pe elementele de mai jos din joc pentru a le personaliza!</p>
-                                            </div>
+                                            <h4 className={`text-lg font-black mb-1 ${gridLayout === key ? 'text-white' : 'text-slate-300'}`}>{preset.label}</h4>
+                                            <p className="text-xs text-slate-500 font-medium">{preset.description}</p>
+                                            <div className="mt-2 text-2xl font-black text-purple-400/40">{key}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        )}
 
-                                            <div 
-                                                className="bg-[#0f212e] rounded-2xl w-full border border-white/10 shadow-2xl overflow-hidden flex flex-col md:flex-row h-[600px] relative transition-all duration-500"
-                                                style={{ boxShadow: `0 0 50px ${themeColor}30`, borderColor: `${themeColor}50` }}
-                                            >
-                                                {/* LEFT PANEL (Editor) */}
-                                                <div className="w-full md:w-80 bg-[#121c22] p-6 flex flex-col gap-4 border-r border-white/5 z-20 relative overflow-y-auto">
-                                                    <div className="flex justify-between items-center mb-2">
-                                                        <div 
-                                                            className="flex flex-col gap-1 text-white cursor-pointer hover:bg-white/5 p-2 -ml-2 rounded-xl transition-colors group/item relative w-full"
-                                                            onClick={() => setEditingField('name')}
-                                                        >
-                                                            {editingField === 'name' ? (
-                                                                <input autoFocus onBlur={() => setEditingField(null)} onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)} value={gameName} onChange={(e) => setGameName(e.target.value)} className="w-full text-xl font-black uppercase tracking-widest bg-black/50 border border-blue-400 rounded px-2" />
-                                                            ) : (
-                                                                <>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <h2 className="text-xl font-black uppercase tracking-widest leading-none truncate">{gameName}</h2>
-                                                                    </div>
-                                                                    <p className="text-[10px] uppercase tracking-widest truncate" style={{ color: themeColor }}>By Playforges Creator</p>
-                                                                    <div className="absolute top-1 right-2 opacity-0 group-hover/item:opacity-100"><span className="text-[10px] bg-black px-1 rounded text-white font-bold">Edit Title</span></div>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
+                        {/* ════════════════════════════════════════════════════ */}
+                        {/* SECTION: Paytable & Volatility                     */}
+                        {/* ════════════════════════════════════════════════════ */}
+                        {gameType === 'slots' && activeSection === 'paytable' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Zap size={16} className="text-amber-400" /> Paytable & Volatility
+                                </h3>
 
-                                                    {/* Description editor */}
-                                                    <div className="mt-1">
-                                                        <input
-                                                            type="text"
-                                                            value={gameDescription}
-                                                            onChange={(e) => setGameDescription(e.target.value)}
-                                                            placeholder="Game description..."
-                                                            className="w-full bg-transparent border-b border-white/10 focus:border-blue-400 px-1 py-1 text-xs text-slate-400 italic focus:text-white focus:outline-none transition-colors placeholder:text-slate-600"
-                                                        />
-                                                    </div>
-
-                                                    {/* Game Background & Effect Settings */}
-                                                    <div className="bg-gradient-to-br from-[#0a1114] to-[#121c22] border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)] rounded-2xl p-4 flex flex-col gap-4 mt-6 shrink-0 relative overflow-hidden">
-                                                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-                                                        
-                                                        <div className="flex flex-col gap-2 relative z-10">
-                                                            <div className="flex items-center gap-2 border-b border-white/5 pb-2 mb-1">
-                                                                <ImageIcon size={16} className="text-blue-400" />
-                                                                <label className="text-xs font-black text-white uppercase tracking-widest">Atmosphere & Background</label>
-                                                            </div>
-                                                            <label className="flex items-center justify-center gap-2 bg-black/40 rounded-xl h-24 border border-dashed border-blue-400/30 hover:border-blue-400 hover:bg-blue-400/5 cursor-pointer transition-all relative overflow-hidden group">
-                                                                {gameBackgroundImage ? (
-                                                                    <>
-                                                                       <img src={gameBackgroundImage} alt="bg" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500" />
-                                                                       <div className="absolute inset-0 bg-black/40 group-hover:bg-transparent transition-colors"></div>
-                                                                       <span className="relative z-10 text-xs text-white font-bold bg-blue-500/80 px-4 py-2 rounded-lg backdrop-blur shadow-lg shadow-blue-500/20 border border-white/20">Change Background</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <div className="flex flex-col items-center gap-2">
-                                                                        <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-110 group-hover:bg-blue-500 group-hover:text-white transition-all">
-                                                                            <Upload size={14} />
-                                                                        </div>
-                                                                        <span className="text-[10px] text-slate-400 font-bold group-hover:text-white transition-colors">Upload Game Background (Max 5MB)</span>
-                                                                    </div>
-                                                                )}
-                                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setGameBackgroundImage)} />
-                                                            </label>
-                                                            {gameBackgroundImage && (
-                                                                <button className="text-[10px] text-slate-500 hover:text-red-400 hover:underline text-right transition-colors" onClick={() => setGameBackgroundImage(null)}>Remove Background</button>
-                                                            )}
-                                                        </div>
-                                                        
-                                                        <div className="flex flex-col gap-3 relative z-10 mt-2">
-                                                            <div className="flex flex-wrap items-center justify-between border-b border-white/5 pb-2 gap-2">
-                                                                <div className="flex items-center gap-2">
-                                                                    <Sparkles size={16} className="text-amber-400 flex-shrink-0" />
-                                                                    <label className="text-xs font-black text-white uppercase tracking-widest leading-none">Victory Celebration</label>
-                                                                </div>
-                                                                <label className={`text-[10px] flex-shrink-0 font-bold px-3 py-2 rounded-xl cursor-pointer transition-all border shadow-lg ${winSound ? 'bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20 hover:border-blue-400'}`}>
-                                                                    <span className="flex items-center gap-1.5 break-normal whitespace-nowrap">
-                                                                        <Volume2 size={12} />
-                                                                        {winSound ? 'Audio Loaded' : 'Add Sound (.mp3)'}
-                                                                    </span>
-                                                                    <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleAudioUpload(e, setWinSound)} />
-                                                                </label>
-                                                            </div>
-                                                            <div className="grid grid-cols-3 gap-2">
-                                                                {WIN_EFFECTS.map(effect => (
-                                                                    <button
-                                                                        key={effect.id}
-                                                                        onClick={() => setWinEffect(effect.id)}
-                                                                        className={`flex flex-col items-center justify-center py-3 rounded-xl border transition-all duration-300 relative overflow-hidden group ${winEffect === effect.id ? 'bg-gradient-to-b from-blue-500/20 to-blue-600/10 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'bg-black/30 border-white/5 hover:bg-white/5 hover:border-white/10'}`}
-                                                                    >
-                                                                        {winEffect === effect.id && <div className="absolute inset-0 bg-blue-400/10 opacity-50 blur-md pointer-events-none"></div>}
-                                                                        <span className={`text-2xl mb-1 transition-transform duration-300 ${winEffect === effect.id ? 'scale-110 drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'group-hover:scale-110 opacity-70'} grayscale-0`}>{effect.icon}</span>
-                                                                        <span className={`text-[9px] font-bold uppercase tracking-wider ${winEffect === effect.id ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`}>{effect.name}</span>
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                            {winSound && (
-                                                                <button className="text-[10px] text-slate-500 hover:text-red-400 hover:underline text-right mt-1 transition-colors" onClick={() => setWinSound(null)}>Remove Audio Track</button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* PAYOUTS / SYMBOLS EDITOR (Only for slot) */}
-                                                    {selectedTemplate === 'slot' && (
-                                                        <div className="bg-[#0a1114]/50 border border-white/5 rounded-xl p-3 flex flex-col gap-2 mt-4 relative group/payouts">
-                                                            <div className="flex justify-between items-center border-b border-white/5 pb-1">
-                                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Payouts & Symbols</span>
-                                                                <span className="text-[10px] text-blue-400 font-bold opacity-0 group-hover/payouts:opacity-100 transition-opacity">Click icon to change</span>
-                                                            </div>
-                                                            <div className="grid grid-cols-2 gap-2 h-32 overflow-y-auto">
-                                                                {slotSymbols.map((sym, i) => (
-                                                                    <label key={i} className="flex justify-between items-center bg-[#121c22] rounded px-2 py-1 h-12 border border-white/5 hover:border-blue-400/50 cursor-pointer transition-colors relative group/sym">
-                                                                        <span className="text-2xl leading-none flex items-center justify-center w-8 h-8 rounded shrink-0 drop-shadow">
-                                                                            {sym.startsWith('data:image') ? <img src={sym} className="w-full h-full object-contain" alt="symbol" /> : sym}
-                                                                        </span>
-                                                                        <span className="font-mono text-[10px] sm:text-xs font-bold" style={{ color: themeColor }}>{(i+1)*2}x</span>
-                                                                        <div className="absolute inset-0 bg-black/80 flex items-center justify-center opacity-0 group-hover/sym:opacity-100 rounded z-10 text-center"><span className="text-[9px] text-white font-bold leading-tight">Upload<br/>Image</span></div>
-                                                                        <input type="file" accept="image/*" className="hidden" onChange={(e)=>{
-                                                                             const file = e.target.files?.[0];
-                                                                             if (file) {
-                                                                                 const reader = new FileReader();
-                                                                                 reader.onload = () => {
-                                                                                     const img = new Image();
-                                                                                     img.onload = () => {
-                                                                                         const canvas = document.createElement('canvas');
-                                                                                         const MAX_SIZE = 120;
-                                                                                         let width = img.width; let height = img.height;
-                                                                                         if(width>height){if(width>MAX_SIZE){height*=MAX_SIZE/width;width=MAX_SIZE;}}
-                                                                                         else{if(height>MAX_SIZE){width*=MAX_SIZE/height;height=MAX_SIZE;}}
-                                                                                         canvas.width = width; canvas.height = height;
-                                                                                         const ctx = canvas.getContext('2d');
-                                                                                         ctx?.drawImage(img, 0, 0, width, height);
-                                                                                         const resizedDataUrl = canvas.toDataURL('image/webp', 0.8);
-                                                                                         const newSyms = [...slotSymbols];
-                                                                                         newSyms[i] = resizedDataUrl;
-                                                                                         setSlotSymbols(newSyms);
-                                                                                     };
-                                                                                     img.src = reader.result as string;
-                                                                                 };
-                                                                                 reader.readAsDataURL(file);
-                                                                             }
-                                                                        }} />
-                                                                    </label>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {/* ICON EDITORS FOR OTHER TEMPLATES */}
-                                                    {selectedTemplate === 'crash' && (
-                                                        <div className="bg-[#0a1114]/50 border border-white/5 rounded-xl p-3 flex flex-col gap-2 mt-4">
-                                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-white/5 pb-1">Crash Icons</span>
-                                                            <div className="grid grid-cols-2 gap-2">
-                                                                {crashIcons.map((icon, i) => (
-                                                                    <label key={i} className="flex items-center gap-2 bg-[#121c22] rounded px-2 py-2 h-12 border border-white/5 hover:border-blue-400/50 cursor-pointer relative group/ic">
-                                                                        <span className="text-2xl w-8 h-8 flex items-center justify-center">{icon.startsWith('data:image') ? <img src={icon} className="w-full h-full object-contain" alt="" /> : icon}</span>
-                                                                        <span className="text-[10px] text-slate-400 font-bold">{i===0?'Ship':'Crash'}</span>
-                                                                        <div className="absolute inset-0 bg-black/80 flex items-center justify-center opacity-0 group-hover/ic:opacity-100 rounded z-10"><span className="text-[9px] text-white font-bold">Upload</span></div>
-                                                                        <input type="file" accept="image/*" className="hidden" onChange={(e)=>{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onload=()=>{const newArr=[...crashIcons];newArr[i]=r.result as string;setCrashIcons(newArr)};r.readAsDataURL(f)}}} />
-                                                                    </label>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {selectedTemplate === 'dice' && (
-                                                        <div className="bg-[#0a1114]/50 border border-white/5 rounded-xl p-3 flex flex-col gap-2 mt-4">
-                                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-white/5 pb-1">Dice Faces</span>
-                                                            <div className="grid grid-cols-3 gap-2">
-                                                                {diceIcons.map((icon, i) => (
-                                                                    <label key={i} className="flex items-center justify-center bg-[#121c22] rounded h-12 border border-white/5 hover:border-blue-400/50 cursor-pointer relative group/ic">
-                                                                        <span className="text-2xl">{icon.startsWith('data:image') ? <img src={icon} className="w-8 h-8 object-contain" alt="" /> : icon}</span>
-                                                                        <div className="absolute inset-0 bg-black/80 flex items-center justify-center opacity-0 group-hover/ic:opacity-100 rounded z-10"><span className="text-[9px] text-white font-bold">Upload</span></div>
-                                                                        <input type="file" accept="image/*" className="hidden" onChange={(e)=>{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onload=()=>{const newArr=[...diceIcons];newArr[i]=r.result as string;setDiceIcons(newArr)};r.readAsDataURL(f)}}} />
-                                                                    </label>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {selectedTemplate === 'mines' && (
-                                                        <div className="bg-[#0a1114]/50 border border-white/5 rounded-xl p-3 flex flex-col gap-2 mt-4">
-                                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-white/5 pb-1">Mine Icons</span>
-                                                            <div className="grid grid-cols-2 gap-2">
-                                                                {minesIcons.map((icon, i) => (
-                                                                    <label key={i} className="flex items-center gap-2 bg-[#121c22] rounded px-2 py-2 h-12 border border-white/5 hover:border-blue-400/50 cursor-pointer relative group/ic">
-                                                                        <span className="text-2xl w-8 h-8 flex items-center justify-center">{icon.startsWith('data:image') ? <img src={icon} className="w-full h-full object-contain" alt="" /> : icon}</span>
-                                                                        <span className="text-[10px] text-slate-400 font-bold">{i===0?'Gem':'Bomb'}</span>
-                                                                        <div className="absolute inset-0 bg-black/80 flex items-center justify-center opacity-0 group-hover/ic:opacity-100 rounded z-10"><span className="text-[9px] text-white font-bold">Upload</span></div>
-                                                                        <input type="file" accept="image/*" className="hidden" onChange={(e)=>{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onload=()=>{const newArr=[...minesIcons];newArr[i]=r.result as string;setMinesIcons(newArr)};r.readAsDataURL(f)}}} />
-                                                                    </label>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {selectedTemplate === 'plinko' && (
-                                                        <div className="bg-[#0a1114]/50 border border-white/5 rounded-xl p-3 flex flex-col gap-2 mt-4">
-                                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-white/5 pb-1">Plinko Icons</span>
-                                                            <div className="grid grid-cols-2 gap-2">
-                                                                {plinkoIcons.map((icon, i) => (
-                                                                    <label key={i} className="flex items-center gap-2 bg-[#121c22] rounded px-2 py-2 h-12 border border-white/5 hover:border-blue-400/50 cursor-pointer relative group/ic">
-                                                                        <span className="text-2xl w-8 h-8 flex items-center justify-center">{icon.startsWith('data:image') ? <img src={icon} className="w-full h-full object-contain" alt="" /> : icon}</span>
-                                                                        <span className="text-[10px] text-slate-400 font-bold">{i===0?'Ball':'Peg'}</span>
-                                                                        <div className="absolute inset-0 bg-black/80 flex items-center justify-center opacity-0 group-hover/ic:opacity-100 rounded z-10"><span className="text-[9px] text-white font-bold">Upload</span></div>
-                                                                        <input type="file" accept="image/*" className="hidden" onChange={(e)=>{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onload=()=>{const newArr=[...plinkoIcons];newArr[i]=r.result as string;setPlinkoIcons(newArr)};r.readAsDataURL(f)}}} />
-                                                                    </label>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {selectedTemplate === 'wheel' && (
-                                                        <div className="bg-[#0a1114]/50 border border-white/5 rounded-xl p-3 flex flex-col gap-2 mt-4">
-                                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-white/5 pb-1">Wheel Segments</span>
-                                                            <div className="grid grid-cols-3 gap-2">
-                                                                {wheelIcons.map((icon, i) => (
-                                                                    <label key={i} className="flex items-center justify-center bg-[#121c22] rounded h-12 border border-white/5 hover:border-blue-400/50 cursor-pointer relative group/ic">
-                                                                        <span className="text-2xl">{icon.startsWith('data:image') ? <img src={icon} className="w-8 h-8 object-contain" alt="" /> : icon}</span>
-                                                                        <div className="absolute inset-0 bg-black/80 flex items-center justify-center opacity-0 group-hover/ic:opacity-100 rounded z-10"><span className="text-[9px] text-white font-bold">Upload</span></div>
-                                                                        <input type="file" accept="image/*" className="hidden" onChange={(e)=>{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onload=()=>{const newArr=[...wheelIcons];newArr[i]=r.result as string;setWheelIcons(newArr)};r.readAsDataURL(f)}}} />
-                                                                    </label>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    <div className="mt-auto relative group/spin shrink-0">
-                                                        <button className={`w-full text-white h-14 rounded-xl font-black text-xl tracking-widest uppercase transition-all shadow-lg hover:brightness-110 relative overflow-hidden`} style={{ background: `linear-gradient(to right, ${themeColor}, ${themeColor}aa)` }}>
-                                                            <span className="relative z-10 flex gap-2 items-center justify-center">
-                                                                {(selectedTemplate === 'slot' || selectedTemplate === 'wheel') ? <><Play size={20} fill="currentColor" /> SPIN</> : <><Play size={20} fill="currentColor" /> PLAY</>}
-                                                            </span>
-                                                        </button>
-                                                        <div className="absolute -top-3 -right-3 cursor-pointer bg-white/10 hover:bg-white/20 p-2 rounded-full backdrop-blur-md opacity-0 group-hover/spin:opacity-100 transition-opacity z-30" onClick={() => { document.getElementById('color-picker-trigger')?.click(); }}>
-                                                            <Palette size={14} className="text-white"/>
-                                                        </div>
-                                                        <input id="color-picker-trigger" type="color" className="hidden" value={themeColor} onChange={e => setThemeColor(e.target.value)} />
-                                                    </div>
-                                                </div>
-
-                                                {/* GAME AREA — Visual Preview */}
-                                                <div 
-                                                    className="flex-1 relative bg-[#06090c] p-4 flex flex-col items-center justify-center overflow-hidden"
-                                                    style={{ backgroundImage: gameBackgroundImage ? `url('${gameBackgroundImage}')` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}
-                                                >
-                                                    {gameBackgroundImage && <div className="absolute inset-0 bg-black/40 pointer-events-none z-0"></div>}
-                                                    {gameDescription && (
-                                                        <div 
-                                                            className="absolute top-4 inset-x-0 mx-auto text-center px-8 z-10 cursor-pointer group/desc"
-                                                            onClick={() => setEditingField('desc')}
-                                                        >
-                                                            {editingField === 'desc' ? (
-                                                                <textarea autoFocus onBlur={() => setEditingField(null)} value={gameDescription} onChange={(e) => setGameDescription(e.target.value)} className="w-full max-w-md h-16 bg-black/60 text-slate-300 text-sm italic rounded-xl px-4 py-2 border border-blue-400 focus:outline-none resize-none mx-auto text-center" />
-                                                            ) : (
-                                                                <p className="text-slate-400 text-sm italic max-w-md mx-auto hover:text-white transition-colors">{gameDescription}</p>
-                                                            )}
-                                                            <span className="text-[10px] bg-black/80 text-white font-bold px-2 py-1 rounded absolute -top-4 opacity-0 group-hover/desc:opacity-100 left-1/2 -translate-x-1/2">Edit Description</span>
-                                                        </div>
-                                                    )}
-
-                                                    {/* TEMPLATE VISUALS */}
-                                                    {selectedTemplate === 'slot' && (
-                                                        <div className="relative p-6 lg:p-10 rounded-3xl border-8 shadow-[inset_0_20px_50px_rgba(0,0,0,0.8),0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-500" style={{ background: `linear-gradient(to bottom, ${themeColor}40, #0a1114)`, borderColor: `${themeColor}20` }}>
-                                                            <div className="flex gap-4 sm:gap-6 bg-[#06090c] p-4 sm:p-6 rounded-2xl shadow-inner border-[4px] border-[#0f171c]">
-                                                                {[0,1,2].map((i) => (
-                                                                    <div key={i} className="w-28 h-40 sm:w-36 sm:h-52 bg-[#121c22] rounded-xl overflow-hidden relative border border-white/5 shadow-inner">
-                                                                        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/60 z-10 pointer-events-none"></div>
-                                                                        <div className="flex flex-col items-center justify-center w-full h-full text-[80px] sm:text-[110px] absolute inset-0 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">
-                                                                            {slotSymbols[i % slotSymbols.length].startsWith('data:image') ? <img src={slotSymbols[i % slotSymbols.length]} className="w-3/4 h-3/4 object-contain" /> : slotSymbols[i % slotSymbols.length]}
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {selectedTemplate === 'crash' && (
-                                                        <div className="w-full max-w-2xl h-[300px] border-l-4 border-b-4 relative flex items-end ml-12" style={{ borderColor: `${themeColor}50` }}>
-                                                            <svg viewBox="0 0 100 100" className="w-full h-full absolute inset-0 preserve-3d overflow-visible" preserveAspectRatio="none">
-                                                                 <path d="M0,100 Q40,90 90,10" fill="none" stroke={themeColor} strokeWidth="4" />
-                                                            </svg>
-                                                            <div className="absolute w-[60px] h-[60px] flex items-center justify-center -translate-x-1/2 translate-y-1/2 z-10" style={{ left: '90%', top: '10%' }}>
-                                                                  {crashIcons[0].startsWith('data:image') ? <img src={crashIcons[0]} className="w-full h-full object-contain drop-shadow-xl" alt="" /> : <span className="text-5xl">{crashIcons[0]}</span>}
-                                                            </div>
-                                                            <div className="absolute text-5xl sm:text-7xl font-black drop-shadow-lg" style={{ color: themeColor, top: '25%', right: '10%' }}>2.14x</div>
-                                                        </div>
-                                                    )}
-
-                                                    {selectedTemplate === 'dice' && (
-                                                        <div className="w-56 h-56 rounded-[40px] border-[6px] flex items-center justify-center text-[100px] shadow-[0_20px_50px_rgba(0,0,0,0.8),inset_0_0_30px_rgba(255,255,255,0.05)] transform rotate-[-5deg]" style={{ background: `linear-gradient(145deg, rgba(255,255,255,0.1), rgba(0,0,0,0.5))`, borderColor: `${themeColor}50` }}>
-                                                            {diceIcons[0] && diceIcons[0].startsWith('data:image') ? <img src={diceIcons[0]} className="w-3/4 h-3/4 object-contain drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]" alt="" /> : <span>{diceIcons[0]}</span>}
-                                                        </div>
-                                                    )}
-
-                                                    {selectedTemplate === 'mines' && (
-                                                        <div className="grid grid-cols-5 gap-2 bg-[#0c1319] p-4 rounded-2xl shadow-inner border border-white/5">
-                                                            {Array.from({length: 25}).map((_, i) => (
-                                                                <div key={i} className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg transition-colors cursor-pointer" style={{ backgroundColor: i===12 ? `${themeColor}40` : `${themeColor}20`, boxShadow: i===12 ? `0 0 15px ${themeColor}40` : 'none' }}>
-                                                                    {i===12 && <div className="w-full h-full flex items-center justify-center drop-shadow-lg text-2xl">
-                                                                        {minesIcons[0] && minesIcons[0].startsWith('data:image') ? <img src={minesIcons[0]} className="w-3/4 h-3/4 object-contain drop-shadow-[0_5px_5px_rgba(0,0,0,0.5)]" alt="" /> : minesIcons[0]}
-                                                                    </div>}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-
-                                                    {selectedTemplate === 'plinko' && (
-                                                        <div className="flex flex-col items-center gap-3">
-                                                            {[1,2,3,4,5,6,7,8].map(row => (
-                                                                <div key={row} className="flex gap-6">
-                                                                     {Array.from({length: row}).map((_, i) => (
-                                                                         <div key={`${row}-${i}`} className="w-3 h-3 rounded-full bg-white/20 shadow-[0_0_8px_rgba(255,255,255,0.2)]"></div>
-                                                                     ))}
-                                                                </div>
-                                                            ))}
-                                                            <div className="flex gap-2.5 mt-4">
-                                                                 {[10,5,2,1,0.5,1,2,5,10].map((m, i) => (
-                                                                     <div key={i} className="px-3 py-1.5 text-xs font-black rounded-lg shadow-lg" style={{ backgroundColor: `${themeColor}40`, color: themeColor }}>{m}x</div>
-                                                                 ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {selectedTemplate === 'wheel' && (
-                                                        <div 
-                                                            className="w-72 h-72 sm:w-80 sm:h-80 rounded-full border-[12px] border-[#0c1319] relative shadow-[0_0_40px_rgba(0,0,0,0.6)] overflow-hidden" 
-                                                            style={{ 
-                                                                background: `conic-gradient(${
-                                                                    wheelIcons.map((_, i) => {
-                                                                        const start = (i * 360) / wheelIcons.length;
-                                                                        const end = ((i + 1) * 360) / wheelIcons.length;
-                                                                        const color = i % 2 === 0 ? themeColor : '#1e293b';
-                                                                        return `${color} ${start}deg ${end}deg`;
-                                                                    }).join(', ')
-                                                                })`
-                                                            }}
-                                                        >
-                                                            {wheelIcons.map((icon, i) => {
-                                                                const rot = (i + 0.5) * (360 / wheelIcons.length);
-                                                                return (
-                                                                    <div key={i} className="absolute inset-0 flex items-start justify-center pointer-events-none z-10" style={{ transform: `rotate(${rot}deg)` }}>
-                                                                         <div className="pt-6 sm:pt-10 font-bold text-white text-xl sm:text-2xl drop-shadow-md flex items-center justify-center" style={{ transform: 'none' }}>
-                                                                              {icon && icon.startsWith('data:image') ? <img src={icon} className="w-8 h-8 sm:w-12 sm:h-12 object-contain drop-shadow" alt="" /> : icon}
-                                                                         </div>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-8 bg-white shrink-0 shadow-xl z-20" style={{ clipPath: 'polygon(50% 100%, 0 0, 100% 0)' }}></div>
-                                                            <div className="absolute inset-0 m-auto w-16 h-16 bg-[#0c1319] rounded-full border-[6px] border-white/10 flex items-center justify-center shadow-inner z-30">
-                                                                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: themeColor }}></div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Fallback for others */}
-                                                    {!['slot', 'crash', 'dice', 'mines', 'plinko', 'wheel'].includes(selectedTemplate) && (
-                                                        <div className="text-center group relative cursor-pointer" onClick={() => setEditingField('name')}>
-                                                            <h3 className="text-6xl font-black text-white z-10 mb-4" style={{ textShadow: `0 0 30px ${themeColor}` }}>{themeEmoji}</h3>
-                                                            <div className="px-6 py-2 rounded-full text-sm font-bold text-white uppercase tracking-widest border border-white/20" style={{ backgroundColor: `${themeColor}50` }}>
-                                                                {selectedTemplate} GAME
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <p className="text-xs text-slate-500 font-medium mt-6 tracking-wide uppercase">Click on text/emoji to edit</p>
-
-                                        <div className="w-full max-w-sm mt-8 border-t border-white/10 pt-8 space-y-4">
-                                            {/* Cover Image Upload */}
-                                            <div className="flex flex-col gap-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Lobby Cover Image (Optional)</label>
-                                                <button className="relative w-full aspect-video rounded-xl bg-[#0a111a] border border-dashed border-white/20 flex flex-col items-center justify-center overflow-hidden hover:border-blue-400 group transition-all text-center">
-                                                    {coverImage ? (
-                                                        <>
-                                                            <img src={coverImage} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
-                                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                                <span className="text-white font-bold bg-white/10 px-4 py-2 rounded-lg border border-white/20 backdrop-blur-md">Change Image</span>
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <ImageIcon size={24} className="text-slate-500 group-hover:text-blue-400 mb-1 transition-colors" />
-                                                            <span className="text-xs text-slate-400 font-bold">Upload Cover</span>
-                                                            <span className="text-[10px] text-red-400/80 mt-1 font-bold">Obligatoriu pentru postare</span>
-                                                        </>
-                                                    )}
-                                                    <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => handleFileUpload(e, setCoverImage)} />
-                                                </button>
-                                            </div>
-
+                                {/* Volatility Presets */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block">Volatility Template</label>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {(Object.entries(VOLATILITY_PRESETS) as [string, typeof VOLATILITY_PRESETS['low']][]).map(([key, preset]) => (
                                             <button
-                                                onClick={handlePublish}
-                                                disabled={isPublishing || !gameName.trim()}
-                                                className={`w-full py-4 rounded-xl font-black text-lg tracking-widest uppercase transition-all shadow-xl hover:-translate-y-1 hover:brightness-110 flex items-center justify-center gap-2 ${isPublishing ? 'opacity-60 pointer-events-none' : ''}`}
-                                                style={{ backgroundColor: themeColor, boxShadow: `0 5px 25px ${themeColor}40`, color: 'white' }}
+                                                key={key}
+                                                onClick={() => applyVolatility(key as any)}
+                                                className={`p-4 rounded-xl border-2 transition-all text-left ${volatility === key
+                                                    ? 'border-amber-500 bg-gradient-to-br from-amber-500/10 to-amber-600/5'
+                                                    : 'border-white/10 bg-[#0a111a] hover:border-white/20'
+                                                }`}
                                             >
-                                                {isPublishing ? (
-                                                    <><Loader2 className="animate-spin" size={20} /> Publishing...</>
-                                                ) : (
-                                                    <><Save size={20} /> Publish to Lobby</>
-                                                )}
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className={`w-3 h-3 rounded-full ${key === 'low' ? 'bg-green-400' : key === 'medium' ? 'bg-amber-400' : 'bg-red-400'}`} />
+                                                    <span className={`text-sm font-black ${volatility === key ? 'text-white' : 'text-slate-400'}`}>{preset.label}</span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500">{preset.description}</p>
                                             </button>
-                                        </div>
+                                        ))}
                                     </div>
-                                </>
-                            )}
-                        </div>
+                                </div>
 
-                        {/* STEP 2: Preview & Customize (appears after generation) */}
-                        <AnimatePresence>
-                            {showPreview && htmlCode && creationMode === 'ai' && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -20 }}
-                                    className="space-y-6"
-                                >
-                                    <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-3 border-b border-white/5 pb-2 flex items-center gap-2">
-                                        <span className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center text-[10px] font-black text-green-400">2</span>
-                                        Preview & Customize
-                                    </h3>
+                                {/* Symbol Table */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Symbols & Payouts</label>
+                                        <button onClick={() => {
+                                            const id = 'sym_' + Date.now();
+                                            setSymbols(prev => [...prev, { id, name: 'New Symbol', image: '🎯', type: 'normal', payouts: { 3: 2, 4: 5, 5: 15 } }]);
+                                        }} className="text-xs bg-purple-500/20 text-purple-400 px-3 py-1.5 rounded-lg font-bold hover:bg-purple-500/30 transition-colors">
+                                            + Add Symbol
+                                        </button>
+                                    </div>
 
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        {/* Live Preview */}
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                    <Eye size={14} /> Live Preview
-                                                </span>
-                                                <button
-                                                    onClick={() => { setShowPreview(false); setHtmlCode(''); setGameName(''); }}
-                                                    className="text-xs text-slate-500 hover:text-red-400 flex items-center gap-1 transition-colors"
-                                                >
-                                                    <RotateCcw size={12} /> Regenerate
-                                                </button>
-                                            </div>
-                                            <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[400px] relative">
-                                                <iframe
-                                                    ref={iframeRef}
-                                                    srcDoc={htmlCode}
-                                                    className="w-full h-full border-0"
-                                                    sandbox="allow-scripts"
-                                                    title="Game Preview"
-                                                />
-                                            </div>
-                                            
-                                            {/* TEST CONTROLS */}
-                                            <div className="flex gap-3 pt-2">
-                                                <button
-                                                    onClick={() => iframeRef.current?.contentWindow?.postMessage({ type: 'START_GAME', bet: 10 }, '*')}
-                                                    className="flex-1 bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-green-500/10"
-                                                >
-                                                    <Play size={16} /> Test Spin
-                                                </button>
-                                                <button
-                                                    onClick={() => iframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*')}
-                                                    className="flex-1 bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-red-500/10"
-                                                >
-                                                    <RotateCcw size={16} /> Reset
-                                                </button>
-                                            </div>
+                                    <div className="bg-[#0a111a] rounded-xl border border-white/10 overflow-hidden">
+                                        {/* Header */}
+                                        <div className="grid grid-cols-[60px_1fr_80px_60px_60px_60px_40px] gap-2 p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-white/5 bg-[#080d14]">
+                                            <div>Icon</div>
+                                            <div>Name</div>
+                                            <div>Type</div>
+                                            <div className="text-center">3×</div>
+                                            <div className="text-center">4×</div>
+                                            <div className="text-center">5×</div>
+                                            <div></div>
                                         </div>
 
-                                        {/* Settings */}
-                                        <div className="space-y-4">
-                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Game Details</span>
+                                        {/* Symbol Rows */}
+                                        {symbols.map((sym) => (
+                                            <div key={sym.id} className="grid grid-cols-[60px_1fr_80px_60px_60px_60px_40px] gap-2 p-3 items-center border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                                                {/* Icon */}
+                                                <label className="w-10 h-10 rounded-lg bg-[#121c22] border border-white/10 flex items-center justify-center cursor-pointer hover:border-purple-400/50 transition-colors relative overflow-hidden group">
+                                                    {sym.image.startsWith('data:image') || sym.image.startsWith('http') || sym.image.startsWith('/')
+                                                        ? <img src={sym.image} className="w-full h-full object-contain p-1" alt="" />
+                                                        : <span className="text-lg">{sym.image}</span>
+                                                    }
+                                                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                        <Upload size={12} className="text-white" />
+                                                    </div>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSymbolImageUpload(sym.id, e)} />
+                                                </label>
 
-                                            {/* Game Name */}
-                                            <div className="flex flex-col gap-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Game Title</label>
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={gameName}
-                                                        onChange={(e) => setGameName(e.target.value)}
-                                                        placeholder="Enter a catchy name..."
-                                                        className="flex-1 bg-[#0a111a] border border-white/10 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-fuchsia-400 transition-colors"
-                                                    />
+                                                {/* Name */}
+                                                <input type="text" value={sym.name} onChange={(e) => setSymbols(prev => prev.map(s => s.id === sym.id ? { ...s, name: e.target.value } : s))}
+                                                    className="bg-transparent border-b border-white/5 focus:border-purple-400 text-white text-sm font-bold px-1 py-1 focus:outline-none transition-colors" />
+
+                                                {/* Type */}
+                                                <select value={sym.type} onChange={(e) => {
+                                                    const newType = e.target.value as 'normal' | 'wild' | 'scatter';
+                                                    setSymbols(prev => prev.map(s => s.id === sym.id ? { ...s, type: newType } : s));
+                                                    if (newType === 'wild') setWildSymbolId(sym.id);
+                                                    if (newType === 'scatter') setScatterSymbolId(sym.id);
+                                                }}
+                                                    className="bg-[#0a111a] border border-white/10 text-white text-[11px] font-bold rounded-lg px-2 py-1.5 focus:outline-none cursor-pointer">
+                                                    <option value="normal">Normal</option>
+                                                    <option value="wild">Wild</option>
+                                                    <option value="scatter">Scatter</option>
+                                                </select>
+
+                                                {/* Payouts */}
+                                                {[3, 4, 5].map(n => (
+                                                    <input key={n} type="number" step="0.1" min="0"
+                                                        value={sym.payouts[n as 3 | 4 | 5] || 0}
+                                                        onChange={(e) => setSymbols(prev => prev.map(s => s.id === sym.id ? { ...s, payouts: { ...s.payouts, [n]: parseFloat(e.target.value) || 0 } } : s))}
+                                                        className="w-full bg-[#0d1520] border border-white/5 text-center text-white font-mono text-xs rounded-lg py-1 focus:outline-none focus:border-purple-400 transition-colors" />
+                                                ))}
+
+                                                {/* Delete */}
+                                                <button onClick={() => { if (symbols.length > 2) setSymbols(prev => prev.filter(s => s.id !== sym.id)); }}
+                                                    className="text-slate-600 hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10 mx-auto" disabled={symbols.length <= 2}>
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ════════════════════════════════════════════════════ */}
+                        {/* SECTION: Features (Toggles)                        */}
+                        {/* ════════════════════════════════════════════════════ */}
+                        {gameType === 'slots' && activeSection === 'features' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Settings2 size={16} className="text-emerald-400" /> Special Mechanics
+                                </h3>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-3">
+                                        <Toggle enabled={wildEnabled} onToggle={() => setWildEnabled(!wildEnabled)} label="Wild Symbol (substitutes any)" />
+                                        {wildEnabled && (
+                                            <div className="ml-8 p-3 bg-[#0a111a] rounded-xl border border-white/5">
+                                                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Wild Symbol</label>
+                                                <select value={wildSymbolId} onChange={(e) => setWildSymbolId(e.target.value)}
+                                                    className="w-full bg-[#121c22] border border-white/10 text-white text-xs font-bold rounded-lg px-3 py-2 focus:outline-none">
+                                                    {symbols.map(s => <option key={s.id} value={s.id}>{s.image} {s.name}</option>)}
+                                                </select>
+                                            </div>
+                                        )}
+
+                                        <Toggle enabled={scatterEnabled} onToggle={() => setScatterEnabled(!scatterEnabled)} label="Scatter → Triggers Free Spins" />
+                                        {scatterEnabled && (
+                                            <div className="ml-8 p-3 bg-[#0a111a] rounded-xl border border-white/5 space-y-3">
+                                                <div>
+                                                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Scatter Symbol</label>
+                                                    <select value={scatterSymbolId} onChange={(e) => setScatterSymbolId(e.target.value)}
+                                                        className="w-full bg-[#121c22] border border-white/10 text-white text-xs font-bold rounded-lg px-3 py-2 focus:outline-none">
+                                                        {symbols.map(s => <option key={s.id} value={s.id}>{s.image} {s.name}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Free Spins Count (3+ scatters)</label>
+                                                    <input type="number" min="1" max="50" value={freeSpinsCount} onChange={(e) => setFreeSpinsCount(parseInt(e.target.value) || 10)}
+                                                        className="w-20 bg-[#121c22] border border-white/10 text-white text-sm font-mono text-center rounded-lg px-3 py-2 focus:outline-none focus:border-purple-400" />
                                                 </div>
                                             </div>
+                                        )}
+                                    </div>
 
-                                            {/* Description */}
-                                            <div className="flex flex-col gap-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Description</label>
-                                                <input
-                                                    type="text"
-                                                    value={gameDescription}
-                                                    onChange={(e) => setGameDescription(e.target.value)}
-                                                    placeholder="Short description..."
-                                                    className="w-full bg-[#0a111a] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-fuchsia-400 transition-colors"
-                                                />
-                                            </div>
+                                    <div className="space-y-3">
+                                        <Toggle enabled={progressiveMultiplier} onToggle={() => setProgressiveMultiplier(!progressiveMultiplier)} label="Progressive Multiplier (grows on wins)" />
+                                        <Toggle enabled={tumbleEnabled} onToggle={() => setTumbleEnabled(!tumbleEnabled)} label="Tumble / Cascade (winning symbols disappear)" />
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
 
-                                            {/* Theme Color */}
-                                            <div className="flex flex-col gap-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Accent Color</label>
-                                                <div className="flex items-center gap-3">
-                                                    <input
-                                                        type="color"
-                                                        value={themeColor}
-                                                        onChange={(e) => setThemeColor(e.target.value)}
-                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent"
-                                                    />
-                                                    <span className="text-white font-mono text-sm">{themeColor}</span>
-                                                    <div className="flex-1 h-2 rounded-full" style={{ background: `linear-gradient(90deg, ${themeColor}00, ${themeColor})` }}></div>
-                                                </div>
-                                            </div>
+                        {/* ════════════════════════════════════════════════════ */}
+                        {/* SECTION: Live Preview                               */}
+                        {/* ════════════════════════════════════════════════════ */}
+                        {gameType === 'slots' && activeSection === 'preview' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Eye size={16} className="text-cyan-400" /> Live Preview & Test
+                                </h3>
 
-                                            {/* AI Custom Assets */}
-                                            {aiCustomAssets.length > 0 && (
-                                                <div className="flex flex-col gap-2 mt-4 bg-blue-500/5 p-4 rounded-xl border border-blue-500/20">
-                                                    <label className="text-xs font-bold text-blue-400 uppercase tracking-widest flex items-center gap-2">
-                                                        <Sparkles size={14} /> Replace Game Elements
-                                                    </label>
-                                                    <div className="grid grid-cols-2 gap-3 mt-1">
-                                                        {aiCustomAssets.map(asset => (
-                                                            <div key={asset.id} className="flex flex-col gap-1">
-                                                                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold truncate">{asset.name}</span>
-                                                                <label className="flex items-center justify-center bg-[#0a111a] border border-white/10 hover:border-blue-400 flex-1 min-h-[60px] rounded-lg cursor-pointer transition-colors relative overflow-hidden group/asset">
-                                                                    {asset.current === asset.default ? (
-                                                                        <span className="text-3xl relative z-10">{asset.current}</span>
-                                                                    ) : (
-                                                                        <img src={asset.current} className="w-10 h-10 object-contain drop-shadow" alt={asset.name} />
-                                                                    )}
-                                                                    <div className="absolute inset-0 bg-blue-500/20 opacity-0 group-hover/asset:opacity-100 transition-opacity"></div>
-                                                                    <div className="absolute inset-x-0 bottom-0 bg-black/80 flex justify-center py-1 translate-y-full group-hover/asset:translate-y-0 transition-transform">
-                                                                        <span className="text-[9px] font-bold text-white uppercase flex items-center gap-1"><Upload size={10} /> Upload</span>
-                                                                    </div>
-                                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                                                                        const file = e.target.files?.[0];
-                                                                        if (file) {
-                                                                            const reader = new FileReader();
-                                                                            reader.onload = () => {
-                                                                                const img = new Image();
-                                                                                img.onload = () => {
-                                                                                    const canvas = document.createElement('canvas');
-                                                                                    const MAX = 120;
-                                                                                    let w = img.width, h = img.height;
-                                                                                    if (w > h) { if (w > MAX) { h *= MAX / w; w = MAX; } }
-                                                                                    else { if (h > MAX) { w *= MAX / h; h = MAX; } }
-                                                                                    canvas.width = w; canvas.height = h;
-                                                                                    const ctx = canvas.getContext('2d');
-                                                                                    ctx?.drawImage(img, 0, 0, w, h);
-                                                                                    updateCustomAsset(asset.id, canvas.toDataURL('image/webp', 0.8));
-                                                                                };
-                                                                                img.src = reader.result as string;
-                                                                            };
-                                                                            reader.readAsDataURL(file);
-                                                                        }
-                                                                    }} />
-                                                                </label>
-                                                            </div>
-                                                        ))}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* Engine Preview */}
+                                    <div className="lg:col-span-2 space-y-3">
+                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative" style={{ boxShadow: `0 0 40px ${accentColor}15` }}>
+                                            <iframe
+                                                ref={iframeRef}
+                                                src="/engines/slot-engine.html"
+                                                className="w-full h-full border-0"
+                                                sandbox="allow-scripts"
+                                                title="Slot Engine Preview"
+                                            />
+                                            {!engineReady && (
+                                                <div className="absolute inset-0 bg-[#060b11] flex items-center justify-center">
+                                                    <div className="flex flex-col items-center gap-3">
+                                                        <Loader2 className="animate-spin text-purple-400" size={32} />
+                                                        <span className="text-slate-500 text-sm font-bold uppercase tracking-wider">Loading Engine...</span>
                                                     </div>
                                                 </div>
                                             )}
+                                        </div>
 
-                                            {/* Cover Image */}
-                                            <div className="flex flex-col gap-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Lobby Cover Image</label>
-                                                <button className="relative w-full aspect-video rounded-xl bg-[#0a111a] border border-dashed border-white/20 flex flex-col items-center justify-center overflow-hidden hover:border-fuchsia-400 group transition-all text-center">
-                                                    {coverImage ? (
-                                                        <>
-                                                            <img src={coverImage} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
-                                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                                <span className="text-white font-bold bg-white/10 px-4 py-2 rounded-lg border border-white/20 backdrop-blur-md">Change Image</span>
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <ImageIcon size={32} className="text-slate-500 group-hover:text-fuchsia-400 mb-2 transition-colors" />
-                                                            <span className="text-sm text-slate-300 font-bold">Upload Cover</span>
-                                                            <span className="text-[10px] text-red-500 mt-1 font-bold">Obligatoriu pentru postare</span>
-                                                        </>
-                                                    )}
-                                                    <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => handleFileUpload(e, setCoverImage)} />
-                                                </button>
-                                            </div>
-
-                                            {/* Winning Celebration (AI Mod) */}
-                                            <div className="bg-gradient-to-br from-[#0a111a] to-[#160b1e] border border-fuchsia-500/20 shadow-[0_0_20px_rgba(217,70,239,0.1)] rounded-2xl p-4 flex flex-col gap-3 mt-4 shrink-0 relative overflow-hidden">
-                                                <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-                                                <div className="flex flex-wrap items-center justify-between border-b border-white/5 pb-2 relative z-10 gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <Sparkles size={16} className="text-amber-400 flex-shrink-0" />
-                                                        <label className="text-xs font-black text-white uppercase tracking-widest leading-none">Victory Celebration</label>
-                                                    </div>
-                                                    <label className={`text-[10px] flex-shrink-0 font-bold px-3 py-2 rounded-xl cursor-pointer transition-all border shadow-lg ${winSound ? 'bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30' : 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/30 hover:bg-fuchsia-500/20 hover:border-fuchsia-400'}`}>
-                                                        <span className="flex items-center gap-1.5 break-normal whitespace-nowrap">
-                                                            <Volume2 size={12} />
-                                                            {winSound ? 'Audio Loaded' : 'Add Sound (.mp3)'}
-                                                        </span>
-                                                        <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleAudioUpload(e, setWinSound)} />
-                                                    </label>
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-2 relative z-10">
-                                                    {WIN_EFFECTS.map(effect => (
-                                                        <button
-                                                            key={effect.id}
-                                                            onClick={() => setWinEffect(effect.id)}
-                                                            className={`flex flex-col items-center justify-center py-3 rounded-xl border transition-all duration-300 relative overflow-hidden group ${winEffect === effect.id ? 'bg-gradient-to-b from-fuchsia-500/20 to-fuchsia-600/10 border-fuchsia-400 shadow-[0_0_15px_rgba(217,70,239,0.2)]' : 'bg-black/30 border-white/5 hover:bg-white/5 hover:border-white/10'}`}
-                                                        >
-                                                            {winEffect === effect.id && <div className="absolute inset-0 bg-fuchsia-400/10 opacity-50 blur-md pointer-events-none"></div>}
-                                                            <span className={`text-2xl mb-1 transition-transform duration-300 ${winEffect === effect.id ? 'scale-110 drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'group-hover:scale-110 opacity-70'} grayscale-0`}>{effect.icon}</span>
-                                                            <span className={`text-[9px] font-bold uppercase tracking-wider ${winEffect === effect.id ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`}>{effect.name}</span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                                {winSound && (
-                                                    <button className="text-[10px] text-slate-500 hover:text-red-400 hover:underline text-right mt-1 transition-colors relative z-10" onClick={() => setWinSound(null)}>Remove Audio Track</button>
-                                                )}
-                                            </div>
-
-                                            {/* Publish Button */}
+                                        {/* Test Controls */}
+                                        <div className="flex gap-3">
                                             <button
-                                                onClick={handlePublish}
-                                                disabled={isPublishing || !gameName.trim() || !htmlCode}
-                                                className={`w-full py-4 rounded-xl font-black text-lg tracking-widest uppercase transition-all flex justify-center items-center gap-2 mt-4
-                                                    ${isPublishing || !gameName.trim() || !htmlCode
-                                                        ? 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none border border-white/5'
-                                                        : 'bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white hover:brightness-110 hover:-translate-y-1 shadow-[0_5px_20px_rgba(217,70,239,0.3)]'
-                                                    }`}
+                                                onClick={handleTestSpin}
+                                                disabled={!engineReady || isTesting}
+                                                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:brightness-110 disabled:opacity-50 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-500/20"
                                             >
-                                                {isPublishing ? 'Publishing...' : <><Save size={20} /> Publish to Lobby</>}
+                                                {isTesting ? <Loader2 className="animate-spin" size={16} /> : <Play size={16} />}
+                                                {isTesting ? 'Spinning...' : 'Test Spin'}
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    iframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
+                                                }}
+                                                className="bg-[#1a2c38] hover:bg-[#2f4553] text-slate-300 px-6 py-3 rounded-xl font-bold flex items-center gap-2 border border-white/5 transition-colors"
+                                            >
+                                                <RotateCcw size={16} /> Reset
                                             </button>
                                         </div>
                                     </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+
+                                    {/* Config Summary */}
+                                    <div className="space-y-4">
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                            <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2">Configuration</h4>
+                                            <div className="space-y-2 text-xs">
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Grid</span><span className="text-white font-mono">{gridLayout}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Symbols</span><span className="text-white font-mono">{symbols.length}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Volatility</span><span className="text-white font-mono capitalize">{volatility}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Wild</span><span className={wildEnabled ? 'text-green-400' : 'text-slate-600'}>{wildEnabled ? '✓' : '✗'}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Scatter</span><span className={scatterEnabled ? 'text-green-400' : 'text-slate-600'}>{scatterEnabled ? '✓' : '✗'}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Free Spins</span><span className="text-white font-mono">{scatterEnabled ? freeSpinsCount : '-'}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Progressive</span><span className={progressiveMultiplier ? 'text-green-400' : 'text-slate-600'}>{progressiveMultiplier ? '✓' : '✗'}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Tumble</span><span className={tumbleEnabled ? 'text-green-400' : 'text-slate-600'}>{tumbleEnabled ? '✓' : '✗'}</span></div>
+                                            </div>
+                                        </div>
+
+                                        {/* Symbol Preview */}
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4">
+                                            <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2 mb-3">Symbols</h4>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                {symbols.map(s => (
+                                                    <div key={s.id} className={`flex flex-col items-center gap-1 p-2 rounded-lg ${s.type === 'wild' ? 'bg-purple-500/10 border border-purple-500/20' : s.type === 'scatter' ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-white/[0.02] border border-white/5'}`}>
+                                                        <div className="text-xl">
+                                                            {s.image.startsWith('data:image') || s.image.startsWith('http') ? <img src={s.image} className="w-6 h-6 object-contain" alt="" /> : s.image}
+                                                        </div>
+                                                        <span className="text-[8px] text-slate-500 font-bold uppercase truncate w-full text-center">{s.type !== 'normal' ? s.type : s.name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Publish Button */}
+                                        <button
+                                            onClick={handlePublish}
+                                            disabled={isPublishing || !gameName.trim() || !coverImage}
+                                            className={`w-full py-4 rounded-xl font-black text-lg tracking-widest uppercase transition-all flex justify-center items-center gap-2 ${isPublishing || !gameName.trim() || !coverImage
+                                                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                                : 'bg-gradient-to-r from-purple-600 to-purple-700 text-white hover:brightness-110 hover:-translate-y-1 shadow-[0_5px_20px_rgba(168,85,247,0.3)]'
+                                            }`}
+                                        >
+                                            {isPublishing ? <><Loader2 className="animate-spin" size={20} /> Publishing...</> : <><Save size={20} /> Publish to Lobby</>}
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ════════════════════════════════════════════════════ */}
+                        {/* CRASH SECTIONS                                      */}
+                        {/* ════════════════════════════════════════════════════ */}
+
+                        {/* ─── Crash Design & Assets ──────────────────────── */}
+                        {gameType === 'crash' && crashActiveSection === 'design' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Palette size={16} className="text-emerald-400" /> Design & Graphics
+                                </h3>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Name & Description */}
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Game Title</label>
+                                            <input type="text" value={crashGameName} onChange={(e) => setCrashGameName(e.target.value)}
+                                                className="w-full bg-[#0a111a] border border-white/10 focus:border-emerald-400 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-400/20 transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Description</label>
+                                            <input type="text" value={crashGameDescription} onChange={(e) => setCrashGameDescription(e.target.value)}
+                                                className="w-full bg-[#0a111a] border border-white/10 focus:border-emerald-400 rounded-xl px-4 py-3 text-white text-sm focus:outline-none transition-all" />
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Graph Color</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={crashGraphColor} onChange={(e) => setCrashGraphColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-xs">{crashGraphColor}</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Accent</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={crashAccentColor} onChange={(e) => setCrashAccentColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-xs">{crashAccentColor}</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Background</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={crashBgColor} onChange={(e) => setCrashBgColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-xs">{crashBgColor}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Images */}
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Game Background Image</label>
+                                            <label className="flex items-center justify-center gap-2 bg-[#0a111a] rounded-xl h-28 border border-dashed border-emerald-400/30 hover:border-emerald-400 hover:bg-emerald-400/5 cursor-pointer transition-all relative overflow-hidden group">
+                                                {crashBgImage ? (
+                                                    <>
+                                                        <img src={crashBgImage} alt="bg" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500" />
+                                                        <span className="relative z-10 text-xs text-white font-bold bg-emerald-500/80 px-4 py-2 rounded-lg backdrop-blur">Change Background</span>
+                                                    </>
+                                                ) : (
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <Upload size={18} className="text-slate-500 group-hover:text-emerald-400 transition-colors" />
+                                                        <span className="text-[11px] text-slate-400 font-bold">Upload Background</span>
+                                                    </div>
+                                                )}
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setCrashBgImage)} />
+                                            </label>
+                                            {crashBgImage && (
+                                                <button className="text-[10px] text-slate-500 hover:text-red-400 mt-1 transition-colors" onClick={() => setCrashBgImage(null)}>Remove</button>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+                                                Lobby Cover Image <span className="text-red-400">*</span>
+                                            </label>
+                                            <label className="relative w-full aspect-video rounded-xl bg-[#0a111a] border border-dashed border-white/20 flex flex-col items-center justify-center overflow-hidden hover:border-emerald-400 group cursor-pointer transition-all block">
+                                                {crashCoverImage ? (
+                                                    <>
+                                                        <img src={crashCoverImage} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
+                                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                            <span className="text-white font-bold bg-white/10 px-4 py-2 rounded-lg border border-white/20 backdrop-blur-md">Change</span>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <ImageIcon size={24} className="text-slate-500 group-hover:text-emerald-400 mb-1 transition-colors" />
+                                                        <span className="text-xs text-slate-400 font-bold">Upload Cover</span>
+                                                        <span className="text-[10px] text-red-400/80 mt-1 font-bold">Required to publish</span>
+                                                    </>
+                                                )}
+                                                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => handleFileUpload(e, setCrashCoverImage)} />
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Flying Object Selector */}
+                                <div className="bg-gradient-to-br from-[#0a111a] to-[#0b1a15] border border-emerald-500/20 rounded-2xl p-5 mt-4">
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <Rocket size={16} className="text-emerald-400" />
+                                            <span className="text-xs font-black text-white uppercase tracking-widest">Flying Object</span>
+                                        </div>
+                                        <label className={`text-[10px] font-bold px-3 py-2 rounded-xl cursor-pointer transition-all border ${crashFlyingObjectImage ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'}`}>
+                                            <span className="flex items-center gap-1.5"><Upload size={12} />{crashFlyingObjectImage ? 'Custom Image' : 'Upload Custom'}</span>
+                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setCrashFlyingObjectImage, 128)} />
+                                        </label>
+                                    </div>
+                                    <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                                        {FLYING_OBJECT_PRESETS.map(obj => (
+                                            <button key={obj.id} onClick={() => { setCrashFlyingObject(obj.emoji); setCrashFlyingObjectImage(null); }}
+                                                className={`flex flex-col items-center justify-center py-3 rounded-xl border transition-all ${crashFlyingObject === obj.emoji && !crashFlyingObjectImage ? 'bg-gradient-to-b from-emerald-500/20 to-emerald-600/10 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-black/30 border-white/5 hover:bg-white/5'}`}>
+                                                <span className={`text-xl mb-1 ${crashFlyingObject === obj.emoji && !crashFlyingObjectImage ? 'scale-110' : 'opacity-60'}`}>{obj.emoji}</span>
+                                                <span className={`text-[8px] font-bold uppercase ${crashFlyingObject === obj.emoji && !crashFlyingObjectImage ? 'text-white' : 'text-slate-500'}`}>{obj.label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {crashFlyingObjectImage && (
+                                        <div className="flex items-center gap-3 mt-3 p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                                            <img src={crashFlyingObjectImage} alt="custom" className="w-10 h-10 rounded-lg object-contain bg-black/30" />
+                                            <span className="text-xs text-emerald-400 font-bold">Custom image uploaded</span>
+                                            <button className="ml-auto text-[10px] text-slate-500 hover:text-red-400" onClick={() => setCrashFlyingObjectImage(null)}>Remove</button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Crash / Explosion Image */}
+                                <div className="bg-gradient-to-br from-[#0a111a] to-[#1a0b0b] border border-red-500/20 rounded-2xl p-5">
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-lg">💥</span>
+                                            <span className="text-xs font-black text-white uppercase tracking-widest">Crash / Explosion Image</span>
+                                        </div>
+                                    </div>
+                                    <label className="flex items-center justify-center gap-2 bg-[#0a111a] rounded-xl h-24 border border-dashed border-red-400/30 hover:border-red-400 hover:bg-red-400/5 cursor-pointer transition-all relative overflow-hidden group">
+                                        {crashCrashImage ? (
+                                            <>
+                                                <img src={crashCrashImage} alt="crash" className="h-16 object-contain" />
+                                                <span className="text-xs text-white font-bold bg-red-500/80 px-3 py-1.5 rounded-lg backdrop-blur">Change</span>
+                                            </>
+                                        ) : (
+                                            <div className="flex flex-col items-center gap-2">
+                                                <Upload size={18} className="text-slate-500 group-hover:text-red-400 transition-colors" />
+                                                <span className="text-[11px] text-slate-400 font-bold">Upload Explosion Image (optional)</span>
+                                            </div>
+                                        )}
+                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setCrashCrashImage, 200)} />
+                                    </label>
+                                    {crashCrashImage && (
+                                        <button className="text-[10px] text-slate-500 hover:text-red-400 mt-1 transition-colors" onClick={() => setCrashCrashImage(null)}>Remove</button>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ─── Crash Engine Params ────────────────────────── */}
+                        {gameType === 'crash' && crashActiveSection === 'engine' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Gauge size={16} className="text-amber-400" /> Engine Parameters
+                                </h3>
+
+                                {/* House Edge / RTP */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block flex items-center gap-2">
+                                        <ShieldCheck size={14} className="text-emerald-400" /> House Edge / RTP
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {HOUSE_EDGE_PRESETS.map(preset => (
+                                            <button
+                                                key={preset.id}
+                                                onClick={() => setCrashHouseEdge(preset.value)}
+                                                className={`p-4 rounded-xl border-2 transition-all text-left ${crashHouseEdge === preset.value
+                                                    ? 'border-emerald-500 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5'
+                                                    : 'border-white/10 bg-[#0a111a] hover:border-white/20'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className={`w-3 h-3 rounded-full ${preset.id === 'low' ? 'bg-green-400' : preset.id === 'medium' ? 'bg-amber-400' : 'bg-red-400'}`} />
+                                                    <span className={`text-sm font-black ${crashHouseEdge === preset.value ? 'text-white' : 'text-slate-400'}`}>{preset.label}</span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500">{preset.description}</p>
+                                                <div className="mt-2 text-lg font-black text-emerald-400/40">{preset.rtp}% RTP</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="mt-3 flex items-center gap-4 bg-[#0a111a] p-3 rounded-xl border border-white/5">
+                                        <label className="text-xs font-bold text-slate-500 whitespace-nowrap">Custom Edge %</label>
+                                        <input type="number" min="1" max="20" step="0.5" value={crashHouseEdge}
+                                            onChange={(e) => setCrashHouseEdge(Math.min(20, Math.max(1, parseFloat(e.target.value) || 5)))}
+                                            className="w-20 bg-[#121c22] border border-white/10 text-white text-sm font-mono text-center rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-400" />
+                                        <span className="text-xs text-slate-400 font-bold">→ RTP: {(100 - crashHouseEdge).toFixed(1)}%</span>
+                                    </div>
+                                </div>
+
+                                {/* Max Multiplier */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block flex items-center gap-2">
+                                        <TrendingUp size={14} className="text-amber-400" /> Max Multiplier Limit
+                                    </label>
+                                    <div className="grid grid-cols-4 gap-3">
+                                        {[100, 500, 1000, 5000].map(val => (
+                                            <button
+                                                key={val}
+                                                onClick={() => setCrashMaxMultiplier(val)}
+                                                className={`py-3 rounded-xl border-2 font-black text-center transition-all ${crashMaxMultiplier === val
+                                                    ? 'border-amber-500 bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-white'
+                                                    : 'border-white/10 bg-[#0a111a] hover:border-white/20 text-slate-400'
+                                                }`}
+                                            >
+                                                {val >= 1000 ? (val / 1000) + 'K' : val}x
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="mt-3 flex items-center gap-4 bg-[#0a111a] p-3 rounded-xl border border-white/5">
+                                        <label className="text-xs font-bold text-slate-500 whitespace-nowrap">Custom Max</label>
+                                        <input type="number" min="10" max="100000" value={crashMaxMultiplier}
+                                            onChange={(e) => setCrashMaxMultiplier(Math.max(10, parseInt(e.target.value) || 1000))}
+                                            className="w-24 bg-[#121c22] border border-white/10 text-white text-sm font-mono text-center rounded-lg px-3 py-2 focus:outline-none focus:border-amber-400" />
+                                        <span className="text-xs text-slate-400 font-bold">× maximum multiplier</span>
+                                    </div>
+                                </div>
+
+                                {/* Acceleration Curve */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block flex items-center gap-2">
+                                        <Gauge size={14} className="text-cyan-400" /> Acceleration Curve
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {ACCELERATION_PRESETS.map(preset => (
+                                            <button
+                                                key={preset.id}
+                                                onClick={() => setCrashAcceleration(preset.value)}
+                                                className={`p-4 rounded-xl border-2 transition-all text-left ${crashAcceleration === preset.value
+                                                    ? 'border-cyan-500 bg-gradient-to-br from-cyan-500/10 to-cyan-600/5'
+                                                    : 'border-white/10 bg-[#0a111a] hover:border-white/20'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className={`w-3 h-3 rounded-full ${preset.id === 'slow' ? 'bg-blue-400' : preset.id === 'standard' ? 'bg-cyan-400' : 'bg-orange-400'}`} />
+                                                    <span className={`text-sm font-black ${crashAcceleration === preset.value ? 'text-white' : 'text-slate-400'}`}>{preset.label}</span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500">{preset.description}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="mt-3 flex items-center gap-4 bg-[#0a111a] p-3 rounded-xl border border-white/5">
+                                        <label className="text-xs font-bold text-slate-500 whitespace-nowrap">Custom Value</label>
+                                        <input type="range" min="0.03" max="0.15" step="0.01" value={crashAcceleration}
+                                            onChange={(e) => setCrashAcceleration(parseFloat(e.target.value))}
+                                            className="flex-1 accent-cyan-400 h-2" />
+                                        <span className="text-sm text-white font-mono font-bold w-12 text-center">{crashAcceleration.toFixed(2)}</span>
+                                    </div>
+                                </div>
+
+                                {/* Quick Stats Summary */}
+                                <div className="bg-gradient-to-br from-[#0a111a] to-[#0b1a15] border border-emerald-500/20 rounded-2xl p-5">
+                                    <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2 mb-3 flex items-center gap-2">
+                                        <Zap size={14} className="text-amber-400" /> Engine Summary
+                                    </h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                        <div className="flex flex-col items-center gap-1 bg-[#06090c] rounded-xl p-3 border border-white/5">
+                                            <span className="text-slate-500 font-bold">RTP</span>
+                                            <span className="text-xl font-black text-emerald-400">{(100 - crashHouseEdge).toFixed(1)}%</span>
+                                        </div>
+                                        <div className="flex flex-col items-center gap-1 bg-[#06090c] rounded-xl p-3 border border-white/5">
+                                            <span className="text-slate-500 font-bold">Max Mult</span>
+                                            <span className="text-xl font-black text-amber-400">{crashMaxMultiplier >= 1000 ? (crashMaxMultiplier / 1000) + 'K' : crashMaxMultiplier}×</span>
+                                        </div>
+                                        <div className="flex flex-col items-center gap-1 bg-[#06090c] rounded-xl p-3 border border-white/5">
+                                            <span className="text-slate-500 font-bold">Speed</span>
+                                            <span className="text-xl font-black text-cyan-400">{crashAcceleration <= 0.05 ? 'Slow' : crashAcceleration <= 0.09 ? 'Normal' : 'Fast'}</span>
+                                        </div>
+                                        <div className="flex flex-col items-center gap-1 bg-[#06090c] rounded-xl p-3 border border-white/5">
+                                            <span className="text-slate-500 font-bold">Object</span>
+                                            <span className="text-2xl">{crashFlyingObjectImage ? '📸' : crashFlyingObject}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ─── Crash Preview & Publish ────────────────────── */}
+                        {gameType === 'crash' && crashActiveSection === 'preview' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Eye size={16} className="text-cyan-400" /> Live Preview & Test
+                                </h3>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* Engine Preview */}
+                                    <div className="lg:col-span-2 space-y-3">
+                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative" style={{ boxShadow: `0 0 40px ${crashGraphColor}15` }}>
+                                            <iframe
+                                                ref={crashIframeRef}
+                                                src="/engines/crash-engine.html"
+                                                className="w-full h-full border-0"
+                                                sandbox="allow-scripts"
+                                                title="Crash Engine Preview"
+                                            />
+                                            {!crashEngineReady && (
+                                                <div className="absolute inset-0 bg-[#060b11] flex items-center justify-center">
+                                                    <div className="flex flex-col items-center gap-3">
+                                                        <Loader2 className="animate-spin text-emerald-400" size={32} />
+                                                        <span className="text-slate-500 text-sm font-bold uppercase tracking-wider">Loading Crash Engine...</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Test Controls */}
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={handleTestCrash}
+                                                disabled={!crashEngineReady || isTesting}
+                                                className="flex-1 bg-gradient-to-r from-emerald-600 to-green-600 hover:brightness-110 disabled:opacity-50 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
+                                            >
+                                                {isTesting ? <Loader2 className="animate-spin" size={16} /> : <Rocket size={16} />}
+                                                {isTesting ? 'Flying...' : 'Test Flight'}
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    crashIframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
+                                                    setIsTesting(false);
+                                                }}
+                                                className="bg-[#1a2c38] hover:bg-[#2f4553] text-slate-300 px-6 py-3 rounded-xl font-bold flex items-center gap-2 border border-white/5 transition-colors"
+                                            >
+                                                <RotateCcw size={16} /> Reset
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Config Summary & Publish */}
+                                    <div className="space-y-4">
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                            <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2">Configuration</h4>
+                                            <div className="space-y-2 text-xs">
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Type</span><span className="text-emerald-400 font-bold">Crash Game</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">House Edge</span><span className="text-white font-mono">{crashHouseEdge}%</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">RTP</span><span className="text-white font-mono">{(100 - crashHouseEdge).toFixed(1)}%</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Max Mult</span><span className="text-white font-mono">{crashMaxMultiplier}×</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Acceleration</span><span className="text-white font-mono">{crashAcceleration.toFixed(2)}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Object</span><span className="text-lg">{crashFlyingObjectImage ? '📸 Custom' : crashFlyingObject}</span></div>
+                                            </div>
+                                        </div>
+
+                                        {/* JSON Preview */}
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4">
+                                            <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2 mb-3">Engine JSON</h4>
+                                            <pre className="text-[10px] text-slate-400 font-mono overflow-auto max-h-[150px] custom-scrollbar bg-black/30 rounded-lg p-2">
+{JSON.stringify({
+  maxMultiplier: crashMaxMultiplier,
+  houseEdge: crashHouseEdge,
+  rtp: (100 - crashHouseEdge),
+  accelerationCurve: crashAcceleration,
+}, null, 2)}
+                                            </pre>
+                                        </div>
+
+                                        {/* Publish Button */}
+                                        <button
+                                            onClick={handlePublish}
+                                            disabled={isPublishing || !crashGameName.trim() || !crashCoverImage}
+                                            className={`w-full py-4 rounded-xl font-black text-lg tracking-widest uppercase transition-all flex justify-center items-center gap-2 ${isPublishing || !crashGameName.trim() || !crashCoverImage
+                                                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                                : 'bg-gradient-to-r from-emerald-600 to-green-600 text-white hover:brightness-110 hover:-translate-y-1 shadow-[0_5px_20px_rgba(16,185,129,0.3)]'
+                                            }`}
+                                        >
+                                            {isPublishing ? <><Loader2 className="animate-spin" size={20} /> Publishing...</> : <><Save size={20} /> Publish to Lobby</>}
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ════════════════════════════════════════════════════ */}
+                        {/* SCRATCH CARD SECTIONS                               */}
+                        {/* ════════════════════════════════════════════════════ */}
+
+                        {/* ─── Scratch Design & Symbols ─────────────────────── */}
+                        {gameType === 'scratch' && scratchActiveSection === 'design' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Palette size={16} className="text-amber-400" /> Design & Symbols
+                                </h3>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Name & Description */}
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Game Title</label>
+                                            <input type="text" value={scratchGameName} onChange={(e) => setScratchGameName(e.target.value)}
+                                                className="w-full bg-[#0a111a] border border-white/10 focus:border-amber-400 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Description</label>
+                                            <input type="text" value={scratchGameDescription} onChange={(e) => setScratchGameDescription(e.target.value)}
+                                                className="w-full bg-[#0a111a] border border-white/10 focus:border-amber-400 rounded-xl px-4 py-3 text-white text-sm focus:outline-none transition-all" />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Accent Color</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={scratchAccentColor} onChange={(e) => setScratchAccentColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-sm">{scratchAccentColor}</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Background</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={scratchBgColor} onChange={(e) => setScratchBgColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-sm">{scratchBgColor}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Cover & Lobby Image */}
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Scratch Foil Image</label>
+                                            <label className="flex items-center justify-center gap-2 bg-[#0a111a] rounded-xl h-28 border border-dashed border-amber-400/30 hover:border-amber-400 hover:bg-amber-400/5 cursor-pointer transition-all relative overflow-hidden group">
+                                                {scratchCoverImage ? (
+                                                    <>
+                                                        <img src={scratchCoverImage} alt="foil" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500" />
+                                                        <span className="relative z-10 text-xs text-white font-bold bg-amber-500/80 px-4 py-2 rounded-lg backdrop-blur">Change Foil</span>
+                                                    </>
+                                                ) : (
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <Upload size={18} className="text-slate-500 group-hover:text-amber-400 transition-colors" />
+                                                        <span className="text-[11px] text-slate-400 font-bold">Upload Foil Cover (optional)</span>
+                                                    </div>
+                                                )}
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setScratchCoverImage)} />
+                                            </label>
+                                            {scratchCoverImage && (
+                                                <button className="text-[10px] text-slate-500 hover:text-red-400 mt-1 transition-colors" onClick={() => setScratchCoverImage(null)}>Remove</button>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+                                                Lobby Cover Image <span className="text-red-400">*</span>
+                                            </label>
+                                            <label className="relative w-full aspect-video rounded-xl bg-[#0a111a] border border-dashed border-white/20 flex flex-col items-center justify-center overflow-hidden hover:border-amber-400 group cursor-pointer transition-all block">
+                                                {scratchLobbyCover ? (
+                                                    <>
+                                                        <img src={scratchLobbyCover} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
+                                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                            <span className="text-white font-bold bg-white/10 px-4 py-2 rounded-lg border border-white/20 backdrop-blur-md">Change</span>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <ImageIcon size={24} className="text-slate-500 group-hover:text-amber-400 mb-1 transition-colors" />
+                                                        <span className="text-xs text-slate-400 font-bold">Upload Cover</span>
+                                                        <span className="text-[10px] text-red-400/80 mt-1 font-bold">Required to publish</span>
+                                                    </>
+                                                )}
+                                                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => handleFileUpload(e, setScratchLobbyCover)} />
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Symbols Manager */}
+                                <div className="bg-gradient-to-br from-[#0a111a] to-[#1a1508] border border-amber-500/20 rounded-2xl p-5 mt-4">
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-lg">🎨</span>
+                                            <span className="text-xs font-black text-white uppercase tracking-widest">Hidden Symbols</span>
+                                        </div>
+                                        <button onClick={() => {
+                                            const id = 'sc_' + Date.now();
+                                            setScratchSymbols(prev => [...prev, { id, name: 'New', image: '🎯', payout: 5 }]);
+                                        }} className="text-xs bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-bold hover:bg-amber-500/30 transition-colors">
+                                            + Add Symbol
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                                        {scratchSymbols.map((sym) => (
+                                            <div key={sym.id} className="bg-[#0a111a] rounded-xl border border-white/10 p-3 space-y-2 group hover:border-amber-500/30 transition-all">
+                                                <label className="w-12 h-12 mx-auto rounded-lg bg-[#121c22] border border-white/10 flex items-center justify-center cursor-pointer hover:border-amber-400/50 transition-colors relative overflow-hidden group/icon block">
+                                                    {sym.image.startsWith('data:image') || sym.image.startsWith('http') || sym.image.startsWith('/')
+                                                        ? <img src={sym.image} className="w-full h-full object-contain p-1" alt="" />
+                                                        : <span className="text-2xl">{sym.image}</span>
+                                                    }
+                                                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover/icon:opacity-100 flex items-center justify-center transition-opacity">
+                                                        <Upload size={12} className="text-white" />
+                                                    </div>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) {
+                                                            const reader = new FileReader();
+                                                            reader.onloadend = () => {
+                                                                const img = new Image();
+                                                                img.onload = () => {
+                                                                    const canvas = document.createElement('canvas');
+                                                                    const MAX = 128;
+                                                                    let w = img.width, h = img.height;
+                                                                    if (w > h) { if (w > MAX) { h *= MAX / w; w = MAX; } }
+                                                                    else { if (h > MAX) { w *= MAX / h; h = MAX; } }
+                                                                    canvas.width = w; canvas.height = h;
+                                                                    const ctx = canvas.getContext('2d');
+                                                                    ctx?.drawImage(img, 0, 0, w, h);
+                                                                    const dataUrl = canvas.toDataURL('image/webp', 0.85);
+                                                                    setScratchSymbols(prev => prev.map(s => s.id === sym.id ? { ...s, image: dataUrl } : s));
+                                                                };
+                                                                img.src = reader.result as string;
+                                                            };
+                                                            reader.readAsDataURL(file);
+                                                        }
+                                                    }} />
+                                                </label>
+                                                <input type="text" value={sym.name} onChange={(e) => setScratchSymbols(prev => prev.map(s => s.id === sym.id ? { ...s, name: e.target.value } : s))}
+                                                    className="w-full bg-transparent border-b border-white/5 focus:border-amber-400 text-white text-xs font-bold text-center px-1 py-1 focus:outline-none transition-colors" />
+                                                {scratchSymbols.length > 2 && (
+                                                    <button onClick={() => setScratchSymbols(prev => prev.filter(s => s.id !== sym.id))}
+                                                        className="w-full text-[10px] text-slate-600 hover:text-red-400 transition-colors text-center">Remove</button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Brush Shape */}
+                                <div className="bg-gradient-to-br from-[#0a111a] to-[#1a1508] border border-amber-500/20 rounded-2xl p-5">
+                                    <div className="flex items-center gap-2 border-b border-white/5 pb-3 mb-4">
+                                        <span className="text-lg">🖌️</span>
+                                        <span className="text-xs font-black text-white uppercase tracking-widest">Brush Shape</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {BRUSH_SHAPE_PRESETS.map(brush => (
+                                            <button key={brush.id} onClick={() => setScratchBrushShape(brush.id as any)}
+                                                className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${scratchBrushShape === brush.id ? 'bg-gradient-to-b from-amber-500/20 to-amber-600/10 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : 'bg-black/30 border-white/5 hover:bg-white/5'}`}>
+                                                <span className={`text-2xl mb-1 ${scratchBrushShape === brush.id ? 'scale-110' : 'opacity-60'}`}>{brush.emoji}</span>
+                                                <span className={`text-[10px] font-bold uppercase ${scratchBrushShape === brush.id ? 'text-white' : 'text-slate-500'}`}>{brush.label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="mt-3 flex items-center gap-4 bg-[#0a111a] p-3 rounded-xl border border-white/5">
+                                        <label className="text-xs font-bold text-slate-500 whitespace-nowrap">Brush Size</label>
+                                        <input type="range" min="20" max="80" value={scratchBrushSize}
+                                            onChange={(e) => setScratchBrushSize(parseInt(e.target.value))}
+                                            className="flex-1 accent-amber-400 h-2" />
+                                        <span className="text-sm text-white font-mono font-bold w-10 text-center">{scratchBrushSize}px</span>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ─── Scratch Paytable & Odds ─────────────────────── */}
+                        {gameType === 'scratch' && scratchActiveSection === 'paytable' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Zap size={16} className="text-amber-400" /> Paytable & Odds
+                                </h3>
+
+                                {/* Win Probability */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block flex items-center gap-2">
+                                        <ShieldCheck size={14} className="text-amber-400" /> Win Probability
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {WIN_PROBABILITY_PRESETS.map(preset => (
+                                            <button
+                                                key={preset.id}
+                                                onClick={() => setScratchWinProbability(preset.value)}
+                                                className={`p-4 rounded-xl border-2 transition-all text-left ${scratchWinProbability === preset.value
+                                                    ? 'border-amber-500 bg-gradient-to-br from-amber-500/10 to-amber-600/5'
+                                                    : 'border-white/10 bg-[#0a111a] hover:border-white/20'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className={`w-3 h-3 rounded-full ${preset.id === 'rare' ? 'bg-red-400' : preset.id === 'balanced' ? 'bg-amber-400' : 'bg-green-400'}`} />
+                                                    <span className={`text-sm font-black ${scratchWinProbability === preset.value ? 'text-white' : 'text-slate-400'}`}>{preset.label}</span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500">{preset.description}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="mt-3 flex items-center gap-4 bg-[#0a111a] p-3 rounded-xl border border-white/5">
+                                        <label className="text-xs font-bold text-slate-500 whitespace-nowrap">Custom %</label>
+                                        <input type="range" min="5" max="60" step="1" value={scratchWinProbability * 100}
+                                            onChange={(e) => setScratchWinProbability(parseInt(e.target.value) / 100)}
+                                            className="flex-1 accent-amber-400 h-2" />
+                                        <span className="text-sm text-white font-mono font-bold w-12 text-center">{Math.round(scratchWinProbability * 100)}%</span>
+                                    </div>
+                                </div>
+
+                                {/* Grid Size */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block flex items-center gap-2">
+                                        <Grid3X3 size={14} className="text-cyan-400" /> Grid Size
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {(Object.entries(GRID_SIZE_PRESETS) as [string, typeof GRID_SIZE_PRESETS['3x3']][]).map(([key, preset]) => (
+                                            <button
+                                                key={key}
+                                                onClick={() => setScratchGridSize(key as any)}
+                                                className={`p-4 rounded-xl border-2 transition-all text-left ${scratchGridSize === key
+                                                    ? 'border-cyan-500 bg-gradient-to-br from-cyan-500/10 to-cyan-600/5'
+                                                    : 'border-white/10 bg-[#0a111a] hover:border-white/20'
+                                                }`}
+                                            >
+                                                {scratchGridSize === key && <div className="absolute top-3 right-3"><Check size={14} className="text-cyan-400" /></div>}
+                                                <div className="flex gap-1 mb-3">
+                                                    {Array.from({ length: preset.cols }).map((_, c) => (
+                                                        <div key={c} className="flex flex-col gap-1">
+                                                            {Array.from({ length: preset.rows }).map((_, r) => (
+                                                                <div key={r} className={`w-3 h-3 rounded-sm transition-all ${scratchGridSize === key ? 'bg-cyan-500/40' : 'bg-white/10'}`} />
+                                                            ))}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <h4 className={`text-sm font-black mb-1 ${scratchGridSize === key ? 'text-white' : 'text-slate-300'}`}>{preset.label}</h4>
+                                                <p className="text-[10px] text-slate-500">{preset.description}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Symbol Payouts Table */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block">Symbol Payouts (3-match multiplier)</label>
+                                    <div className="bg-[#0a111a] rounded-xl border border-white/10 overflow-hidden">
+                                        <div className="grid grid-cols-[60px_1fr_100px] gap-2 p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-white/5 bg-[#080d14]">
+                                            <div>Icon</div>
+                                            <div>Name</div>
+                                            <div className="text-center">Payout (×bet)</div>
+                                        </div>
+                                        {scratchSymbols.map((sym) => (
+                                            <div key={sym.id} className="grid grid-cols-[60px_1fr_100px] gap-2 p-3 items-center border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                                                <div className="w-10 h-10 rounded-lg bg-[#121c22] border border-white/10 flex items-center justify-center">
+                                                    {sym.image.startsWith('data:image') || sym.image.startsWith('http')
+                                                        ? <img src={sym.image} className="w-full h-full object-contain p-1" alt="" />
+                                                        : <span className="text-lg">{sym.image}</span>
+                                                    }
+                                                </div>
+                                                <span className="text-white text-sm font-bold">{sym.name}</span>
+                                                <input type="number" min="1" step="1" value={sym.payout}
+                                                    onChange={(e) => setScratchSymbols(prev => prev.map(s => s.id === sym.id ? { ...s, payout: parseInt(e.target.value) || 1 } : s))}
+                                                    className="w-full bg-[#0d1520] border border-white/5 text-center text-white font-mono text-sm rounded-lg py-2 focus:outline-none focus:border-amber-400 transition-colors" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ─── Scratch Preview & Publish ───────────────────── */}
+                        {gameType === 'scratch' && scratchActiveSection === 'preview' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Eye size={16} className="text-cyan-400" /> Live Preview & Test
+                                </h3>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* Engine Preview */}
+                                    <div className="lg:col-span-2 space-y-3">
+                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative" style={{ boxShadow: `0 0 40px ${scratchAccentColor}15` }}>
+                                            <iframe
+                                                ref={scratchIframeRef}
+                                                src="/engines/scratch-engine.html"
+                                                className="w-full h-full border-0"
+                                                sandbox="allow-scripts"
+                                                title="Scratch Card Preview"
+                                            />
+                                            {!scratchEngineReady && (
+                                                <div className="absolute inset-0 bg-[#060b11] flex items-center justify-center">
+                                                    <div className="flex flex-col items-center gap-3">
+                                                        <Loader2 className="animate-spin text-amber-400" size={32} />
+                                                        <span className="text-slate-500 text-sm font-bold uppercase tracking-wider">Loading Scratch Engine...</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Test Controls */}
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={handleTestScratch}
+                                                disabled={!scratchEngineReady || isTesting}
+                                                className="flex-1 bg-gradient-to-r from-amber-600 to-yellow-600 hover:brightness-110 disabled:opacity-50 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
+                                            >
+                                                {isTesting ? <Loader2 className="animate-spin" size={16} /> : <Play size={16} />}
+                                                {isTesting ? 'Generating...' : 'New Card'}
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    scratchIframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
+                                                    setIsTesting(false);
+                                                }}
+                                                className="bg-[#1a2c38] hover:bg-[#2f4553] text-slate-300 px-6 py-3 rounded-xl font-bold flex items-center gap-2 border border-white/5 transition-colors"
+                                            >
+                                                <RotateCcw size={16} /> Reset
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Config Summary & Publish */}
+                                    <div className="space-y-4">
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                            <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2">Configuration</h4>
+                                            <div className="space-y-2 text-xs">
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Type</span><span className="text-amber-400 font-bold">Scratch Card</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Grid</span><span className="text-white font-mono">{scratchGridSize}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Symbols</span><span className="text-white font-mono">{scratchSymbols.length}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Win Rate</span><span className="text-white font-mono">{Math.round(scratchWinProbability * 100)}%</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Brush</span><span className="text-white capitalize">{scratchBrushShape}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Custom Foil</span><span className={scratchCoverImage ? 'text-green-400' : 'text-slate-600'}>{scratchCoverImage ? '✓' : '✗'}</span></div>
+                                            </div>
+                                        </div>
+
+                                        {/* JSON Preview */}
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4">
+                                            <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2 mb-3">Engine JSON</h4>
+                                            <pre className="text-[10px] text-slate-400 font-mono overflow-auto max-h-[150px] custom-scrollbar bg-black/30 rounded-lg p-2">
+{JSON.stringify({
+  gridSize: scratchGridSize,
+  winProbability: scratchWinProbability,
+  brushShape: scratchBrushShape,
+  symbolCount: scratchSymbols.length,
+  payouts: scratchSymbols.map(s => ({ name: s.name, payout: s.payout })),
+}, null, 2)}
+                                            </pre>
+                                        </div>
+
+                                        {/* Publish Button */}
+                                        <button
+                                            onClick={handlePublish}
+                                            disabled={isPublishing || !scratchGameName.trim() || !scratchLobbyCover}
+                                            className={`w-full py-4 rounded-xl font-black text-lg tracking-widest uppercase transition-all flex justify-center items-center gap-2 ${isPublishing || !scratchGameName.trim() || !scratchLobbyCover
+                                                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                                : 'bg-gradient-to-r from-amber-600 to-yellow-600 text-white hover:brightness-110 hover:-translate-y-1 shadow-[0_5px_20px_rgba(245,158,11,0.3)]'
+                                            }`}
+                                        >
+                                            {isPublishing ? <><Loader2 className="animate-spin" size={20} /> Publishing...</> : <><Save size={20} /> Publish to Lobby</>}
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
 
                     </div>
                 )}

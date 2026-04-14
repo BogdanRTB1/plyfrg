@@ -93,21 +93,15 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
         if (!isOpen) {
             // Save session to history if any bets were made
             if (sessionWagered > 0) {
-                const hist = JSON.parse(localStorage.getItem('playforges_history') || '[]');
-                hist.unshift({
-                    id: `session_${Math.floor(Math.random()*100000)}`,
-                    game: "Heist",
-                    image: "/images/game-heist-v2.png",
-                    time: new Date().toLocaleString(),
-                    bet: sessionWagered,
-                    multiplier: sessionWagered > 0 ? (sessionPayout / sessionWagered) : 0,
-                    payout: sessionPayout,
-                    status: (sessionPayout >= sessionWagered) ? 'win' : 'loss',
-                    provablyFair: "Verify",
-                    currency: currencyType
-                });
-                localStorage.setItem('playforges_history', JSON.stringify(hist.slice(0, 50)));
-                window.dispatchEvent(new Event('history_updated'));
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: "Heist", 
+                        gameImage: "/images/game-heist-v2.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
                 
                 // Reset session
                 setSessionWagered(0);

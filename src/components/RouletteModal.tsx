@@ -59,8 +59,14 @@ export default function RouletteModal({ isOpen, onClose, diamonds, setDiamonds, 
 
         setGameState('SPINNING');
 
-        // Pick random 0-36
-        const winningNumber = Math.floor(Math.random() * 37);
+        // Pick random 0-36, but rig it towards loss
+        let winningNumber = Math.floor(Math.random() * 37);
+        if (Math.random() < 0.60) {
+            // 60% chance to force a losing number
+            while (ROULETTE_CONFIG.segments[winningNumber].color === targetChoice) {
+                winningNumber = Math.floor(Math.random() * 37);
+            }
+        }
         const winningSegment = ROULETTE_CONFIG.segments[winningNumber];
 
         // Calculate rotation
@@ -110,21 +116,15 @@ export default function RouletteModal({ isOpen, onClose, diamonds, setDiamonds, 
         if (!isOpen) {
              // Save session to history if any bets were made
              if (sessionWagered > 0) {
-                const hist = JSON.parse(localStorage.getItem('playforges_history') || '[]');
-                hist.unshift({
-                    id: `session_${Math.floor(Math.random()*100000)}`,
-                    game: "Roulette",
-                    image: "/images/game-roulette.png",
-                    time: new Date().toLocaleString(),
-                    bet: sessionWagered,
-                    multiplier: sessionWagered > 0 ? (sessionPayout / sessionWagered) : 0,
-                    payout: sessionPayout,
-                    status: (sessionPayout >= sessionWagered) ? 'win' : 'loss',
-                    provablyFair: "Verify",
-                    currency: currencyType
-                });
-                localStorage.setItem('playforges_history', JSON.stringify(hist.slice(0, 50)));
-                window.dispatchEvent(new Event('history_updated'));
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: "Roulette", 
+                        gameImage: "/images/game-roulette.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
                 
                 // Reset session
                 setSessionWagered(0);

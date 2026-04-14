@@ -40,19 +40,56 @@ export default function HistoryContent() {
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
 
+        let allHistory: any[] = [];
         if (data) {
-            const formatted: GameSession[] = data.map(session => ({
-                id: session.id.substring(0, 8),
-                game: session.game_name,
-                image: session.game_image || '/images/game-placeholder.png',
-                time: new Date(session.created_at).toLocaleString('ro-RO'),
-                bet: Number(session.wagered),
-                multiplier: Number(session.wagered) > 0 ? Number(session.payout) / Number(session.wagered) : 0,
-                payout: Number(session.payout),
-                status: session.status as 'win' | 'loss',
-                currency: session.currency as 'GC' | 'FC'
-            }));
+             allHistory = [...data];
+        }
+
+        try {
+             const local = JSON.parse(localStorage.getItem('user_history_local') || '[]');
+             const bridgeLocal = JSON.parse(localStorage.getItem('playforges_history') || '[]');
+             allHistory = [...bridgeLocal, ...local, ...allHistory];
+        } catch (e) {}
+
+        // De-duplicate history entries (Supabase sync vs Local instant fallback)
+        const uniqueSessions = new Map();
+        allHistory.forEach(session => {
+            const baseTime = session.created_at || session.time || session.date || '';
+            const timeKey = baseTime.substring(0, 16); // matches up to the minute
+            const key = `${session.game_name || session.game}_${session.wagered ?? session.bet}_${timeKey}`;
+            // Prioritize Supabase entry (it usually has a robust UUID instead of a local random ID)
+            if (!uniqueSessions.has(key) || (session.id && String(session.id).length > 15)) {
+                uniqueSessions.set(key, session);
+            }
+        });
+        
+        allHistory = Array.from(uniqueSessions.values());
+        allHistory.sort((a,b) => {
+            const dateA = new Date(a.created_at || a.time || a.date || 0).getTime();
+            const dateB = new Date(b.created_at || b.time || b.date || 0).getTime();
+            return dateB - dateA;
+        });
+
+        if (allHistory.length > 0) {
+            const formatted: GameSession[] = allHistory.map(session => {
+                const safeBet = Number(session.wagered ?? session.bet ?? 0);
+                const safePayout = Number(session.payout ?? 0);
+                const timeString = session.created_at || session.time || session.date;
+                return {
+                    id: session.id ? String(session.id).substring(0, 8) : Math.random().toString(36).substring(2, 9),
+                    game: session.game_name || session.game || 'Unknown Game',
+                    image: session.game_image || '/images/game-placeholder.png',
+                    time: timeString ? new Date(timeString).toLocaleString('ro-RO') : new Date().toLocaleString('ro-RO'),
+                    bet: safeBet,
+                    multiplier: safeBet > 0 ? safePayout / safeBet : 0,
+                    payout: safePayout,
+                    status: (session.status as 'win' | 'loss') || (safePayout >= safeBet ? 'win' : 'loss'),
+                    currency: (session.currency as 'GC' | 'FC') || 'FC'
+                };
+            });
             setHistoryData(formatted);
+        } else {
+            setHistoryData([]);
         }
         setLoading(false);
     };
@@ -71,9 +108,15 @@ export default function HistoryContent() {
         return true;
     });
 
-    const totalWagered = historyData.reduce((acc, curr) => acc + curr.bet, 0);
-    const totalPayout = historyData.reduce((acc, curr) => acc + curr.payout, 0);
-    const totalProfit = totalPayout - totalWagered;
+    const fcData = historyData.filter(d => d.currency !== 'GC'); // Default everything to FC if undefined
+    const totalWageredFC = fcData.reduce((acc, curr) => acc + curr.bet, 0);
+    const totalPayoutFC = fcData.reduce((acc, curr) => acc + curr.payout, 0);
+    const totalProfitFC = totalPayoutFC - totalWageredFC;
+
+    const gcData = historyData.filter(d => d.currency === 'GC');
+    const totalWageredGC = gcData.reduce((acc, curr) => acc + curr.bet, 0);
+    const totalPayoutGC = gcData.reduce((acc, curr) => acc + curr.payout, 0);
+    const totalProfitGC = totalPayoutGC - totalWageredGC;
 
     const container = {
         hidden: { opacity: 0 },
@@ -117,24 +160,26 @@ export default function HistoryContent() {
                                 <TrendingUp size={24} />
                             </div>
                             <div>
-                                <p className="text-xs text-slate-500 font-bold uppercase">Total Profit</p>
+                                <p className="text-xs text-slate-500 font-bold uppercase">FC Profit</p>
                                 <div className="flex items-center gap-1.5">
-                                    <p className={`text-xl font-bold ${totalProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                        {totalProfit >= 0 ? '+' : ''}{totalProfit.toFixed(2)}
+                                    <p className={`text-xl font-bold ${totalProfitFC >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                        {totalProfitFC >= 0 ? '+' : ''}{totalProfitFC.toFixed(2)}
                                     </p>
                                     <ForgesCoinIcon className="w-5 h-5" />
                                 </div>
                             </div>
                         </div>
                         <div className="bg-[#0f212e] border border-white/5 rounded-xl p-4 flex items-center gap-4 min-w-[180px]">
-                            <div className="p-3 bg-amber-500/10 rounded-lg text-amber-500">
-                                <Coins size={24} />
+                            <div className="p-3 bg-blue-500/10 rounded-lg text-blue-500">
+                                <TrendingUp size={24} />
                             </div>
                             <div>
-                                <p className="text-xs text-slate-500 font-bold uppercase">Wagered</p>
+                                <p className="text-xs text-slate-500 font-bold uppercase">Diamond Profit</p>
                                 <div className="flex items-center gap-1.5">
-                                    <p className="text-xl font-bold text-white">{totalWagered.toFixed(2)}</p>
-                                    <ForgesCoinIcon className="w-5 h-5" />
+                                    <p className={`text-xl font-bold ${totalProfitGC >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
+                                        {totalProfitGC >= 0 ? '+' : ''}{totalProfitGC.toFixed(2)}
+                                    </p>
+                                    <DiamondIcon className="w-5 h-5" />
                                 </div>
                             </div>
                         </div>
@@ -182,7 +227,12 @@ export default function HistoryContent() {
                                             <td className="p-4 pl-6 font-bold text-white whitespace-nowrap">{session.game}</td>
                                             <td className="p-4 text-sm text-slate-400 whitespace-nowrap opacity-60 group-hover:opacity-100 transition-opacity">{session.time}</td>
                                             <td className="p-4 text-right text-slate-300 font-mono">
-                                                {session.bet.toFixed(2)} <ForgesCoinIcon className="inline w-4 h-4 ml-1 align-sub" />
+                                                {session.bet.toFixed(2)} 
+                                                {session.currency === 'GC' ? (
+                                                     <DiamondIcon className="inline w-4 h-4 ml-1 align-sub" />
+                                                ) : (
+                                                     <ForgesCoinIcon className="inline w-4 h-4 ml-1 align-sub" />
+                                                )}
                                             </td>
                                             <td className="p-4 text-right">
                                                 <span className={`px-2 py-1 rounded text-xs font-black tracking-tight ${session.payout > session.bet ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
@@ -190,7 +240,12 @@ export default function HistoryContent() {
                                                 </span>
                                             </td>
                                             <td className={`p-4 text-right font-black ${session.payout - session.bet >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                {(session.payout - session.bet).toFixed(2)} <ForgesCoinIcon className="inline w-4 h-4 ml-1 align-sub" />
+                                                {(session.payout - session.bet).toFixed(2)}
+                                                {session.currency === 'GC' ? (
+                                                     <DiamondIcon className="inline w-4 h-4 ml-1 align-sub" />
+                                                ) : (
+                                                     <ForgesCoinIcon className="inline w-4 h-4 ml-1 align-sub" />
+                                                )}
                                             </td>
                                             <td className="p-4 text-center">
                                                 <div className="flex justify-center transition-transform group-hover:scale-110">

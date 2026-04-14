@@ -27,6 +27,10 @@ export default function FootballModal({ isOpen, onClose, diamonds, setDiamonds, 
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC', mult: number } | null>(null);
 
+    // Session Tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const [gameState, setGameState] = useState<'IDLE' | 'SHOOTING' | 'FINISHED'>('IDLE');
     const [result, setResult] = useState<'SCORE' | 'PARRIED' | null>(null);
     const [mult, setMult] = useState(0);
@@ -41,6 +45,8 @@ export default function FootballModal({ isOpen, onClose, diamonds, setDiamonds, 
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         setGameState('SHOOTING');
         setResult(null);
@@ -74,6 +80,8 @@ export default function FootballModal({ isOpen, onClose, diamonds, setDiamonds, 
             } else {
                 setForgesCoins((prev: number) => prev + winAmount);
             }
+
+        setSessionPayout(prev => prev + winAmount);
 
             if (multiplier >= 1.5) {
                 confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });

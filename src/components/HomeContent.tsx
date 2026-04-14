@@ -20,6 +20,7 @@ import {
     Instagram,
     Youtube
 } from "lucide-react";
+import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import GameCard from "./GameCard";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
@@ -286,7 +287,10 @@ export default function HomeContent() {
                                     </div>
                                     <div className="text-slate-300 font-medium truncate">{win.user}</div>
                                     <div className="text-right font-bold text-[#00b9f0]">{win.multiplier}x</div>
-                                    <div className="text-right font-black text-green-400 pr-2 shadow-green-500/10 drop-shadow-sm">{win.payout}</div>
+                                    <div className="text-right font-black text-green-400 pr-2 shadow-green-500/10 drop-shadow-sm flex items-center justify-end gap-1.5">
+                                        <ForgesCoinIcon className="w-4 h-4 dropshadow-green" />
+                                        {win.payout.replace(' FC', '')}
+                                    </div>
                                 </div>
                             ))}
                         </div>

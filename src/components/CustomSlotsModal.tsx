@@ -14,6 +14,10 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
 
+    // Session Tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const [gameState, setGameState] = useState<'IDLE' | 'SPINNING' | 'WON' | 'LOST'>('IDLE');
     const [reels, setReels] = useState<number[]>([1, 1, 1]);
     const [spinningReels, setSpinningReels] = useState<boolean[]>([false, false, false]);
@@ -29,6 +33,8 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         setGameState('SPINNING');
         setWinMultiplier(0);
@@ -68,6 +74,8 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
                     setForgesCoins((prev: number) => prev + winAmount);
                 }
 
+        setSessionPayout(prev => prev + winAmount);
+
                 confetti({ particleCount: 150, spread: 80, origin: { y: 0.5 } });
             } else {
                 setGameState('LOST');
@@ -84,9 +92,26 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
 
     useEffect(() => {
         if (!isOpen) {
+            // Save session to history if any bets were made
+            if (sessionWagered > 0) {
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: gameData?.name || "Custom Game", 
+                        gameImage: gameData?.coverImage || "/images/game-placeholder.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
+                // Reset session
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
+
             setGameState('IDLE');
+        
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout, currencyType, gameData]);
 
     if (!isOpen || !gameData) return null;
     if (typeof document === "undefined") return null;

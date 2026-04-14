@@ -37,6 +37,10 @@ export default function AviatorModal({ isOpen, onClose, diamonds, setDiamonds, f
     const [autoCashout, setAutoCashout] = useState<number | string>('');
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC', mult: number } | null>(null);
 
+    // Session Tracking
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
+
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'CRASHED'>('IDLE');
     const [cashedOutAt, setCashedOutAt] = useState<number | null>(null);
     const [multiplier, setMultiplier] = useState(1.00);
@@ -71,6 +75,8 @@ export default function AviatorModal({ isOpen, onClose, diamonds, setDiamonds, f
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+
+        setSessionWagered(prev => prev + betAmount);
 
         const cp = generateCrashPoint();
         crashPointRef.current = cp;
@@ -219,6 +225,8 @@ export default function AviatorModal({ isOpen, onClose, diamonds, setDiamonds, f
             setForgesCoins((prev: number) => prev + winAmount);
         }
 
+        setSessionPayout(prev => prev + winAmount);
+
         confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
     };
 
@@ -231,6 +239,21 @@ export default function AviatorModal({ isOpen, onClose, diamonds, setDiamonds, f
 
     useEffect(() => {
         if (!isOpen) {
+            // Save session to history if any bets were made
+            if (sessionWagered > 0) {
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: { 
+                        gameName: "Aviator Influencer", 
+                        gameImage: "/images/game-aviator.png", 
+                        wagered: sessionWagered, 
+                        payout: sessionPayout, 
+                        currency: currencyType 
+                    }
+                }));
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
+
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
             setGameState('IDLE');
             setMultiplier(1.00);
@@ -242,8 +265,9 @@ export default function AviatorModal({ isOpen, onClose, diamonds, setDiamonds, f
             }
         } else {
             setTimeout(() => drawGraph(0, 1.0, false), 100);
+        
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout, currencyType]);
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;

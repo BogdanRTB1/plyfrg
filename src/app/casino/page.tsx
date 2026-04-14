@@ -4,56 +4,33 @@ import { Dices, Search, Filter, Sparkles, TrendingUp } from "lucide-react";
 import GameCard from "@/components/GameCard";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import PlinkoModal from "@/components/PlinkoModal";
-import MinesModal from "@/components/MinesModal";
-import SlotsModal from "@/components/SlotsModal";
-import BlackjackModal from "@/components/BlackjackModal";
-import RouletteModal from "@/components/RouletteModal";
-import CrashModal from "@/components/CrashModal";
-import SneakModal from "@/components/SneakModal";
-import DartWheelModal from "@/components/DartWheelModal";
-import AviatorModal from "@/components/AviatorModal";
-import AIGameModal from "@/components/AIGameModal";
 
 export default function CasinoPage() {
     const allGames = [
-        // Influencer Games (Top Priority)
-        { name: "Ninja's Crash", image: "/images/game-crash.png", rtp: "98.5%", provider: "@Ninja", badge: "Hot" },
-        { name: "Plinko by xQc", image: "/images/game-plinko.png", rtp: "99.0%", provider: "@xQc" },
-        { name: "Pixel Poker", image: null, rtp: "98.0%", provider: "@RetroGamer" },
-        { name: "Crypto Quest", image: null, rtp: "95.5%", provider: "@TechnoKing", badge: "Featured" },
-
-        // Other Popular Games
-        { name: "Minesweeper Pro", image: "/images/game-mines.png", rtp: "98.5%", provider: "InfluenBet" },
-        { name: "Cosmic Slots", image: "/images/game-slots.png", rtp: "96.5%", provider: "GalaxyGames" },
-        { name: "High Roller Blackjack", image: "/images/game-blackjack.png", rtp: "99.5%", provider: "TableMasters" },
-        { name: "Neon Roulette", image: "/images/game-roulette.png", rtp: "97.3%", provider: "CyberSlots" },
-        { name: "Dragon's Luck", image: null, rtp: "96.0%", provider: "Provider X", badge: "New" },
-        { name: "Space Gems", image: null, rtp: "97.0%", provider: "StarStudios" },
-        { name: "Wild West Shootout", image: null, rtp: "96.2%", provider: "WesternGaming" },
-        { name: "Cyberpunk Dice", image: null, rtp: "99.0%", provider: "CyberSlots" },
-        { name: "Secret Sneak", image: "/images/game-secret-sneak.png", rtp: "97.5%", provider: "StealthGames" },
-        { name: 'Dart Wheel', image: '/images/game-dart-wheel.png', rtp: "96.8%", provider: "SpinMasters" },
-        { name: 'Aviator', image: '/images/game-aviator.png', rtp: "97.0%", provider: "SkyHighGames" }
+        { name: "Crash", image: "/images/game-crash.png", rtp: "98.5%", provider: "InfluenBet", badge: "Hot" },
+        { name: "Plinko", image: "/images/game-plinko.png", rtp: "99.0%", provider: "InfluenBet" },
+        { name: "Mines", image: "/images/game-mines.png", rtp: "98.5%", provider: "InfluenBet" },
+        { name: "Slots", image: "/images/game-slots.png", rtp: "96.5%", provider: "InfluenBet" },
+        { name: "Blackjack", image: "/images/game-blackjack.png", rtp: "99.5%", provider: "InfluenBet" },
+        { name: "Roulette", image: "/images/game-roulette.png", rtp: "97.3%", provider: "InfluenBet" },
+        { name: "Aviator", image: "/images/game-aviator.png", rtp: "97.0%", provider: "InfluenBet" },
+        { name: "Dart Wheel", image: "/images/game-darts.png", rtp: "98.0%", provider: "InfluenBet" },
+        { name: "Penalty", image: "/images/game-penalty.png", rtp: "96.0%", provider: "InfluenBet" },
+        { name: "Glass Bridge", image: "/images/game-bridge.png", rtp: "95.5%", provider: "InfluenBet", badge: "New" },
+        { name: "Wanted", image: "/images/game-wanted.png", rtp: "96.8%", provider: "InfluenBet" },
+        { name: "Escape", image: "/images/game-escape.png", rtp: "97.5%", provider: "InfluenBet" },
+        { name: "Secret Sneak", image: "/images/game-secret-sneak.png", rtp: "97.5%", provider: "InfluenBet" },
+        { name: "Bomb Defuse", image: null, rtp: "95.5%", provider: "InfluenBet" },
+        { name: "Tomatoes", image: null, rtp: "98.5%", provider: "InfluenBet" },
+        { name: "Heist", image: null, rtp: "98.1%", provider: "InfluenBet" },
     ];
 
-    const categories = ["All Games", "Influencers", "Slots", "Live Casino", "Table Games", "New Releases"];
-
-    const [isPlinkoOpen, setIsPlinkoOpen] = useState(false);
-    const [isMinesOpen, setIsMinesOpen] = useState(false);
-    const [isSlotsOpen, setIsSlotsOpen] = useState(false);
-    const [isBlackjackOpen, setIsBlackjackOpen] = useState(false);
-    const [isRouletteOpen, setIsRouletteOpen] = useState(false);
-    const [isCrashOpen, setIsCrashOpen] = useState(false);
-    const [isSneakOpen, setIsSneakOpen] = useState(false);
-    const [isDartOpen, setIsDartOpen] = useState(false);
-    const [isAviatorOpen, setIsAviatorOpen] = useState(false);
+    const categories = ["All Games", "Trending", "New Releases", "Table Games", "Instant Win"];
 
     // AI / Custom game states
     const [customGames, setCustomGames] = useState<any[]>([]);
-    const [activeCustomGame, setActiveCustomGame] = useState<any>(null);
-    const [isAIGameOpen, setIsAIGameOpen] = useState(false);
 
+    // Balance & User state for potential other uses (if any left, though mostly removed)
     const [diamonds, setDiamonds] = useState(0);
     const [forgesCoins, setForgesCoins] = useState(0);
 
@@ -89,6 +66,10 @@ export default function CasinoPage() {
         window.addEventListener('storage', fetchCustomGames);
         return () => window.removeEventListener('storage', fetchCustomGames);
     }, []);
+
+    const playNow = (game: any) => {
+        window.dispatchEvent(new CustomEvent('open_game', { detail: game }));
+    };
 
     return (
         <div className="flex-1 h-full overflow-y-auto bg-[#050505] relative custom-scrollbar p-6 md:p-10 pb-32 z-0">
@@ -187,17 +168,7 @@ export default function CasinoPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 * (index % 10) }}
                     >
-                        <div className="relative h-full cursor-pointer" onClick={() => {
-                            if (game.name.includes('Plinko')) setIsPlinkoOpen(true);
-                            if (game.name.includes('Minesweeper')) setIsMinesOpen(true);
-                            if (game.name.includes('Slots')) setIsSlotsOpen(true);
-                            if (game.name.includes('Blackjack')) setIsBlackjackOpen(true);
-                            if (game.name.includes('Roulette')) setIsRouletteOpen(true);
-                            if (game.name === 'Crash') setIsCrashOpen(true);
-                            if (game.name === 'Secret Sneak') setIsSneakOpen(true);
-                            if (game.name === 'Dart Wheel') setIsDartOpen(true);
-                            if (game.name === 'Aviator') setIsAviatorOpen(true);
-                        }}>
+                        <div className="relative h-full cursor-pointer" onClick={() => playNow(game.name)}>
                             <GameCard
                                 name={game.name}
                                 image={game.image || ""}
@@ -240,10 +211,7 @@ export default function CasinoPage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.05 * index }}
                             >
-                                <div className="relative h-full cursor-pointer" onClick={() => {
-                                    setActiveCustomGame(game);
-                                    if (game.type === 'ai_generated' || game.type === 'manual_template') setIsAIGameOpen(true);
-                                }}>
+                                <div className="relative h-full cursor-pointer" onClick={() => playNow(game)}>
                                     <GameCard
                                         name={game.name}
                                         image={game.coverImage || ""}
@@ -260,25 +228,6 @@ export default function CasinoPage() {
                         ))}
                     </div>
                 </motion.div>
-            )}
-
-            <PlinkoModal isOpen={isPlinkoOpen} onClose={() => setIsPlinkoOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-            <MinesModal isOpen={isMinesOpen} onClose={() => setIsMinesOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-            <SlotsModal isOpen={isSlotsOpen} onClose={() => setIsSlotsOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-            <BlackjackModal isOpen={isBlackjackOpen} onClose={() => setIsBlackjackOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-            <RouletteModal isOpen={isRouletteOpen} onClose={() => setIsRouletteOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-            <CrashModal isOpen={isCrashOpen} onClose={() => setIsCrashOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-            <SneakModal isOpen={isSneakOpen} onClose={() => setIsSneakOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-            <DartWheelModal isOpen={isDartOpen} onClose={() => setIsDartOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-            <AviatorModal isOpen={isAviatorOpen} onClose={() => setIsAviatorOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-
-            {activeCustomGame && (
-                <AIGameModal
-                    isOpen={isAIGameOpen}
-                    onClose={() => { setIsAIGameOpen(false); setActiveCustomGame(null); }}
-                    gameData={activeCustomGame}
-                    diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins}
-                />
             )}
 
         </div>

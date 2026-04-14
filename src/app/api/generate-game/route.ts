@@ -3,6 +3,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+// @ts-ignore
+import { JSDOM, VirtualConsole } from 'jsdom';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
@@ -93,10 +95,10 @@ AUDIO INTEGRATION:
    \`\`\`js
    const roll = Math.random();
    let multiplier = 0; // default: loss
-   if (roll < 0.05)      multiplier = 25;  // 5% jackpot
-   else if (roll < 0.15) multiplier = 5;   // 10% big win
-   else if (roll < 0.40) multiplier = 1.5; // 25% small win
-   // else multiplier stays 0 — 60% loss
+   if (roll < 0.01)      multiplier = 25;  // 1% jackpot
+   else if (roll < 0.06) multiplier = 5;   // 5% big win
+   else if (roll < 0.25) multiplier = 1.5; // 19% small win
+   // else multiplier stays 0 — 75% loss
    \`\`\`
    This EXACT distribution must be in every game. Adjust the multiplier display values for flavor but the thresholds MUST remain.
 
@@ -160,8 +162,8 @@ export async function POST(req: Request) {
            } catch (e: any) {
                console.error(`Gemini API Error (Attempt ${i + 1}/${maxRetries}):`, e.message || e);
                lastError = e;
-               // Wait 2 seconds before retrying
-               await new Promise(resolve => setTimeout(resolve, 2000));
+               // Wait 2.5 seconds before retrying to prevent infinite loading times
+               await new Promise(resolve => setTimeout(resolve, 2500 * (i + 1)));
            }
        }
        throw lastError;
@@ -179,10 +181,10 @@ export async function POST(req: Request) {
          return NextResponse.json({ error: 'AI Setup Incomplete' }, { status: 500 });
       }
       const model = genAI.getGenerativeModel({
-         model: "gemini-2.5-flash",
+         model: "gemini-2.5-pro",
          generationConfig: {
             temperature: 0.65,
-            maxOutputTokens: 16384,
+            maxOutputTokens: 8192,
          }
       });
 
@@ -241,7 +243,7 @@ ${text}
 
 VERIFICATION CHECKLIST — check EVERY item:
 1. Does \`startGame(bet)\` contain the EXACT outcome distribution pattern?
-   \`const roll = Math.random(); let multiplier = 0; if (roll < 0.05) multiplier = 25; else if (roll < 0.15) multiplier = 5; else if (roll < 0.40) multiplier = 1.5;\`
+   \`const roll = Math.random(); let multiplier = 0; if (roll < 0.01) multiplier = 25; else if (roll < 0.06) multiplier = 5; else if (roll < 0.25) multiplier = 1.5;\`
    If this pattern is missing or different thresholds are used, ADD IT.
 2. Does \`startGame\` call \`sendResult(multiplier)\` AT THE END after animations complete? This is MANDATORY.
 3. Is there a safety timeout at the TOP of startGame: \`setTimeout(() => { if (!_resultSent) sendResult(0); }, 6000);\`? If not, ADD IT.
@@ -406,7 +408,92 @@ setTimeout(function() { parent.postMessage({ type: 'GAME_READY' }, '*'); }, 1500
 
               if (!parsedData.gameName || !parsedData.htmlCode) throw new Error('Missing required JSON fields (gameName or htmlCode)');
 
-              console.log("Static Analysis Passed! Game is valid.");
+              // DYNAMIC EXECUTION TESTING via JSDOM
+              console.log("Running Dynamic Execution Test via JSDOM...");
+              
+              const virtualConsole = new VirtualConsole();
+              // Prevent JSDOM errors from breaking the server log too much
+              virtualConsole.on("error", () => {});
+              virtualConsole.on("warn", () => {});
+              virtualConsole.on("jsdomError", () => {});
+              
+              const dom = new JSDOM(parsedData.htmlCode, { 
+                  runScripts: "dangerously",
+                  resources: "usable",
+                  virtualConsole,
+                  beforeParse(window: any) {
+                      // Mock canvas to prevent crashes if game uses it
+                      window.HTMLCanvasElement.prototype.getContext = function () {
+                          return {
+                              fillRect: () => {}, clearRect: () => {}, getImageData: () => ({ data: [] }),
+                              putImageData: () => {}, createImageData: () => ({}), setTransform: () => {},
+                              drawImage: () => {}, save: () => {}, fillText: () => {}, restore: () => {},
+                              beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, closePath: () => {},
+                              stroke: () => {}, translate: () => {}, scale: () => {}, rotate: () => {},
+                              arc: () => {}, fill: () => {}, measureText: () => ({ width: 0 }),
+                              transform: () => {}, rect: () => {}, clip: () => {},
+                          };
+                      };
+                      // Mock Audio
+                      window.Audio = function() { return { play: () => {}, pause: () => {}, load: () => {} }; };
+                  }
+              });
+
+              let results: any[] = [];
+              dom.window.parent = {
+                  postMessage: (msg: any) => {
+                      if (msg && msg.type === 'GAME_RESULT') {
+                          results.push(msg);
+                      }
+                  }
+              };
+
+              const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+              try {
+                  // Wait for init
+                  await sleep(500);
+                  
+                  // TEST 1: First Start
+                  dom.window.postMessage({ type: 'START_GAME', bet: 10 }, '*');
+                  
+                  // Wait up to 6.5s to see if a result is sent
+                  let waitedFor = 0;
+                  while (results.length === 0 && waitedFor < 6500) {
+                      await sleep(200);
+                      waitedFor += 200;
+                  }
+
+                  if (results.length === 0) {
+                      throw new Error("Dynamic Test Failed: Game did not return GAME_RESULT within 6.5s on first play.");
+                  }
+                  
+                  console.log("First play passed.");
+
+                  // TEST 2: Reset and Play Again
+                  dom.window.postMessage({ type: 'RESET' }, '*');
+                  await sleep(200);
+                  
+                  let initialResultsCount = results.length;
+                  dom.window.postMessage({ type: 'START_GAME', bet: 10 }, '*');
+                  
+                  waitedFor = 0;
+                  while (results.length === initialResultsCount && waitedFor < 6500) {
+                      await sleep(200);
+                      waitedFor += 200;
+                  }
+
+                  if (results.length === initialResultsCount) {
+                      throw new Error("Dynamic Test Failed: Game did not return GAME_RESULT on the second play (after RESET).");
+                  }
+
+                  console.log("Second play passed.");
+              } finally {
+                  // Cleanup memory
+                  dom.window.close();
+              }
+
+              console.log("Static and Dynamic Analysis Passed! Game is perfectly valid.");
               validGameData = parsedData;
               break; // Success! Exit the loop.
 
