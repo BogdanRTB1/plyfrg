@@ -20,6 +20,20 @@ import {
   ScratchConfig, ScratchSymbol, DEFAULT_SCRATCH_CONFIG, DEFAULT_SCRATCH_SYMBOLS,
   GRID_SIZE_PRESETS, BRUSH_SHAPE_PRESETS, WIN_PROBABILITY_PRESETS
 } from '@/types/scratchConfig';
+import {
+  WheelConfig, WheelSegment, DEFAULT_WHEEL_CONFIG, DEFAULT_WHEEL_SEGMENTS,
+  POINTER_PRESETS, TEXTURE_PRESETS, TICK_SOUND_PRESETS, SEGMENT_COLORS
+} from '@/types/wheelConfig';
+import {
+  MinesConfig, MinesGridSize, DEFAULT_MINES_CONFIG,
+  GRID_SIZE_PRESETS as MINES_GRID_PRESETS, BUST_ANIMATION_PRESETS, LOSS_SOUND_PRESETS
+} from '@/types/minesConfig';
+import {
+  CaseConfig, CaseItem, CaseRarity, DEFAULT_CASE_CONFIG, CASE_DESIGN_PRESETS, OPENING_SOUND_PRESETS, SCROLL_SPEED_PRESETS, RARITY_CONFIG
+} from '@/types/caseConfig';
+import {
+  HiLoConfig, DEFAULT_HILO_CONFIG, HILO_DEAL_SOUNDS, HILO_LOSS_SOUNDS
+} from '@/types/hiloConfig';
 
 // ─── Sound Helper ──────────────────────────────────────────────────────────
 const playSynthSound = (type: string) => {
@@ -66,7 +80,7 @@ const WIN_EFFECTS = [
     { id: 'none', icon: '❌', name: 'None' },
 ];
 
-type GameType = 'slots' | 'crash' | 'scratch';
+type GameType = 'slots' | 'crash' | 'scratch' | 'wheel' | 'mines' | 'case' | 'hilo';
 
 interface CreatorGameStudioProps {
     creatorData: any;
@@ -76,6 +90,17 @@ interface CreatorGameStudioProps {
 export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGameStudioProps) {
     // ─── Game Type ────────────────────────────────────────────────────────
     const [gameType, setGameType] = useState<GameType>('slots');
+    const [isGameDropdownOpen, setIsGameDropdownOpen] = useState(false);
+
+    const GAME_TYPES_INFO = [
+        { id: 'slots', label: 'Slot Machine', icon: '🎰', desc: 'Classic reels & paytable', style: 'border-purple-500 bg-purple-500/10 text-purple-400', iconBg: 'bg-purple-500/20' },
+        { id: 'crash', label: 'Crash Game', icon: '🚀', desc: 'Multiplier rises & cash out', style: 'border-emerald-500 bg-emerald-500/10 text-emerald-400', iconBg: 'bg-emerald-500/20' },
+        { id: 'scratch', label: 'Scratch Card', icon: '🎟️', desc: 'Scratch to reveal & win', style: 'border-amber-500 bg-amber-500/10 text-amber-400', iconBg: 'bg-amber-500/20' },
+        { id: 'wheel', label: 'Wheel of Fortune', icon: '🎡', desc: 'Spin to win — custom odds', style: 'border-rose-500 bg-rose-500/10 text-rose-400', iconBg: 'bg-rose-500/20' },
+        { id: 'mines', label: 'Mines', icon: '💣', desc: 'Avoid mines — reveal gems', style: 'border-orange-500 bg-orange-500/10 text-orange-400', iconBg: 'bg-orange-500/20' },
+        { id: 'case', label: 'Case Opening', icon: '📦', desc: 'Unbox items & rarities', style: 'border-indigo-500 bg-indigo-500/10 text-indigo-400', iconBg: 'bg-indigo-500/20' },
+        { id: 'hilo', label: 'Cards Hi-Lo', icon: '🃏', desc: 'Pick higher or lower', style: 'border-sky-500 bg-sky-500/10 text-sky-400', iconBg: 'bg-sky-500/20' }
+    ];
 
     // ─── Slot Config State ─────────────────────────────────────────────────
     const [gridLayout, setGridLayout] = useState<GridLayout>('5x3');
@@ -124,6 +149,80 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
     const [scratchGameName, setScratchGameName] = useState(DEFAULT_SCRATCH_CONFIG.theme.gameName);
     const [scratchGameDescription, setScratchGameDescription] = useState(DEFAULT_SCRATCH_CONFIG.theme.gameDescription);
     const [scratchLobbyCover, setScratchLobbyCover] = useState<string | null>(null);
+
+    // ─── Wheel Config State ─────────────────────────────────────────────────
+    const [wheelSegments, setWheelSegments] = useState<WheelSegment[]>([...DEFAULT_WHEEL_SEGMENTS]);
+    const [wheelPointerStyle, setWheelPointerStyle] = useState<'arrow' | 'finger' | 'sword' | 'microphone' | 'custom'>(DEFAULT_WHEEL_CONFIG.pointerStyle);
+    const [wheelPointerImage, setWheelPointerImage] = useState<string | null>(null);
+    const [wheelTexture, setWheelTexture] = useState(DEFAULT_WHEEL_CONFIG.wheelTexture);
+    const [wheelTickSound, setWheelTickSound] = useState(DEFAULT_WHEEL_CONFIG.tickSound);
+    const [wheelTickSoundFile, setWheelTickSoundFile] = useState<string | null>(null);
+    const [wheelEnableTrollWheel, setWheelEnableTrollWheel] = useState(DEFAULT_WHEEL_CONFIG.enableTrollWheel);
+    const [wheelConfettiType, setWheelConfettiType] = useState<'classic' | 'custom_logo'>(DEFAULT_WHEEL_CONFIG.confettiType);
+    const [wheelConfettiImage, setWheelConfettiImage] = useState<string | null>(null);
+    const [wheelAccentColor, setWheelAccentColor] = useState(DEFAULT_WHEEL_CONFIG.accentColor);
+    const [wheelBgColor, setWheelBgColor] = useState(DEFAULT_WHEEL_CONFIG.backgroundColor);
+    const [wheelBgImage, setWheelBgImage] = useState<string | null>(null);
+    const [wheelGameName, setWheelGameName] = useState(DEFAULT_WHEEL_CONFIG.theme.gameName);
+    const [wheelGameDescription, setWheelGameDescription] = useState(DEFAULT_WHEEL_CONFIG.theme.gameDescription);
+    const [wheelCoverImage, setWheelCoverImage] = useState<string | null>(null);
+    const [wheelActiveSection, setWheelActiveSection] = useState<'design' | 'segments' | 'preview'>('design');
+
+    // ─── Mines Config State ──────────────────────────────────────────────────
+    const [minesGridSize, setMinesGridSize] = useState<MinesGridSize>(DEFAULT_MINES_CONFIG.gridSize);
+    const [minesMineImage, setMinesMineImage] = useState<string | null>(DEFAULT_MINES_CONFIG.mineImage);
+    const [minesGemImage, setMinesGemImage] = useState<string | null>(DEFAULT_MINES_CONFIG.gemImage);
+    const [minesBustImage, setMinesBustImage] = useState<string | null>(DEFAULT_MINES_CONFIG.bustImage);
+    const [minesWatermarkImage, setMinesWatermarkImage] = useState<string | null>(DEFAULT_MINES_CONFIG.watermarkImage);
+    const [minesBgImage, setMinesBgImage] = useState<string | null>(DEFAULT_MINES_CONFIG.backgroundImage);
+    const [minesAccentColor, setMinesAccentColor] = useState(DEFAULT_MINES_CONFIG.accentColor);
+    const [minesBgColor, setMinesBgColor] = useState(DEFAULT_MINES_CONFIG.backgroundColor);
+    const [minesTileColor, setMinesTileColor] = useState(DEFAULT_MINES_CONFIG.tileColor);
+    const [minesEnableSuspense, setMinesEnableSuspense] = useState(DEFAULT_MINES_CONFIG.enableProgressiveSuspense);
+    const [minesLossSoundType, setMinesLossSoundType] = useState(DEFAULT_MINES_CONFIG.lossSoundType);
+    const [minesLossSoundFile, setMinesLossSoundFile] = useState<string | null>(DEFAULT_MINES_CONFIG.lossSoundFile);
+    const [minesRevealSoundFile, setMinesRevealSoundFile] = useState<string | null>(DEFAULT_MINES_CONFIG.revealSoundFile);
+    const [minesEnableFlip, setMinesEnableFlip] = useState(DEFAULT_MINES_CONFIG.enableFlipAnimation);
+    const [minesBustStyle, setMinesBustStyle] = useState(DEFAULT_MINES_CONFIG.bustAnimationStyle);
+    const [minesGameName, setMinesGameName] = useState(DEFAULT_MINES_CONFIG.theme.gameName);
+    const [minesGameDescription, setMinesGameDescription] = useState(DEFAULT_MINES_CONFIG.theme.gameDescription);
+    const [minesCoverImage, setMinesCoverImage] = useState<string | null>(null);
+    const [minesActiveSection, setMinesActiveSection] = useState<'design' | 'mechanics' | 'preview'>('design');
+
+    // ─── Case Config State ───────────────────────────────────────────────────
+    const [caseCollectionName, setCaseCollectionName] = useState(DEFAULT_CASE_CONFIG.collectionName);
+    const [caseDesign, setCaseDesign] = useState(DEFAULT_CASE_CONFIG.caseDesign);
+    const [caseImage, setCaseImage] = useState<string | null>(DEFAULT_CASE_CONFIG.caseImage);
+    const [caseBgImage, setCaseBgImage] = useState<string | null>(DEFAULT_CASE_CONFIG.backgroundImage);
+    const [caseAccentColor, setCaseAccentColor] = useState(DEFAULT_CASE_CONFIG.accentColor);
+    const [caseBgColor, setCaseBgColor] = useState(DEFAULT_CASE_CONFIG.backgroundColor);
+    const [caseEnableRarityGlow, setCaseEnableRarityGlow] = useState(DEFAULT_CASE_CONFIG.enableRarityGlow);
+    const [caseOpeningSoundType, setCaseOpeningSoundType] = useState(DEFAULT_CASE_CONFIG.openingSoundType);
+    const [caseOpeningSoundFile, setCaseOpeningSoundFile] = useState<string | null>(DEFAULT_CASE_CONFIG.openingSoundFile);
+    const [caseEnableRareExplosion, setCaseEnableRareExplosion] = useState(DEFAULT_CASE_CONFIG.enableRareExplosionSound);
+    const [caseItems, setCaseItems] = useState<CaseItem[]>([...DEFAULT_CASE_CONFIG.items]);
+    const [caseScrollDuration, setCaseScrollDuration] = useState(DEFAULT_CASE_CONFIG.scrollDuration);
+    const [caseGameName, setCaseGameName] = useState(DEFAULT_CASE_CONFIG.theme.gameName);
+    const [caseGameDescription, setCaseGameDescription] = useState(DEFAULT_CASE_CONFIG.theme.gameDescription);
+    const [caseCoverImage, setCaseCoverImage] = useState<string | null>(null);
+    const [caseActiveSection, setCaseActiveSection] = useState<'design' | 'items' | 'preview'>('design');
+
+    // ─── HiLo Config State ───────────────────────────────────────────────────
+    const [hiloGameName, setHiloGameName] = useState(DEFAULT_HILO_CONFIG.theme.gameName);
+    const [hiloGameDescription, setHiloGameDescription] = useState(DEFAULT_HILO_CONFIG.theme.gameDescription);
+    const [hiloCoverImage, setHiloCoverImage] = useState<string | null>(null);
+    const [hiloCardBackImage, setHiloCardBackImage] = useState<string | null>(DEFAULT_HILO_CONFIG.cardBackImage);
+    const [hiloFaceJ, setHiloFaceJ] = useState<string | null>(DEFAULT_HILO_CONFIG.customFaceCards.J);
+    const [hiloFaceQ, setHiloFaceQ] = useState<string | null>(DEFAULT_HILO_CONFIG.customFaceCards.Q);
+    const [hiloFaceK, setHiloFaceK] = useState<string | null>(DEFAULT_HILO_CONFIG.customFaceCards.K);
+    const [hiloFaceA, setHiloFaceA] = useState<string | null>(DEFAULT_HILO_CONFIG.customFaceCards.A);
+    const [hiloAccentColor, setHiloAccentColor] = useState(DEFAULT_HILO_CONFIG.accentColor);
+    const [hiloBgColor, setHiloBgColor] = useState(DEFAULT_HILO_CONFIG.backgroundColor);
+    const [hiloDealSoundType, setHiloDealSoundType] = useState(DEFAULT_HILO_CONFIG.dealSoundType);
+    const [hiloDealSoundFile, setHiloDealSoundFile] = useState<string | null>(DEFAULT_HILO_CONFIG.dealSoundFile);
+    const [hiloLossSoundType, setHiloLossSoundType] = useState(DEFAULT_HILO_CONFIG.lossSoundType);
+    const [hiloLossSoundFile, setHiloLossSoundFile] = useState<string | null>(DEFAULT_HILO_CONFIG.lossSoundFile);
+    const [hiloActiveSection, setHiloActiveSection] = useState<'design' | 'audio' | 'preview'>('design');
 
     // ─── UI State ──────────────────────────────────────────────────────────
     const [winEffect, setWinEffect] = useState('confetti');
@@ -287,6 +386,98 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
             return () => clearTimeout(timeout);
         }
     }, [scratchEngineReady, sendScratchConfigToEngine]);
+
+    // ─── Build Wheel Config JSON ─────────────────────────────────────────────
+    const buildWheelConfig = useCallback((): WheelConfig => {
+        return {
+            pointerStyle: wheelPointerStyle,
+            pointerImage: wheelPointerImage,
+            wheelTexture: wheelTexture,
+            accentColor: wheelAccentColor,
+            backgroundColor: wheelBgColor,
+            backgroundImage: wheelBgImage,
+            tickSound: wheelTickSound,
+            tickSoundFile: wheelTickSoundFile,
+            segments: wheelSegments,
+            enableTrollWheel: wheelEnableTrollWheel,
+            confettiType: wheelConfettiType,
+            confettiImage: wheelConfettiImage,
+            theme: {
+                gameName: wheelGameName,
+                gameDescription: wheelGameDescription,
+            },
+        };
+    }, [wheelPointerStyle, wheelPointerImage, wheelTexture, wheelAccentColor, wheelBgColor, wheelBgImage, wheelTickSound, wheelTickSoundFile, wheelSegments, wheelEnableTrollWheel, wheelConfettiType, wheelConfettiImage, wheelGameName, wheelGameDescription]);
+
+    // ─── Build Mines Config JSON ─────────────────────────────────────────────
+    const buildMinesConfig = useCallback((): MinesConfig => {
+        return {
+            gridSize: minesGridSize,
+            mineImage: minesMineImage,
+            gemImage: minesGemImage,
+            bustImage: minesBustImage,
+            watermarkImage: minesWatermarkImage,
+            backgroundImage: minesBgImage,
+            accentColor: minesAccentColor,
+            backgroundColor: minesBgColor,
+            tileColor: minesTileColor,
+            enableProgressiveSuspense: minesEnableSuspense,
+            lossSoundType: minesLossSoundType,
+            lossSoundFile: minesLossSoundFile,
+            revealSoundFile: minesRevealSoundFile,
+            enableFlipAnimation: minesEnableFlip,
+            bustAnimationStyle: minesBustStyle,
+            theme: {
+                gameName: minesGameName,
+                gameDescription: minesGameDescription,
+            },
+        };
+    }, [minesGridSize, minesMineImage, minesGemImage, minesBustImage, minesWatermarkImage, minesBgImage, minesAccentColor, minesBgColor, minesTileColor, minesEnableSuspense, minesLossSoundType, minesLossSoundFile, minesRevealSoundFile, minesEnableFlip, minesBustStyle, minesGameName, minesGameDescription]);
+
+    // ─── Build Case Config JSON ──────────────────────────────────────────────
+    const buildCaseConfig = useCallback((): CaseConfig => {
+        return {
+            collectionName: caseCollectionName,
+            caseDesign,
+            caseImage,
+            backgroundImage: caseBgImage,
+            accentColor: caseAccentColor,
+            backgroundColor: caseBgColor,
+            enableRarityGlow: caseEnableRarityGlow,
+            openingSoundType: caseOpeningSoundType,
+            openingSoundFile: caseOpeningSoundFile,
+            enableRareExplosionSound: caseEnableRareExplosion,
+            items: caseItems,
+            scrollDuration: caseScrollDuration,
+            theme: {
+                gameName: caseGameName,
+                gameDescription: caseGameDescription,
+            },
+        };
+    }, [caseCollectionName, caseDesign, caseImage, caseBgImage, caseAccentColor, caseBgColor, caseEnableRarityGlow, caseOpeningSoundType, caseOpeningSoundFile, caseEnableRareExplosion, caseItems, caseScrollDuration, caseGameName, caseGameDescription]);
+
+    // ─── Build HiLo Config JSON ──────────────────────────────────────────────
+    const buildHiloConfig = useCallback((): HiLoConfig => {
+        return {
+            cardBackImage: hiloCardBackImage,
+            customFaceCards: {
+                J: hiloFaceJ,
+                Q: hiloFaceQ,
+                K: hiloFaceK,
+                A: hiloFaceA
+            },
+            accentColor: hiloAccentColor,
+            backgroundColor: hiloBgColor,
+            dealSoundType: hiloDealSoundType as any,
+            dealSoundFile: hiloDealSoundFile,
+            lossSoundType: hiloLossSoundType as any,
+            lossSoundFile: hiloLossSoundFile,
+            theme: {
+                gameName: hiloGameName,
+                gameDescription: hiloGameDescription
+            }
+        };
+    }, [hiloCardBackImage, hiloFaceJ, hiloFaceQ, hiloFaceK, hiloFaceA, hiloAccentColor, hiloBgColor, hiloDealSoundType, hiloDealSoundFile, hiloLossSoundType, hiloLossSoundFile, hiloGameName, hiloGameDescription]);
 
     // ─── Test Spin ─────────────────────────────────────────────────────────
     const handleTestSpin = async () => {
@@ -559,6 +750,195 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                     setIsSuccess(false);
                 }, 2500);
             }, 1500);
+        } else if (gameType === 'wheel') {
+            // Wheel publish
+            if (!wheelGameName.trim()) { alert("Please provide a game name."); return; }
+            if (!wheelCoverImage) { alert("Please upload a cover image before publishing."); return; }
+
+            const existingStr = localStorage.getItem('custom_published_games');
+            const existing = existingStr ? JSON.parse(existingStr) : [];
+            if (existing.some((g: any) => g.name.toLowerCase() === wheelGameName.trim().toLowerCase())) {
+                alert("A game with this name already exists. Please choose a unique name.");
+                return;
+            }
+
+            setIsPublishing(true);
+
+            setTimeout(() => {
+                const wheelConfig = buildWheelConfig();
+                const newGame = {
+                    id: 'wheel_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    creatorId: creatorData.id || creatorData.name,
+                    creatorName: creatorData.name,
+                    type: 'wheel',
+                    name: wheelGameName,
+                    gameDescription: wheelGameDescription,
+                    coverImage: wheelCoverImage,
+                    themeEmoji: '🎡',
+                    themeColor: wheelAccentColor,
+                    wheelConfig,
+                    winEffect,
+                    winSound,
+                    publishedAt: new Date().toISOString()
+                };
+
+                const gamesStr = localStorage.getItem('custom_published_games');
+                const games = gamesStr ? JSON.parse(gamesStr) : [];
+                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
+                window.dispatchEvent(new Event('storage'));
+                setIsPublishing(false);
+                setIsSuccess(true);
+
+                setTimeout(() => {
+                    setWheelGameName('My Wheel Game');
+                    setWheelGameDescription('Spin the wheel and win big!');
+                    setWheelCoverImage(null);
+                    setIsSuccess(false);
+                }, 2500);
+            }, 1500);
+        } else if (gameType === 'mines') {
+            // Mines publish
+            if (!minesGameName.trim()) { alert("Please provide a game name."); return; }
+            if (!minesCoverImage) { alert("Please upload a cover image before publishing."); return; }
+
+            const existingStr = localStorage.getItem('custom_published_games');
+            const existing = existingStr ? JSON.parse(existingStr) : [];
+            if (existing.some((g: any) => g.name.toLowerCase() === minesGameName.trim().toLowerCase())) {
+                alert("A game with this name already exists. Please choose a unique name.");
+                return;
+            }
+
+            setIsPublishing(true);
+
+            setTimeout(() => {
+                const minesConfig = buildMinesConfig();
+                const newGame = {
+                    id: 'mines_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    creatorId: creatorData.id || creatorData.name,
+                    creatorName: creatorData.name,
+                    type: 'mines',
+                    name: minesGameName,
+                    gameDescription: minesGameDescription,
+                    coverImage: minesCoverImage,
+                    themeEmoji: '💣',
+                    themeColor: minesAccentColor,
+                    minesConfig,
+                    winEffect,
+                    winSound,
+                    publishedAt: new Date().toISOString()
+                };
+
+                const gamesStr = localStorage.getItem('custom_published_games');
+                const games = gamesStr ? JSON.parse(gamesStr) : [];
+                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
+                window.dispatchEvent(new Event('storage'));
+                setIsPublishing(false);
+                setIsSuccess(true);
+
+                setTimeout(() => {
+                    setMinesGameName('My Mines Game');
+                    setMinesGameDescription('Reveal the safe tiles and avoid the mines!');
+                    setMinesCoverImage(null);
+                    setIsSuccess(false);
+                }, 2500);
+            }, 1500);
+        } else if (gameType === 'case') {
+            if (!caseGameName.trim()) { alert("Please provide a game name."); return; }
+            if (!caseCoverImage) { alert("Please upload a cover image before publishing."); return; }
+
+            const existingStr = localStorage.getItem('custom_published_games');
+            const existing = existingStr ? JSON.parse(existingStr) : [];
+            if (existing.some((g: any) => g.name.toLowerCase() === caseGameName.trim().toLowerCase())) {
+                alert("A game with this name already exists. Please choose a unique name.");
+                return;
+            }
+
+            // Ensure probabilities sum to 100
+            const totalProb = caseItems.reduce((sum, item) => sum + item.probability, 0);
+            if (Math.abs(totalProb - 100) > 0.01) {
+                alert(`Item probabilities must sum to exactly 100%. Currently: ${totalProb}%`);
+                return;
+            }
+
+            setIsPublishing(true);
+
+            setTimeout(() => {
+                const caseConfig = buildCaseConfig();
+                const newGame = {
+                    id: 'case_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    creatorId: creatorData.id || creatorData.name,
+                    creatorName: creatorData.name,
+                    type: 'case',
+                    name: caseGameName,
+                    gameDescription: caseGameDescription,
+                    coverImage: caseCoverImage,
+                    themeEmoji: '📦',
+                    themeColor: caseAccentColor,
+                    caseConfig,
+                    winEffect,
+                    winSound,
+                    publishedAt: new Date().toISOString()
+                };
+
+                const gamesStr = localStorage.getItem('custom_published_games');
+                const games = gamesStr ? JSON.parse(gamesStr) : [];
+                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
+                window.dispatchEvent(new Event('storage'));
+                setIsPublishing(false);
+                setIsSuccess(true);
+
+                setTimeout(() => {
+                    setCaseGameName('My Case Opening');
+                    setCaseGameDescription('Open the case to discover rewards!');
+                    setCaseCoverImage(null);
+                    setIsSuccess(false);
+                }, 2500);
+            }, 1500);
+        } else if (gameType === 'hilo') {
+            if (!hiloGameName.trim()) { alert("Please provide a game name."); return; }
+            if (!hiloCoverImage) { alert("Please upload a cover image before publishing."); return; }
+
+            const existingStr = localStorage.getItem('custom_published_games');
+            const existing = existingStr ? JSON.parse(existingStr) : [];
+            if (existing.some((g: any) => g.name.toLowerCase() === hiloGameName.trim().toLowerCase())) {
+                alert("A game with this name already exists. Please choose a unique name.");
+                return;
+            }
+
+            setIsPublishing(true);
+
+            setTimeout(() => {
+                const hiloConfig = buildHiloConfig();
+                const newGame = {
+                    id: 'hilo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    creatorId: creatorData.id || creatorData.name,
+                    creatorName: creatorData.name,
+                    type: 'hilo',
+                    name: hiloGameName,
+                    gameDescription: hiloGameDescription,
+                    coverImage: hiloCoverImage,
+                    themeEmoji: '🃏',
+                    themeColor: hiloAccentColor,
+                    hiloConfig,
+                    winEffect,
+                    winSound,
+                    publishedAt: new Date().toISOString()
+                };
+
+                const gamesStr = localStorage.getItem('custom_published_games');
+                const games = gamesStr ? JSON.parse(gamesStr) : [];
+                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
+                window.dispatchEvent(new Event('storage'));
+                setIsPublishing(false);
+                setIsSuccess(true);
+
+                setTimeout(() => {
+                    setHiloGameName('My Hi-Lo Game');
+                    setHiloGameDescription('Guess higher or lower!');
+                    setHiloCoverImage(null);
+                    setIsSuccess(false);
+                }, 2500);
+            }, 1500);
         }
     };
 
@@ -596,8 +976,8 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                 <div className="flex justify-between items-center mb-6">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${gameType === 'crash' ? 'bg-emerald-500/20 text-emerald-400' : gameType === 'scratch' ? 'bg-amber-500/20 text-amber-400' : 'bg-purple-500/20 text-purple-400'}`}>
-                                {gameType === 'crash' ? <Rocket size={24} /> : gameType === 'scratch' ? <Sparkles size={24} /> : <Sparkles size={24} />}
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${gameType === 'crash' ? 'bg-emerald-500/20 text-emerald-400' : gameType === 'scratch' ? 'bg-amber-500/20 text-amber-400' : gameType === 'wheel' ? 'bg-rose-500/20 text-rose-400' : gameType === 'mines' ? 'bg-orange-500/20 text-orange-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                                {gameType === 'crash' ? <Rocket size={24} /> : gameType === 'scratch' ? <Sparkles size={24} /> : gameType === 'wheel' ? <RotateCcw size={24} /> : gameType === 'mines' ? <Grid3X3 size={24} /> : <Sparkles size={24} />}
                             </div>
                             <h2 className="text-3xl font-black text-white tracking-tight">Game Creator Studio</h2>
                         </div>
@@ -605,58 +985,73 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                     </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                    <button
-                        onClick={() => setGameType('slots')}
-                        className={`relative group p-5 rounded-2xl border-2 transition-all duration-300 text-left overflow-hidden ${
-                            gameType === 'slots'
-                                ? 'border-purple-500 bg-gradient-to-br from-purple-500/10 to-purple-600/5 shadow-[0_0_30px_rgba(168,85,247,0.15)]'
-                                : 'border-white/10 bg-[#0a111a] hover:border-white/20 hover:bg-white/[0.02]'
+                <div className="relative mb-8 z-50">
+                    <button 
+                        onClick={() => setIsGameDropdownOpen(!isGameDropdownOpen)}
+                        className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between shadow-lg ${
+                            isGameDropdownOpen 
+                                ? 'bg-[#111c2a] border-indigo-500/50 shadow-[0_0_30px_rgba(99,102,241,0.15)]' 
+                                : 'bg-[#0a111a] border-white/10 hover:border-white/20 hover:bg-white/[0.02]'
                         }`}
                     >
-                        {gameType === 'slots' && <div className="absolute top-3 right-3"><Check size={16} className="text-purple-400" /></div>}
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${gameType === 'slots' ? 'bg-purple-500/20' : 'bg-white/5'}`}>🎰</div>
-                            <div>
-                                <h3 className={`text-lg font-black ${gameType === 'slots' ? 'text-white' : 'text-slate-300'}`}>Slot Machine</h3>
-                                <p className="text-xs text-slate-500">Classic reels & paytable</p>
-                            </div>
+                        {(() => {
+                            const current = GAME_TYPES_INFO.find(t => t.id === gameType);
+                            return (
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl ${current?.iconBg}`}>
+                                        {current?.icon}
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
+                                            Selected Template
+                                        </div>
+                                        <h3 className="text-2xl font-black text-white">{current?.label}</h3>
+                                        <p className="text-xs text-slate-400 mt-0.5">{current?.desc}</p>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-white/5 transition-transform ${isGameDropdownOpen ? 'rotate-180 bg-indigo-500/20 text-indigo-400' : 'text-slate-400'}`}>
+                            <ChevronDown size={20} />
                         </div>
                     </button>
-                    <button
-                        onClick={() => setGameType('crash')}
-                        className={`relative group p-5 rounded-2xl border-2 transition-all duration-300 text-left overflow-hidden ${
-                            gameType === 'crash'
-                                ? 'border-emerald-500 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 shadow-[0_0_30px_rgba(16,185,129,0.15)]'
-                                : 'border-white/10 bg-[#0a111a] hover:border-white/20 hover:bg-white/[0.02]'
-                        }`}
-                    >
-                        {gameType === 'crash' && <div className="absolute top-3 right-3"><Check size={16} className="text-emerald-400" /></div>}
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${gameType === 'crash' ? 'bg-emerald-500/20' : 'bg-white/5'}`}>🚀</div>
-                            <div>
-                                <h3 className={`text-lg font-black ${gameType === 'crash' ? 'text-white' : 'text-slate-300'}`}>Crash Game</h3>
-                                <p className="text-xs text-slate-500">Multiplier rises — cash out!</p>
-                            </div>
-                        </div>
-                    </button>
-                    <button
-                        onClick={() => setGameType('scratch')}
-                        className={`relative group p-5 rounded-2xl border-2 transition-all duration-300 text-left overflow-hidden ${
-                            gameType === 'scratch'
-                                ? 'border-amber-500 bg-gradient-to-br from-amber-500/10 to-amber-600/5 shadow-[0_0_30px_rgba(245,158,11,0.15)]'
-                                : 'border-white/10 bg-[#0a111a] hover:border-white/20 hover:bg-white/[0.02]'
-                        }`}
-                    >
-                        {gameType === 'scratch' && <div className="absolute top-3 right-3"><Check size={16} className="text-amber-400" /></div>}
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${gameType === 'scratch' ? 'bg-amber-500/20' : 'bg-white/5'}`}>🎟️</div>
-                            <div>
-                                <h3 className={`text-lg font-black ${gameType === 'scratch' ? 'text-white' : 'text-slate-300'}`}>Scratch Card</h3>
-                                <p className="text-xs text-slate-500">Scratch to reveal & win!</p>
-                            </div>
-                        </div>
-                    </button>
+
+                    <AnimatePresence>
+                        {isGameDropdownOpen && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: -10 }} 
+                                animate={{ opacity: 1, y: 0 }} 
+                                exit={{ opacity: 0, y: -10 }}
+                                className="absolute top-[calc(100%+0.5rem)] left-0 right-0 bg-[#0f1722] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-50 p-3"
+                            >
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    {GAME_TYPES_INFO.map((g) => (
+                                        <button
+                                            key={g.id}
+                                            onClick={() => {
+                                                setGameType(g.id as GameType);
+                                                setIsGameDropdownOpen(false);
+                                            }}
+                                            className={`p-4 rounded-xl border text-left transition-all flex items-center gap-4 w-full group ${
+                                                gameType === g.id 
+                                                    ? g.style 
+                                                    : 'border-transparent bg-white/[0.01] hover:bg-white/5 hover:border-white/10'
+                                            }`}
+                                        >
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${g.iconBg} group-hover:scale-110 transition-transform ${gameType === g.id ? 'scale-110' : ''}`}>
+                                                {g.icon}
+                                            </div>
+                                            <div className="flex-1">
+                                                <h4 className={`font-black text-lg ${gameType === g.id ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>{g.label}</h4>
+                                                <p className="text-xs text-slate-500 line-clamp-1">{g.desc}</p>
+                                            </div>
+                                            {gameType === g.id && <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center"><Check size={14} className="opacity-100 text-white" /></div>}
+                                        </button>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
 
                 {isSuccess ? (
@@ -665,7 +1060,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                             <Check size={48} />
                         </div>
                         <h3 className="text-3xl font-black text-white mb-2 tracking-tight">Game Published!</h3>
-                        <p className="text-slate-400 max-w-md">{gameType === 'crash' ? 'Your crash game is now live! Players can bet and ride the multiplier.' : gameType === 'scratch' ? 'Your scratch card is now live! Players can scratch and win prizes.' : 'Your slot game is now live in the Casino Lobby. Players can spin and you\'ll earn a cut!'}</p>
+                        <p className="text-slate-400 max-w-md">{gameType === 'crash' ? 'Your crash game is now live! Players can bet and ride the multiplier.' : gameType === 'scratch' ? 'Your scratch card is now live! Players can scratch and win prizes.' : gameType === 'wheel' ? 'Your wheel game is now live! Players can spin and test their luck.' : gameType === 'mines' ? 'Your mines game is now live! Players can reveal tiles and test their luck!' : 'Your slot game is now live in the Casino Lobby. Players can spin and you\'ll earn a cut!'}</p>
                     </div>
                 ) : (
                     <div className="space-y-6">
@@ -724,6 +1119,94 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                     onClick={() => setScratchActiveSection(s.id as any)}
                                     className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${scratchActiveSection === s.id
                                         ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-lg shadow-amber-500/20'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                >
+                                    {s.icon}
+                                    {s.label}
+                                </button>
+                            ))}
+                        </div>
+                        )}
+
+                        {gameType === 'wheel' && (
+                        <div className="flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
+                            {[
+                                { id: 'design', icon: <Palette size={16} />, label: 'Design & Assets' },
+                                { id: 'segments', icon: <Settings2 size={16} />, label: 'Segments & Mechanics' },
+                                { id: 'preview', icon: <Eye size={16} />, label: 'Preview & Publish' },
+                            ].map((s) => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => setWheelActiveSection(s.id as any)}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${wheelActiveSection === s.id
+                                        ? 'bg-gradient-to-r from-rose-600 to-rose-700 text-white shadow-lg shadow-rose-500/20'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                >
+                                    {s.icon}
+                                    {s.label}
+                                </button>
+                            ))}
+                        </div>
+                        )}
+
+                        {gameType === 'mines' && (
+                        <div className="flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
+                            {[
+                                { id: 'design', icon: <Palette size={16} />, label: 'Design & Assets' },
+                                { id: 'mechanics', icon: <Settings2 size={16} />, label: 'Grid & Mechanics' },
+                                { id: 'preview', icon: <Eye size={16} />, label: 'Preview & Publish' },
+                            ].map((s) => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => setMinesActiveSection(s.id as any)}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${minesActiveSection === s.id
+                                        ? 'bg-gradient-to-r from-orange-600 to-orange-700 text-white shadow-lg shadow-orange-500/20'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                >
+                                    {s.icon}
+                                    {s.label}
+                                </button>
+                            ))}
+                        </div>
+                        )}
+
+                        {gameType === 'case' && (
+                        <div className="flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
+                            {[
+                                { id: 'design', icon: <Palette size={16} />, label: 'Design & Audio' },
+                                { id: 'items', icon: <Settings2 size={16} />, label: 'Items & Rarities' },
+                                { id: 'preview', icon: <Eye size={16} />, label: 'Preview & Publish' },
+                            ].map((s) => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => setCaseActiveSection(s.id as any)}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${caseActiveSection === s.id
+                                        ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/20'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                >
+                                    {s.icon}
+                                    {s.label}
+                                </button>
+                            ))}
+                        </div>
+                        )}
+
+                        {gameType === 'hilo' && (
+                        <div className="flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
+                            {[
+                                { id: 'design', icon: <Palette size={16} />, label: 'Design' },
+                                { id: 'audio', icon: <Volume2 size={16} />, label: 'Audio' },
+                                { id: 'preview', icon: <Eye size={16} />, label: 'Preview' },
+                            ].map((s) => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => setHiloActiveSection(s.id as any)}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${hiloActiveSection === s.id
+                                        ? 'bg-gradient-to-r from-blue-600 to-sky-600 text-white shadow-lg shadow-blue-500/20'
                                         : 'text-slate-400 hover:text-white hover:bg-white/5'
                                     }`}
                                 >
@@ -1896,6 +2379,1403 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                 </div>
                             </motion.div>
                         )}
+
+                        {/* ════════════════════════════════════════════════════ */}
+                        {/* WHEEL OF FORTUNE SECTIONS                           */}
+                        {/* ════════════════════════════════════════════════════ */}
+
+                        {/* ─── Wheel Design & Assets ──────────────────────── */}
+                        {gameType === 'wheel' && wheelActiveSection === 'design' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Palette size={16} className="text-rose-400" /> Design & Graphics
+                                </h3>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Name & Description */}
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Game Title</label>
+                                            <input type="text" value={wheelGameName} onChange={(e) => setWheelGameName(e.target.value)}
+                                                className="w-full bg-[#0a111a] border border-white/10 focus:border-rose-400 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:ring-2 focus:ring-rose-400/20 transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Description</label>
+                                            <input type="text" value={wheelGameDescription} onChange={(e) => setWheelGameDescription(e.target.value)}
+                                                className="w-full bg-[#0a111a] border border-white/10 focus:border-rose-400 rounded-xl px-4 py-3 text-white text-sm focus:outline-none transition-all" />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Accent Color</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={wheelAccentColor} onChange={(e) => setWheelAccentColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-xs">{wheelAccentColor}</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Background</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={wheelBgColor} onChange={(e) => setWheelBgColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-xs">{wheelBgColor}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Images */}
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Game Background Image</label>
+                                            <label className="flex items-center justify-center gap-2 bg-[#0a111a] rounded-xl h-28 border border-dashed border-rose-400/30 hover:border-rose-400 hover:bg-rose-400/5 cursor-pointer transition-all relative overflow-hidden group">
+                                                {wheelBgImage ? (
+                                                    <>
+                                                        <img src={wheelBgImage} alt="bg" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500" />
+                                                        <span className="relative z-10 text-xs text-white font-bold bg-rose-500/80 px-4 py-2 rounded-lg backdrop-blur">Change Background</span>
+                                                    </>
+                                                ) : (
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <Upload size={18} className="text-slate-500 group-hover:text-rose-400 transition-colors" />
+                                                        <span className="text-[11px] text-slate-400 font-bold">Upload Background</span>
+                                                    </div>
+                                                )}
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setWheelBgImage)} />
+                                            </label>
+                                            {wheelBgImage && (
+                                                <button className="text-[10px] text-slate-500 hover:text-red-400 mt-1 transition-colors" onClick={() => setWheelBgImage(null)}>Remove</button>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+                                                Lobby Cover Image <span className="text-red-400">*</span>
+                                            </label>
+                                            <label className="relative w-full aspect-video rounded-xl bg-[#0a111a] border border-dashed border-white/20 flex flex-col items-center justify-center overflow-hidden hover:border-rose-400 group cursor-pointer transition-all block">
+                                                {wheelCoverImage ? (
+                                                    <>
+                                                        <img src={wheelCoverImage} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
+                                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                            <span className="text-white font-bold bg-white/10 px-4 py-2 rounded-lg border border-white/20 backdrop-blur-md">Change</span>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <ImageIcon size={24} className="text-slate-500 group-hover:text-rose-400 mb-1 transition-colors" />
+                                                        <span className="text-xs text-slate-400 font-bold">Upload Cover</span>
+                                                        <span className="text-[10px] text-red-400/80 mt-1 font-bold">Required to publish</span>
+                                                    </>
+                                                )}
+                                                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => handleFileUpload(e, setWheelCoverImage)} />
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Pointer Style Selector */}
+                                <div className="bg-gradient-to-br from-[#0a111a] to-[#1a0b1e] border border-rose-500/20 rounded-2xl p-5 mt-4">
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-lg">👆</span>
+                                            <span className="text-xs font-black text-white uppercase tracking-widest">Pointer / Indicator Style</span>
+                                        </div>
+                                        <label className={`text-[10px] font-bold px-3 py-2 rounded-xl cursor-pointer transition-all border ${wheelPointerImage ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20'}`}>
+                                            <span className="flex items-center gap-1.5"><Upload size={12} />{wheelPointerImage ? 'Custom Image' : 'Upload Custom'}</span>
+                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setWheelPointerImage, 128)} />
+                                        </label>
+                                    </div>
+                                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                                        {POINTER_PRESETS.map(ptr => (
+                                            <button key={ptr.id} onClick={() => { setWheelPointerStyle(ptr.id as any); setWheelPointerImage(null); }}
+                                                className={`flex flex-col items-center justify-center py-3 rounded-xl border transition-all ${wheelPointerStyle === ptr.id && !wheelPointerImage ? 'bg-gradient-to-b from-rose-500/20 to-rose-600/10 border-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'bg-black/30 border-white/5 hover:bg-white/5'}`}>
+                                                <span className={`text-xl mb-1 ${wheelPointerStyle === ptr.id && !wheelPointerImage ? 'scale-110' : 'opacity-60'}`}>{ptr.emoji}</span>
+                                                <span className={`text-[8px] font-bold uppercase ${wheelPointerStyle === ptr.id && !wheelPointerImage ? 'text-white' : 'text-slate-500'}`}>{ptr.label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {wheelPointerImage && (
+                                        <div className="flex items-center gap-3 mt-3 p-2 bg-rose-500/10 rounded-lg border border-rose-500/20">
+                                            <img src={wheelPointerImage} alt="custom" className="w-10 h-10 rounded-lg object-contain bg-black/30" />
+                                            <span className="text-xs text-rose-400 font-bold">Custom pointer uploaded</span>
+                                            <button className="ml-auto text-[10px] text-slate-500 hover:text-red-400" onClick={() => setWheelPointerImage(null)}>Remove</button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Wheel Texture */}
+                                <div className="bg-gradient-to-br from-[#0a111a] to-[#1a0b1e] border border-rose-500/20 rounded-2xl p-5">
+                                    <div className="flex items-center gap-2 border-b border-white/5 pb-3 mb-4">
+                                        <span className="text-lg">🎨</span>
+                                        <span className="text-xs font-black text-white uppercase tracking-widest">Wheel Texture</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                                        {TEXTURE_PRESETS.map(tex => (
+                                            <button key={tex.id} onClick={() => setWheelTexture(tex.id as any)}
+                                                className={`p-4 rounded-xl border-2 transition-all text-left ${wheelTexture === tex.id
+                                                    ? 'border-rose-500 bg-gradient-to-br from-rose-500/10 to-rose-600/5'
+                                                    : 'border-white/10 bg-[#0a111a] hover:border-white/20'
+                                                }`}>
+                                                <span className={`text-xl mb-2 block ${wheelTexture === tex.id ? 'scale-110' : 'opacity-60'}`}>{tex.emoji}</span>
+                                                <span className={`text-xs font-black block ${wheelTexture === tex.id ? 'text-white' : 'text-slate-400'}`}>{tex.label}</span>
+                                                <span className="text-[10px] text-slate-500">{tex.description}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Confetti Celebration */}
+                                <div className="bg-gradient-to-br from-[#0a111a] to-[#1a0b1e] border border-rose-500/20 rounded-2xl p-5">
+                                    <div className="flex items-center gap-2 border-b border-white/5 pb-3 mb-4">
+                                        <span className="text-lg">🎉</span>
+                                        <span className="text-xs font-black text-white uppercase tracking-widest">Win Celebration</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button onClick={() => setWheelConfettiType('classic')}
+                                            className={`p-4 rounded-xl border-2 transition-all text-left ${wheelConfettiType === 'classic' ? 'border-rose-500 bg-gradient-to-br from-rose-500/10 to-rose-600/5' : 'border-white/10 bg-[#0a111a] hover:border-white/20'}`}>
+                                            <span className="text-2xl mb-2 block">🎊</span>
+                                            <span className={`text-sm font-black ${wheelConfettiType === 'classic' ? 'text-white' : 'text-slate-400'}`}>Classic Confetti</span>
+                                            <p className="text-[10px] text-slate-500 mt-1">Standard colorful particles</p>
+                                        </button>
+                                        <button onClick={() => setWheelConfettiType('custom_logo')}
+                                            className={`p-4 rounded-xl border-2 transition-all text-left ${wheelConfettiType === 'custom_logo' ? 'border-rose-500 bg-gradient-to-br from-rose-500/10 to-rose-600/5' : 'border-white/10 bg-[#0a111a] hover:border-white/20'}`}>
+                                            <span className="text-2xl mb-2 block">📸</span>
+                                            <span className={`text-sm font-black ${wheelConfettiType === 'custom_logo' ? 'text-white' : 'text-slate-400'}`}>Custom Logo Rain</span>
+                                            <p className="text-[10px] text-slate-500 mt-1">Your logo falls as confetti</p>
+                                        </button>
+                                    </div>
+                                    {wheelConfettiType === 'custom_logo' && (
+                                        <div className="mt-3">
+                                            <label className="flex items-center justify-center gap-2 bg-[#0a111a] rounded-xl h-20 border border-dashed border-rose-400/30 hover:border-rose-400 hover:bg-rose-400/5 cursor-pointer transition-all relative overflow-hidden group">
+                                                {wheelConfettiImage ? (
+                                                    <>
+                                                        <img src={wheelConfettiImage} alt="logo" className="h-12 object-contain" />
+                                                        <span className="text-xs text-rose-400 font-bold">Change Logo</span>
+                                                    </>
+                                                ) : (
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <Upload size={16} className="text-slate-500 group-hover:text-rose-400 transition-colors" />
+                                                        <span className="text-[11px] text-slate-400 font-bold">Upload Logo / Channel Icon</span>
+                                                    </div>
+                                                )}
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setWheelConfettiImage, 64)} />
+                                            </label>
+                                            {wheelConfettiImage && <button className="text-[10px] text-slate-500 hover:text-red-400 mt-1" onClick={() => setWheelConfettiImage(null)}>Remove</button>}
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ─── Wheel Segments & Mechanics ─────────────────── */}
+                        {gameType === 'wheel' && wheelActiveSection === 'segments' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Settings2 size={16} className="text-rose-400" /> Segments & Mechanics
+                                </h3>
+
+                                {/* Troll Wheel Toggle */}
+                                <div className="bg-gradient-to-br from-[#0a111a] to-[#1a0b1e] border border-rose-500/20 rounded-2xl p-5">
+                                    <Toggle enabled={wheelEnableTrollWheel} onToggle={() => setWheelEnableTrollWheel(!wheelEnableTrollWheel)}
+                                        label='🎭 Troll Wheel — Visual size ≠ Real probability' />
+                                    {wheelEnableTrollWheel && (
+                                        <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                                            <p className="text-[11px] text-amber-400 font-bold">⚡ Troll Mode Active — You can make a segment look HUGE on the wheel but have a tiny actual chance. Great for stream entertainment!</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Segments Table */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Wheel Segments</label>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => {
+                                                const id = 'seg_' + Date.now();
+                                                const prob = 1 / (wheelSegments.length + 1);
+                                                setWheelSegments(prev => [...prev, { id, label: 'New', multiplier: 1, color: SEGMENT_COLORS[prev.length % SEGMENT_COLORS.length], visualWeight: 1, realProbability: prob }]);
+                                            }} className="text-xs bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-lg font-bold hover:bg-rose-500/30 transition-colors">
+                                                + Add Segment
+                                            </button>
+                                            <button onClick={() => {
+                                                const id = 'seg_sp_' + Date.now();
+                                                setWheelSegments(prev => [...prev, { id, label: 'RESPIN', multiplier: 0, color: '#e67e22', visualWeight: 1, realProbability: 0.05, specialType: 'respin' }]);
+                                            }} className="text-xs bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-bold hover:bg-amber-500/30 transition-colors">
+                                                + Respin
+                                            </button>
+                                            <button onClick={() => {
+                                                const id = 'seg_x2_' + Date.now();
+                                                setWheelSegments(prev => [...prev, { id, label: 'x2 NEXT', multiplier: 0, color: '#9b59b6', visualWeight: 1, realProbability: 0.05, specialType: 'multiplier_x2' }]);
+                                            }} className="text-xs bg-purple-500/20 text-purple-400 px-3 py-1.5 rounded-lg font-bold hover:bg-purple-500/30 transition-colors">
+                                                + Multiplier ×2
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-[#0a111a] rounded-xl border border-white/10 overflow-hidden">
+                                        {/* Table Header */}
+                                        <div className={`grid gap-2 p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-white/5 bg-[#080d14] ${wheelEnableTrollWheel ? 'grid-cols-[40px_80px_1fr_80px_70px_70px_40px]' : 'grid-cols-[40px_80px_1fr_80px_80px_40px]'}`}>
+                                            <div>Color</div>
+                                            <div>Label</div>
+                                            <div>Type</div>
+                                            <div className="text-center">Mult</div>
+                                            {wheelEnableTrollWheel && <div className="text-center">Visual W</div>}
+                                            <div className="text-center">Prob %</div>
+                                            <div></div>
+                                        </div>
+
+                                        {/* Segment Rows */}
+                                        {wheelSegments.map((seg) => (
+                                            <div key={seg.id} className={`grid gap-2 p-3 items-center border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors ${wheelEnableTrollWheel ? 'grid-cols-[40px_80px_1fr_80px_70px_70px_40px]' : 'grid-cols-[40px_80px_1fr_80px_80px_40px]'}`}>
+                                                {/* Color */}
+                                                <input type="color" value={seg.color}
+                                                    onChange={(e) => setWheelSegments(prev => prev.map(s => s.id === seg.id ? { ...s, color: e.target.value } : s))}
+                                                    className="w-8 h-8 rounded-lg border border-white/10 cursor-pointer bg-transparent" />
+                                                {/* Label */}
+                                                <input type="text" value={seg.label}
+                                                    onChange={(e) => setWheelSegments(prev => prev.map(s => s.id === seg.id ? { ...s, label: e.target.value } : s))}
+                                                    className="bg-transparent border-b border-white/5 focus:border-rose-400 text-white text-xs font-bold px-1 py-1 focus:outline-none transition-colors" />
+                                                {/* Type */}
+                                                <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md w-fit ${seg.specialType === 'respin' ? 'bg-amber-500/20 text-amber-400' : seg.specialType === 'multiplier_x2' ? 'bg-purple-500/20 text-purple-400' : 'bg-white/5 text-slate-400'}`}>
+                                                    {seg.specialType === 'respin' ? '🔄 Respin' : seg.specialType === 'multiplier_x2' ? '✖️2 Mult' : '💰 Normal'}
+                                                </span>
+                                                {/* Multiplier */}
+                                                <input type="number" step="0.5" min="0" value={seg.multiplier}
+                                                    onChange={(e) => setWheelSegments(prev => prev.map(s => s.id === seg.id ? { ...s, multiplier: parseFloat(e.target.value) || 0 } : s))}
+                                                    disabled={!!seg.specialType}
+                                                    className="w-full bg-[#0d1520] border border-white/5 text-center text-white font-mono text-xs rounded-lg py-1.5 focus:outline-none focus:border-rose-400 transition-colors disabled:opacity-40" />
+                                                {/* Visual Weight (troll mode only) */}
+                                                {wheelEnableTrollWheel && (
+                                                    <input type="number" step="0.1" min="0.1" value={seg.visualWeight}
+                                                        onChange={(e) => setWheelSegments(prev => prev.map(s => s.id === seg.id ? { ...s, visualWeight: parseFloat(e.target.value) || 1 } : s))}
+                                                        className="w-full bg-[#0d1520] border border-white/5 text-center text-white font-mono text-xs rounded-lg py-1.5 focus:outline-none focus:border-amber-400 transition-colors" />
+                                                )}
+                                                {/* Real Probability */}
+                                                <input type="number" step="1" min="1" max="100"
+                                                    value={Math.round(seg.realProbability * 100)}
+                                                    onChange={(e) => {
+                                                        const val = Math.max(1, Math.min(100, parseInt(e.target.value) || 1));
+                                                        setWheelSegments(prev => prev.map(s => s.id === seg.id ? { ...s, realProbability: val / 100 } : s));
+                                                    }}
+                                                    className="w-full bg-[#0d1520] border border-white/5 text-center text-white font-mono text-xs rounded-lg py-1.5 focus:outline-none focus:border-rose-400 transition-colors" />
+                                                {/* Delete */}
+                                                <button onClick={() => { if (wheelSegments.length > 2) setWheelSegments(prev => prev.filter(s => s.id !== seg.id)); }}
+                                                    className="text-slate-600 hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10 mx-auto" disabled={wheelSegments.length <= 2}>
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Probability sum warning */}
+                                    {(() => {
+                                        const total = wheelSegments.reduce((sum, s) => sum + Math.round(s.realProbability * 100), 0);
+                                        return total !== 100 ? (
+                                            <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                                                <p className="text-[11px] text-amber-400 font-bold">⚠️ Probabilities sum to {total}% — they should add up to 100%. Values will be normalized automatically at runtime.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-2 p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
+                                                <p className="text-[11px] text-green-400 font-bold">✓ Probabilities sum to 100%</p>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+
+                                {/* Tick Sound */}
+                                <div className="bg-gradient-to-br from-[#0a111a] to-[#1a0b1e] border border-rose-500/20 rounded-2xl p-5">
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <Volume2 size={16} className="text-rose-400" />
+                                            <span className="text-xs font-black text-white uppercase tracking-widest">Tick Sound Theme</span>
+                                        </div>
+                                        <label className={`text-[10px] font-bold px-3 py-2 rounded-xl cursor-pointer transition-all border ${wheelTickSoundFile ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20'}`}>
+                                            <span className="flex items-center gap-1.5"><Upload size={12} />{wheelTickSoundFile ? 'Custom Audio' : 'Upload Custom'}</span>
+                                            <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleAudioUpload(e, setWheelTickSoundFile)} />
+                                        </label>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {TICK_SOUND_PRESETS.map(snd => (
+                                            <button key={snd.id} onClick={() => { setWheelTickSound(snd.id as any); setWheelTickSoundFile(null); }}
+                                                className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${wheelTickSound === snd.id && !wheelTickSoundFile ? 'bg-gradient-to-b from-rose-500/20 to-rose-600/10 border-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'bg-black/30 border-white/5 hover:bg-white/5'}`}>
+                                                <span className={`text-2xl mb-1 ${wheelTickSound === snd.id && !wheelTickSoundFile ? 'scale-110' : 'opacity-60'}`}>{snd.emoji}</span>
+                                                <span className={`text-[10px] font-bold uppercase ${wheelTickSound === snd.id && !wheelTickSoundFile ? 'text-white' : 'text-slate-500'}`}>{snd.label}</span>
+                                                <span className="text-[9px] text-slate-600 mt-1">{snd.description}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {wheelTickSoundFile && <button className="text-[10px] text-slate-500 hover:text-red-400 mt-2" onClick={() => setWheelTickSoundFile(null)}>Remove Custom Audio</button>}
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ─── Wheel Preview & Publish ────────────────────── */}
+                        {gameType === 'wheel' && wheelActiveSection === 'preview' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Eye size={16} className="text-cyan-400" /> Preview & Publish
+                                </h3>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* Wheel Preview Canvas */}
+                                    <div className="lg:col-span-2 space-y-3">
+                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative flex items-center justify-center" style={{ boxShadow: `0 0 40px ${wheelAccentColor}15`, backgroundColor: wheelBgColor }}>
+                                            {wheelBgImage && <img src={wheelBgImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />}
+                                            <div className="absolute inset-0 bg-black/30"></div>
+
+                                            {/* Pointer preview */}
+                                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
+                                                {wheelPointerStyle === 'custom' && wheelPointerImage ? (
+                                                    <img src={wheelPointerImage} alt="ptr" className="w-8 h-10 object-contain drop-shadow-lg" />
+                                                ) : wheelPointerStyle === 'finger' ? (
+                                                    <span className="text-3xl">👆</span>
+                                                ) : wheelPointerStyle === 'sword' ? (
+                                                    <span className="text-3xl">⚔️</span>
+                                                ) : wheelPointerStyle === 'microphone' ? (
+                                                    <span className="text-3xl">🎤</span>
+                                                ) : (
+                                                    <div className="w-7 h-9 border-2 border-white drop-shadow-md"
+                                                        style={{ backgroundColor: wheelAccentColor, clipPath: 'polygon(50% 100%, 0 0, 100% 0)' }} />
+                                                )}
+                                            </div>
+
+                                            {/* Static wheel preview using CSS conic-gradient */}
+                                            <div className="relative z-10 w-72 h-72 sm:w-80 sm:h-80">
+                                                {(() => {
+                                                    const totalW = wheelSegments.reduce((s, seg) => s + seg.visualWeight, 0);
+                                                    let cumDeg = 0;
+                                                    const stops = wheelSegments.map((seg) => {
+                                                        const start = cumDeg;
+                                                        const arcDeg = (seg.visualWeight / totalW) * 360;
+                                                        cumDeg += arcDeg;
+                                                        return `${seg.color} ${start}deg ${cumDeg}deg`;
+                                                    });
+                                                    return (
+                                                        <div className="w-full h-full rounded-full border-4 overflow-hidden relative"
+                                                            style={{
+                                                                background: `conic-gradient(from -90deg, ${stops.join(', ')})`,
+                                                                borderColor: wheelTexture === 'neon' ? wheelAccentColor + '60' : 'rgba(255,255,255,0.15)',
+                                                                boxShadow: wheelTexture === 'neon' ? `0 0 40px ${wheelAccentColor}30, inset 0 0 20px ${wheelAccentColor}10` : 'none',
+                                                            }}>
+                                                            {/* Segment labels */}
+                                                            {wheelSegments.map((seg, i) => {
+                                                                const tw = wheelSegments.reduce((s, se) => s + se.visualWeight, 0);
+                                                                let angle = -90;
+                                                                for (let j = 0; j < i; j++) angle += (wheelSegments[j].visualWeight / tw) * 360;
+                                                                angle += (seg.visualWeight / tw) * 360 / 2;
+                                                                const rad = (angle * Math.PI) / 180;
+                                                                const r = 38;
+                                                                const x = 50 + Math.cos(rad) * r;
+                                                                const y = 50 + Math.sin(rad) * r;
+                                                                return (
+                                                                    <div key={seg.id} className="absolute text-white font-black text-[10px] sm:text-xs drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+                                                                        style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%,-50%)', textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
+                                                                        {seg.specialType ? (seg.specialType === 'respin' ? '🔄' : '×2') : seg.multiplier + 'x'}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                            {/* Center dot */}
+                                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                                <div className="w-8 h-8 rounded-full bg-[#1a1a2e] border-2" style={{ borderColor: wheelTexture === 'neon' ? wheelAccentColor + '60' : 'rgba(255,255,255,0.2)' }} />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Config Summary & Publish */}
+                                    <div className="space-y-4">
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                            <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2">Configuration</h4>
+                                            <div className="space-y-2 text-xs">
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Type</span><span className="text-rose-400 font-bold">Wheel of Fortune</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Segments</span><span className="text-white font-mono">{wheelSegments.length}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Troll Mode</span><span className={wheelEnableTrollWheel ? 'text-amber-400' : 'text-slate-600'}>{wheelEnableTrollWheel ? '✓ Active' : '✗'}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Texture</span><span className="text-white capitalize">{wheelTexture}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Pointer</span><span className="text-white capitalize">{wheelPointerImage ? '📸 Custom' : wheelPointerStyle}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Tick Sound</span><span className="text-white capitalize">{wheelTickSoundFile ? '📸 Custom' : wheelTickSound}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Confetti</span><span className="text-white capitalize">{wheelConfettiType === 'custom_logo' ? '📸 Logo' : 'Classic'}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Specials</span><span className="text-white font-mono">{wheelSegments.filter(s => s.specialType).length}</span></div>
+                                            </div>
+                                        </div>
+
+                                        {/* Segment breakdown */}
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4">
+                                            <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2 mb-3">Segments</h4>
+                                            <div className="space-y-1.5 max-h-[200px] overflow-auto custom-scrollbar">
+                                                {wheelSegments.map(seg => (
+                                                    <div key={seg.id} className="flex items-center gap-2 text-xs">
+                                                        <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: seg.color }} />
+                                                        <span className="text-white font-bold flex-1 truncate">{seg.label}</span>
+                                                        <span className="text-slate-400 font-mono">
+                                                            {seg.specialType ? (seg.specialType === 'respin' ? '🔄' : '×2') : seg.multiplier + 'x'}
+                                                        </span>
+                                                        <span className="text-slate-500 font-mono text-[10px]">
+                                                            {Math.round(seg.realProbability * 100)}%
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Publish Button */}
+                                        <button
+                                            onClick={handlePublish}
+                                            disabled={isPublishing || !wheelGameName.trim() || !wheelCoverImage}
+                                            className={`w-full py-4 rounded-xl font-black text-lg tracking-widest uppercase transition-all flex justify-center items-center gap-2 ${isPublishing || !wheelGameName.trim() || !wheelCoverImage
+                                                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                                : 'bg-gradient-to-r from-rose-600 to-pink-600 text-white hover:brightness-110 hover:-translate-y-1 shadow-[0_5px_20px_rgba(244,63,94,0.3)]'
+                                            }`}
+                                        >
+                                            {isPublishing ? <><Loader2 className="animate-spin" size={20} /> Publishing...</> : <><Save size={20} /> Publish to Lobby</>}
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ════════════════════════════════════════════════════ */}
+                        {/* MINES SECTIONS                                       */}
+                        {/* ════════════════════════════════════════════════════ */}
+
+                        {/* ═══ MINES: Design & Assets ═══ */}
+                        {gameType === 'mines' && minesActiveSection === 'design' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Palette size={16} className="text-orange-400" /> Appearance & Branding
+                                </h3>
+                                
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Name & Description */}
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Game Title</label>
+                                            <input type="text" value={minesGameName} onChange={(e) => setMinesGameName(e.target.value)}
+                                                className="w-full bg-[#0a111a] border border-white/10 focus:border-orange-400 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:ring-2 focus:ring-orange-400/20 transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Description</label>
+                                            <input type="text" value={minesGameDescription} onChange={(e) => setMinesGameDescription(e.target.value)}
+                                                className="w-full bg-[#0a111a] border border-white/10 focus:border-orange-400 rounded-xl px-4 py-3 text-white text-sm focus:outline-none transition-all" />
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Accent</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={minesAccentColor} onChange={(e) => setMinesAccentColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-xs">{minesAccentColor}</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Background</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={minesBgColor} onChange={(e) => setMinesBgColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-xs">{minesBgColor}</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Tiles</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={minesTileColor} onChange={(e) => setMinesTileColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-xs">{minesTileColor}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Image Uploads */}
+                                    <div className="space-y-4">
+                                        {/* Mine Image */}
+                                        <div className="bg-[#0a111a] border border-white/10 rounded-xl p-4 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Mine / Bomb Image</label>
+                                                {minesMineImage && <button onClick={() => setMinesMineImage(null)} className="text-xs text-red-400 hover:text-red-300">Remove</button>}
+                                            </div>
+                                            {minesMineImage ? (
+                                                <img src={minesMineImage} alt="Mine" className="w-16 h-16 object-contain rounded-lg bg-white/5 p-2 mx-auto" />
+                                            ) : (
+                                                <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-orange-400 transition-colors bg-white/5 rounded-lg p-3 justify-center border border-dashed border-white/10">
+                                                    <Upload size={14} /> Upload mine artwork
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setMinesMineImage, 128)} />
+                                                </label>
+                                            )}
+                                        </div>
+
+                                        {/* Gem Image */}
+                                        <div className="bg-[#0a111a] border border-white/10 rounded-xl p-4 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Safe / Gem Image</label>
+                                                {minesGemImage && <button onClick={() => setMinesGemImage(null)} className="text-xs text-red-400 hover:text-red-300">Remove</button>}
+                                            </div>
+                                            {minesGemImage ? (
+                                                <img src={minesGemImage} alt="Gem" className="w-16 h-16 object-contain rounded-lg bg-white/5 p-2 mx-auto" />
+                                            ) : (
+                                                <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-green-400 transition-colors bg-white/5 rounded-lg p-3 justify-center border border-dashed border-white/10">
+                                                    <Upload size={14} /> Upload gem artwork
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setMinesGemImage, 128)} />
+                                                </label>
+                                            )}
+                                        </div>
+
+                                        {/* Bust Image */}
+                                        <div className="bg-[#0a111a] border border-white/10 rounded-xl p-4 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">&quot;BUSTED&quot; Overlay Image</label>
+                                                {minesBustImage && <button onClick={() => setMinesBustImage(null)} className="text-xs text-red-400 hover:text-red-300">Remove</button>}
+                                            </div>
+                                            <p className="text-[10px] text-slate-600">Shown fullscreen when player hits a mine (meme, streamer B&W photo, etc.)</p>
+                                            {minesBustImage ? (
+                                                <img src={minesBustImage} alt="Bust" className="w-full max-h-24 object-contain rounded-lg bg-white/5 p-2" />
+                                            ) : (
+                                                <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-red-400 transition-colors bg-white/5 rounded-lg p-3 justify-center border border-dashed border-white/10">
+                                                    <Upload size={14} /> Upload bust overlay
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setMinesBustImage, 800)} />
+                                                </label>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Watermark & Background */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div className="bg-[#0a111a] border border-white/10 rounded-xl p-4 space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Brand Watermark</label>
+                                            {minesWatermarkImage && <button onClick={() => setMinesWatermarkImage(null)} className="text-xs text-red-400 hover:text-red-300">Remove</button>}
+                                        </div>
+                                        <p className="text-[10px] text-slate-600">Semi-transparent logo behind the grid tiles</p>
+                                        {minesWatermarkImage ? (
+                                            <img src={minesWatermarkImage} alt="Watermark" className="w-20 h-20 object-contain rounded-lg bg-white/5 p-2 mx-auto opacity-50" />
+                                        ) : (
+                                            <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-orange-400 transition-colors bg-white/5 rounded-lg p-3 justify-center border border-dashed border-white/10">
+                                                <Upload size={14} /> Upload watermark
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setMinesWatermarkImage, 400)} />
+                                            </label>
+                                        )}
+                                    </div>
+                                    <div className="bg-[#0a111a] border border-white/10 rounded-xl p-4 space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Background Image</label>
+                                            {minesBgImage && <button onClick={() => setMinesBgImage(null)} className="text-xs text-red-400 hover:text-red-300">Remove</button>}
+                                        </div>
+                                        {minesBgImage ? (
+                                            <img src={minesBgImage} alt="BG" className="w-full max-h-24 object-cover rounded-lg" />
+                                        ) : (
+                                            <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-orange-400 transition-colors bg-white/5 rounded-lg p-3 justify-center border border-dashed border-white/10">
+                                                <Upload size={14} /> Upload background
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setMinesBgImage, 800)} />
+                                            </label>
+                                        )}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ═══ MINES: Grid & Mechanics ═══ */}
+                        {gameType === 'mines' && minesActiveSection === 'mechanics' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Grid3X3 size={16} className="text-orange-400" /> Grid Size & Game Mechanics
+                                </h3>
+
+                                {/* Grid Size */}
+                                <div className="space-y-3">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Grid Size</label>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        {(Object.entries(MINES_GRID_PRESETS) as [MinesGridSize, any][]).map(([key, preset]) => (
+                                            <button
+                                                key={key}
+                                                onClick={() => setMinesGridSize(key)}
+                                                className={`p-4 rounded-xl border-2 transition-all text-center ${minesGridSize === key
+                                                    ? 'border-orange-500 bg-orange-500/10 shadow-[0_0_20px_rgba(249,115,22,0.15)]'
+                                                    : 'border-white/10 bg-[#0a111a] hover:border-white/20'
+                                                }`}
+                                            >
+                                                <div className="text-2xl font-black text-white mb-1">{preset.label}</div>
+                                                <div className="text-[10px] text-slate-400">{preset.description}</div>
+                                                <div className="text-xs text-orange-400 font-bold mt-1">{preset.total} tiles</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Animations */}
+                                <div className="space-y-3">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Animations</label>
+                                    <Toggle enabled={minesEnableFlip} onToggle={() => setMinesEnableFlip(!minesEnableFlip)} label="3D Flip Animation on Safe Reveal" />
+
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-4 block">Bust Animation Style</label>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {BUST_ANIMATION_PRESETS.map(preset => (
+                                            <button
+                                                key={preset.id}
+                                                onClick={() => setMinesBustStyle(preset.id as any)}
+                                                className={`p-3 rounded-xl border transition-all text-center ${minesBustStyle === preset.id
+                                                    ? 'border-orange-500 bg-orange-500/10'
+                                                    : 'border-white/10 bg-[#0a111a] hover:border-white/20'
+                                                }`}
+                                            >
+                                                <div className="text-xl mb-1">{preset.emoji}</div>
+                                                <div className="text-xs font-bold text-white">{preset.label}</div>
+                                                <div className="text-[10px] text-slate-500 mt-1">{preset.description}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Audio */}
+                                <div className="space-y-3">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                        <Volume2 size={14} /> Audio Settings
+                                    </label>
+                                    <Toggle enabled={minesEnableSuspense} onToggle={() => setMinesEnableSuspense(!minesEnableSuspense)} label="Progressive Suspense (BPM accelerates with each safe reveal)" />
+
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-4 block">Loss Sound</label>
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                        {LOSS_SOUND_PRESETS.map(preset => (
+                                            <button
+                                                key={preset.id}
+                                                onClick={() => setMinesLossSoundType(preset.id as any)}
+                                                className={`p-3 rounded-xl border transition-all text-center ${minesLossSoundType === preset.id
+                                                    ? 'border-orange-500 bg-orange-500/10'
+                                                    : 'border-white/10 bg-[#0a111a] hover:border-white/20'
+                                                }`}
+                                            >
+                                                <div className="text-lg mb-1">{preset.emoji}</div>
+                                                <div className="text-xs font-bold text-white">{preset.label}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {minesLossSoundType === 'custom' && (
+                                        <div className="bg-[#0a111a] border border-white/10 rounded-xl p-4 space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs font-bold text-slate-500">Custom Loss Sound</span>
+                                                {minesLossSoundFile && <button onClick={() => setMinesLossSoundFile(null)} className="text-xs text-red-400">Remove</button>}
+                                            </div>
+                                            {minesLossSoundFile ? (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-green-400">✓ Uploaded</span>
+                                                    <audio controls src={minesLossSoundFile} className="h-8 w-full max-w-[200px]" />
+                                                </div>
+                                            ) : (
+                                                <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-orange-400 bg-white/5 rounded-lg p-3 justify-center border border-dashed border-white/10">
+                                                    <Upload size={14} /> Upload audio (max 2MB)
+                                                    <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleAudioUpload(e, setMinesLossSoundFile)} />
+                                                </label>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Custom reveal sound */}
+                                    <div className="bg-[#0a111a] border border-white/10 rounded-xl p-4 space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Custom Reveal Sound (Optional)</span>
+                                            {minesRevealSoundFile && <button onClick={() => setMinesRevealSoundFile(null)} className="text-xs text-red-400">Remove</button>}
+                                        </div>
+                                        {minesRevealSoundFile ? (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-green-400">✓ Uploaded</span>
+                                                <audio controls src={minesRevealSoundFile} className="h-8 w-full max-w-[200px]" />
+                                            </div>
+                                        ) : (
+                                            <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-green-400 bg-white/5 rounded-lg p-3 justify-center border border-dashed border-white/10">
+                                                <Upload size={14} /> Upload safe-reveal sound
+                                                <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleAudioUpload(e, setMinesRevealSoundFile)} />
+                                            </label>
+                                        )}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ═══ MINES: Preview & Publish ═══ */}
+                        {gameType === 'mines' && minesActiveSection === 'preview' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Eye size={16} className="text-orange-400" /> Preview & Publish
+                                </h3>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Grid Preview */}
+                                    <div className="space-y-4">
+                                        <h4 className="text-xs font-black text-white uppercase tracking-widest">Grid Preview</h4>
+                                        <div className="rounded-2xl p-6 border border-white/10 relative overflow-hidden" style={{ backgroundColor: minesBgColor }}>
+                                            {/* Watermark */}
+                                            {minesWatermarkImage && (
+                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                                                    <img src={minesWatermarkImage} alt="" className="w-3/4 h-3/4 object-contain opacity-10" />
+                                                </div>
+                                            )}
+                                            {/* Background */}
+                                            {minesBgImage && (
+                                                <div className="absolute inset-0 z-0">
+                                                    <img src={minesBgImage} alt="" className="w-full h-full object-cover opacity-20" />
+                                                </div>
+                                            )}
+                                            <div className="relative z-10 grid gap-2 max-w-[300px] mx-auto" style={{ gridTemplateColumns: `repeat(${MINES_GRID_PRESETS[minesGridSize].cols}, 1fr)` }}>
+                                                {Array(MINES_GRID_PRESETS[minesGridSize].total).fill(0).map((_, idx) => {
+                                                    const showMine = idx === 3 || idx === 7;
+                                                    const showGem = idx === 0 || idx === 4;
+                                                    return (
+                                                        <div
+                                                            key={idx}
+                                                            className={`aspect-square rounded-xl flex items-center justify-center transition-all ${
+                                                                showMine ? 'bg-red-950/60 border border-red-500/30' :
+                                                                showGem ? 'bg-[#0a1114] border border-white/5' :
+                                                                'border border-white/5'
+                                                            }`}
+                                                            style={{ backgroundColor: !showMine && !showGem ? minesTileColor : undefined }}
+                                                        >
+                                                            {showMine && (
+                                                                minesMineImage ? <img src={minesMineImage} alt="" className="w-6 h-6 object-contain" /> :
+                                                                <span className="text-red-500 text-lg">💣</span>
+                                                            )}
+                                                            {showGem && (
+                                                                minesGemImage ? <img src={minesGemImage} alt="" className="w-6 h-6 object-contain" /> :
+                                                                <span className="text-green-400 text-lg">💎</span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Bust Preview */}
+                                        {minesBustImage && minesBustStyle === 'fullscreen_image' && (
+                                            <div className="bg-[#0a111a] border border-white/10 rounded-xl p-4">
+                                                <h4 className="text-xs font-black text-white uppercase tracking-widest mb-2">Bust Overlay Preview</h4>
+                                                <div className="relative rounded-lg overflow-hidden bg-black/50 aspect-video flex items-center justify-center">
+                                                    <img src={minesBustImage} alt="Bust" className="max-w-full max-h-full object-contain opacity-70" />
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <span className="text-5xl font-black text-red-500 uppercase tracking-widest drop-shadow-[0_0_20px_rgba(255,0,0,0.8)]" style={{ textShadow: '0 0 30px rgba(255,0,0,0.5)' }}>BUSTED</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Config Summary & Publish */}
+                                    <div className="space-y-4">
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                            <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2">Configuration</h4>
+                                            <div className="space-y-2 text-xs">
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Type</span><span className="text-orange-400 font-bold">Mines</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Grid</span><span className="text-white font-mono">{MINES_GRID_PRESETS[minesGridSize].label} ({MINES_GRID_PRESETS[minesGridSize].total} tiles)</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">3D Flip</span><span className={minesEnableFlip ? 'text-green-400' : 'text-slate-600'}>{minesEnableFlip ? '✓ Enabled' : '✗'}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Bust Style</span><span className="text-white capitalize">{minesBustStyle.replace('_', ' ')}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Suspense Audio</span><span className={minesEnableSuspense ? 'text-green-400' : 'text-slate-600'}>{minesEnableSuspense ? '✓ Progressive' : '✗'}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Loss Sound</span><span className="text-white capitalize">{minesLossSoundType.replace('_', ' ')}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Mine Image</span><span className="text-white">{minesMineImage ? '📸 Custom' : 'Default'}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Gem Image</span><span className="text-white">{minesGemImage ? '📸 Custom' : 'Default'}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Bust Image</span><span className="text-white">{minesBustImage ? '📸 Custom' : 'None'}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Watermark</span><span className="text-white">{minesWatermarkImage ? '📸 Custom' : 'None'}</span></div>
+                                            </div>
+                                        </div>
+
+                                        {/* Cover Image Upload */}
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <h4 className="text-xs font-black text-white uppercase tracking-widest">Lobby Cover Image</h4>
+                                                {minesCoverImage && <button onClick={() => setMinesCoverImage(null)} className="text-xs text-red-400 hover:text-red-300">Remove</button>}
+                                            </div>
+                                            {minesCoverImage ? (
+                                                <img src={minesCoverImage} alt="Cover" className="w-full h-40 object-cover rounded-lg border border-white/10" />
+                                            ) : (
+                                                <label className="flex flex-col items-center gap-2 text-slate-400 cursor-pointer hover:text-orange-400 transition-colors bg-white/5 rounded-xl p-8 justify-center border-2 border-dashed border-white/10 hover:border-orange-500/30">
+                                                    <ImageIcon size={24} />
+                                                    <span className="text-xs font-bold">Upload Cover Image</span>
+                                                    <span className="text-[10px] text-slate-600">Required for publishing</span>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setMinesCoverImage, 800)} />
+                                                </label>
+                                            )}
+                                        </div>
+
+                                        {/* Publish Button */}
+                                        <button
+                                            onClick={handlePublish}
+                                            disabled={isPublishing || !minesGameName.trim() || !minesCoverImage}
+                                            className={`w-full py-4 rounded-xl font-black text-lg tracking-widest uppercase transition-all flex justify-center items-center gap-2 ${isPublishing || !minesGameName.trim() || !minesCoverImage
+                                                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                                : 'bg-gradient-to-r from-orange-600 to-amber-600 text-white hover:brightness-110 hover:-translate-y-1 shadow-[0_5px_20px_rgba(249,115,22,0.3)]'
+                                            }`}
+                                        >
+                                            {isPublishing ? <><Loader2 className="animate-spin" size={20} /> Publishing...</> : <><Save size={20} /> Publish to Lobby</>}
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ════════════════════════════════════════════════════ */}
+                        {/* CASE SECTIONS                                        */}
+                        {/* ════════════════════════════════════════════════════ */}
+
+                        {/* ═══ CASE: Design & Audio ═══ */}
+                        {gameType === 'case' && caseActiveSection === 'design' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Palette size={16} className="text-indigo-400" /> Appearance & Audio
+                                </h3>
+                                
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Game Title</label>
+                                            <input type="text" value={caseGameName} onChange={(e) => setCaseGameName(e.target.value)}
+                                                className="w-full bg-[#0a111a] border border-white/10 focus:border-indigo-400 rounded-xl px-4 py-3 text-white font-bold focus:outline-none transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Description</label>
+                                            <input type="text" value={caseGameDescription} onChange={(e) => setCaseGameDescription(e.target.value)}
+                                                className="w-full bg-[#0a111a] border border-white/10 focus:border-indigo-400 rounded-xl px-4 py-3 text-white text-sm focus:outline-none transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Collection Name</label>
+                                            <input type="text" value={caseCollectionName} onChange={(e) => setCaseCollectionName(e.target.value)}
+                                                className="w-full bg-[#0a111a] border border-white/10 focus:border-indigo-400 rounded-xl px-4 py-3 text-white focus:outline-none transition-all" />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Accent</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={caseAccentColor} onChange={(e) => setCaseAccentColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-xs">{caseAccentColor}</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Background</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={caseBgColor} onChange={(e) => setCaseBgColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-xs">{caseBgColor}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-4 block flex items-center gap-2">
+                                            <ImageIcon size={14} /> Background Image (Optional)
+                                        </label>
+                                        {caseBgImage ? (
+                                            <div className="relative rounded-xl overflow-hidden h-32 border border-white/10">
+                                                <img src={caseBgImage} alt="" className="w-full h-full object-cover opacity-50" style={{ backgroundColor: caseBgColor }} />
+                                                <button onClick={() => setCaseBgImage(null)} className="absolute top-2 right-2 bg-red-500/80 text-white p-1 rounded-md hover:bg-red-500 transition-colors">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-indigo-400 bg-white/5 rounded-xl p-4 justify-center border border-dashed border-white/10 hover:border-indigo-400/30 transition-all">
+                                                <Upload size={16} /> Upload Background Image
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setCaseBgImage, 1200)} />
+                                            </label>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block">Case Design</label>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {CASE_DESIGN_PRESETS.map(preset => (
+                                                <button
+                                                    key={preset.id}
+                                                    onClick={() => setCaseDesign(preset.id as any)}
+                                                    className={`p-3 rounded-xl border transition-all text-left ${caseDesign === preset.id
+                                                        ? 'border-indigo-500 bg-indigo-500/10'
+                                                        : 'border-white/10 bg-[#0a111a] hover:border-white/20'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-2xl">{preset.emoji}</span>
+                                                        <div>
+                                                            <div className="text-sm font-bold text-white">{preset.label}</div>
+                                                            <div className="text-[10px] text-slate-500">{preset.description}</div>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {caseDesign === 'custom' && (
+                                            <div className="mt-3">
+                                                {caseImage ? (
+                                                    <div className="relative rounded-xl overflow-hidden h-32 border border-white/10 flex items-center justify-center bg-[#0a111a]">
+                                                        <img src={caseImage} alt="" className="h-24 object-contain" />
+                                                        <button onClick={() => setCaseImage(null)} className="absolute top-2 right-2 bg-red-500/80 text-white p-1 rounded-md hover:bg-red-500 transition-colors">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-indigo-400 bg-white/5 rounded-xl p-4 justify-center border border-dashed border-white/10 hover:border-indigo-400/30 transition-all">
+                                                        <Upload size={16} /> Upload Custom Case Image
+                                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setCaseImage, 500)} />
+                                                    </label>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <div className="h-px w-full bg-white/5 my-6" />
+
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block flex items-center gap-2">
+                                            <Volume2 size={14} /> Audio & Visual FX
+                                        </label>
+                                        
+                                        <label className="text-xs font-bold text-slate-400 mt-2 block">Opening Sound</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {OPENING_SOUND_PRESETS.map(preset => (
+                                                <button
+                                                    key={preset.id}
+                                                    onClick={() => setCaseOpeningSoundType(preset.id as any)}
+                                                    className={`py-2 px-3 rounded-lg border transition-all text-left flex items-center gap-2 ${caseOpeningSoundType === preset.id
+                                                        ? 'border-indigo-500 bg-indigo-500/10'
+                                                        : 'border-white/10 bg-[#0a111a] hover:border-white/20'
+                                                    }`}
+                                                >
+                                                    <span>{preset.emoji}</span>
+                                                    <span className="text-xs font-bold text-white">{preset.label}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <Toggle enabled={caseEnableRareExplosion} onToggle={() => setCaseEnableRareExplosion(!caseEnableRareExplosion)} label="Rare+ Reveal Explosion Sounds" />
+                                        <Toggle enabled={caseEnableRarityGlow} onToggle={() => setCaseEnableRarityGlow(!caseEnableRarityGlow)} label="Item Rarity Neon Glow FX" />
+
+                                        <label className="text-xs font-bold text-slate-400 mt-2 block">Roulette Reveal Speed</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {SCROLL_SPEED_PRESETS.map(preset => (
+                                                <button
+                                                    key={preset.id}
+                                                    onClick={() => setCaseScrollDuration(preset.value)}
+                                                    className={`py-2 rounded-lg border transition-all text-center ${caseScrollDuration === preset.value
+                                                        ? 'border-indigo-500 bg-indigo-500/10 text-white font-bold'
+                                                        : 'border-white/10 bg-[#0a111a] text-slate-500 hover:border-white/20 hover:text-slate-300'
+                                                    }`}
+                                                >
+                                                    <div className="text-xs">{preset.label}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ═══ CASE: Items & Rarities ═══ */}
+                        {gameType === 'case' && caseActiveSection === 'items' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                                    <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest flex items-center gap-2">
+                                        <Settings2 size={16} className="text-indigo-400" /> Items & Rarities
+                                    </h3>
+                                    
+                                    <div className="text-xs font-mono font-bold flex items-center gap-2">
+                                        Total Probability: 
+                                        <span className={Math.abs(caseItems.reduce((acc, item) => acc + item.probability, 0) - 100) < 0.01 ? 'text-green-400' : 'text-red-400'}>
+                                            {caseItems.reduce((acc, item) => acc + item.probability, 0).toFixed(2)}%
+                                        </span>
+                                        (Must equal 100%)
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {caseItems.map((item, index) => (
+                                        <div key={item.id} className="bg-[#0a111a] border border-white/10 rounded-xl p-4 flex flex-col md:flex-row gap-4 items-center group">
+                                            {/* Delete Button */}
+                                            <button onClick={() => {
+                                                const newItems = [...caseItems];
+                                                newItems.splice(index, 1);
+                                                setCaseItems(newItems);
+                                            }} className="absolute -left-2 top-1/2 -translate-y-1/2 md:static md:translate-y-0 text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 p-2">
+                                                <Trash2 size={16} />
+                                            </button>
+
+                                            {/* Item Image */}
+                                            <div className="w-16 h-16 shrink-0 rounded-lg border border-white/10 overflow-hidden relative group/img cursor-pointer bg-white/5 flex items-center justify-center">
+                                                {item.image ? (
+                                                    <img src={item.image} alt="" className="w-full h-full object-contain p-1" />
+                                                ) : (
+                                                    <span className="text-xl font-black text-white">{item.multiplier}x</span>
+                                                )}
+                                                <label className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer text-white">
+                                                    <Upload size={16} />
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                                        handleFileUpload(e, (url: string | null) => {
+                                                            const newItems = [...caseItems];
+                                                            newItems[index].image = url;
+                                                            setCaseItems(newItems);
+                                                        }, 200);
+                                                    }} />
+                                                </label>
+                                                {item.image && (
+                                                    <button onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        const newItems = [...caseItems];
+                                                        newItems[index].image = null;
+                                                        setCaseItems(newItems);
+                                                    }} className="absolute top-0 right-0 p-1 text-red-500 opacity-0 group-hover/img:opacity-100 bg-black/50 rounded-bl-lg">
+                                                        <X size={12} />
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {/* Item Details */}
+                                            <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-3 w-full">
+                                                <div className="col-span-2 md:col-span-1">
+                                                    <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Name</label>
+                                                    <input type="text" value={item.name} onChange={(e) => {
+                                                        const newItems = [...caseItems];
+                                                        newItems[index].name = e.target.value;
+                                                        setCaseItems(newItems);
+                                                    }} className="w-full bg-black/30 border border-white/5 rounded-lg px-3 py-2 text-sm text-white font-bold" />
+                                                </div>
+                                                
+                                                <div>
+                                                    <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Rarity</label>
+                                                    <select value={item.rarity} onChange={(e) => {
+                                                        const newItems = [...caseItems];
+                                                        newItems[index].rarity = e.target.value as CaseRarity;
+                                                        setCaseItems(newItems);
+                                                    }} className="w-full bg-black/30 border border-white/5 rounded-lg px-3 py-2 text-sm text-white capitalize appearance-none">
+                                                        {(Object.keys(RARITY_CONFIG) as CaseRarity[]).map(r => (
+                                                            <option key={r} value={r}>{RARITY_CONFIG[r].label}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Multiplier</label>
+                                                    <div className="relative">
+                                                        <input type="number" step="0.1" value={item.multiplier} onChange={(e) => {
+                                                            const newItems = [...caseItems];
+                                                            newItems[index].multiplier = Number(e.target.value);
+                                                            setCaseItems(newItems);
+                                                        }} className="w-full bg-black/30 border border-white/5 rounded-lg pl-3 pr-6 py-2 text-sm text-white font-mono" />
+                                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 text-xs">x</span>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Prob (%)</label>
+                                                    <div className="relative">
+                                                        <input type="number" step="0.01" value={item.probability} onChange={(e) => {
+                                                            const newItems = [...caseItems];
+                                                            newItems[index].probability = Number(e.target.value);
+                                                            setCaseItems(newItems);
+                                                        }} className="w-full bg-black/30 border border-white/5 rounded-lg pl-3 pr-6 py-2 text-sm text-white font-mono" />
+                                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 text-xs">%</span>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Color</label>
+                                                    <input type="color" value={item.color} onChange={(e) => {
+                                                        const newItems = [...caseItems];
+                                                        newItems[index].color = e.target.value;
+                                                        setCaseItems(newItems);
+                                                    }} className="w-full h-9 rounded-lg border border-white/5 cursor-pointer bg-black/30 p-1" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    <button 
+                                        onClick={() => {
+                                            setCaseItems([
+                                                ...caseItems,
+                                                { id: 'item_' + Date.now(), name: 'New Item', multiplier: 1, rarity: 'common', probability: 0, image: null, color: '#4b5563' }
+                                            ]);
+                                        }}
+                                        className="w-full py-3 rounded-xl border border-dashed border-white/20 text-slate-400 hover:text-indigo-400 hover:border-indigo-400/50 hover:bg-indigo-500/5 transition-all text-sm font-bold flex justify-center items-center gap-2"
+                                    >
+                                        + Add New Item
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ═══ CASE: Preview & Publish ═══ */}
+                        {gameType === 'case' && caseActiveSection === 'preview' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Eye size={16} className="text-indigo-400" /> Preview & Publish
+                                </h3>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* Preview container */}
+                                    <div className="lg:col-span-2 space-y-3">
+                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative flex flex-col items-center justify-center p-6" style={{ boxShadow: `0 0 40px ${caseAccentColor}15`, backgroundColor: caseBgColor }}>
+                                            {caseBgImage && <img src={caseBgImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />}
+                                            <div className="absolute inset-0 bg-black/30 z-0"></div>
+
+                                            {/* Big preview case */}
+                                            <div className="relative z-10 flex flex-col items-center gap-4">
+                                                {caseDesign === 'custom' && caseImage ? (
+                                                    <img src={caseImage} alt="Case Info" className="w-32 h-32 object-contain drop-shadow-2xl" />
+                                                ) : (
+                                                    <div className="text-8xl filter drop-shadow-2xl" style={{ textShadow: `0 0 40px ${caseAccentColor}50` }}>
+                                                        {CASE_DESIGN_PRESETS.find(d => d.id === caseDesign)?.emoji}
+                                                    </div>
+                                                )}
+                                                <h2 className="text-3xl font-black text-white uppercase tracking-widest">{caseCollectionName}</h2>
+                                                
+                                                <div className="mt-8 flex gap-2 overflow-x-auto max-w-[500px] pb-4 custom-scrollbar">
+                                                    {caseItems.slice(0, 5).map(item => (
+                                                        <div key={item.id} className="w-20 h-24 shrink-0 rounded-xl flex flex-col items-center justify-center border-2" 
+                                                             style={{ 
+                                                                 borderColor: caseEnableRarityGlow ? RARITY_CONFIG[item.rarity].glowColor : 'rgba(255,255,255,0.1)', 
+                                                                 backgroundColor: item.color + '40'
+                                                             }}>
+                                                            {item.image ? (
+                                                                <img src={item.image} alt="" className="w-10 h-10 object-contain p-1" />
+                                                            ) : (
+                                                                <span className="text-lg font-black text-white">{item.multiplier}x</span>
+                                                            )}
+                                                            <span className="text-[9px] text-white/50 font-bold uppercase truncate max-w-full px-1">{item.name}</span>
+                                                        </div>
+                                                    ))}
+                                                    {caseItems.length > 5 && (
+                                                        <div className="w-20 h-24 shrink-0 rounded-xl flex items-center justify-center border border-dashed border-white/20 bg-white/5">
+                                                            <span className="text-xs text-white/50 font-bold">+{caseItems.length - 5} More</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Config Summary & Publish */}
+                                    <div className="space-y-4">
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                            <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2">Configuration</h4>
+                                            <div className="space-y-2 text-xs">
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Type</span><span className="text-indigo-400 font-bold">Case Opening</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Items Count</span><span className="text-white font-mono">{caseItems.length}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Total Prob</span><span className={Math.abs(caseItems.reduce((acc, item) => acc + item.probability, 0) - 100) < 0.01 ? 'text-green-400' : 'text-red-400'}>{caseItems.reduce((acc, item) => acc + item.probability, 0).toFixed(2)}%</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Case Design</span><span className="text-white capitalize">{caseDesign}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Opening Sound</span><span className="text-white capitalize">{caseOpeningSoundType}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-500 font-bold">Rarity Glow FX</span><span className={caseEnableRarityGlow ? 'text-green-400' : 'text-slate-600'}>{caseEnableRarityGlow ? '✓ On' : '✗ Off'}</span></div>
+                                            </div>
+                                        </div>
+
+                                        {/* Cover Image Upload */}
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <h4 className="text-xs font-black text-white uppercase tracking-widest">Lobby Cover Image</h4>
+                                                {caseCoverImage && <button onClick={() => setCaseCoverImage(null)} className="text-xs text-red-400 hover:text-red-300">Remove</button>}
+                                            </div>
+                                            {caseCoverImage ? (
+                                                <img src={caseCoverImage} alt="Cover" className="w-full h-40 object-cover rounded-lg border border-white/10" />
+                                            ) : (
+                                                <label className="flex flex-col items-center gap-2 text-slate-400 cursor-pointer hover:text-indigo-400 transition-colors bg-white/5 rounded-xl p-8 justify-center border-2 border-dashed border-white/10 hover:border-indigo-500/30">
+                                                    <ImageIcon size={24} />
+                                                    <span className="text-xs font-bold">Upload Cover Image</span>
+                                                    <span className="text-[10px] text-slate-600">Required for publishing</span>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setCaseCoverImage, 800)} />
+                                                </label>
+                                            )}
+                                        </div>
+
+                                        {/* Publish Button */}
+                                        <button
+                                            onClick={handlePublish}
+                                            disabled={isPublishing || !caseGameName.trim() || !caseCoverImage || Math.abs(caseItems.reduce((acc, item) => acc + item.probability, 0) - 100) > 0.01}
+                                            className={`w-full py-4 rounded-xl font-black text-lg tracking-widest uppercase transition-all flex justify-center items-center gap-2 ${isPublishing || !caseGameName.trim() || !caseCoverImage || Math.abs(caseItems.reduce((acc, item) => acc + item.probability, 0) - 100) > 0.01
+                                                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                                : 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:brightness-110 hover:-translate-y-1 shadow-[0_5px_20px_rgba(99,102,241,0.3)]'
+                                            }`}
+                                        >
+                                            {isPublishing ? <><Loader2 className="animate-spin" size={20} /> Publishing...</> : <><Save size={20} /> Publish to Lobby</>}
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ════════════════════════════════════════════════════ */}
+                        {/* HILO SECTIONS                                        */}
+                        {/* ════════════════════════════════════════════════════ */}
+
+                        {gameType === 'hilo' && hiloActiveSection === 'design' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Palette size={16} className="text-blue-400" /> Branding & Aesthetics
+                                </h3>
+                                
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <label className="block">
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Game Name</span>
+                                            <input type="text" value={hiloGameName} onChange={e => setHiloGameName(e.target.value)} className="w-full bg-[#0a111a] border border-white/10 rounded-xl p-4 text-white focus:border-blue-500 font-bold transition-all outline-none" />
+                                        </label>
+                                        <label className="block">
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Description</span>
+                                            <textarea value={hiloGameDescription} onChange={e => setHiloGameDescription(e.target.value)} className="w-full bg-[#0a111a] border border-white/10 rounded-xl p-4 text-white focus:border-blue-500 font-medium transition-all outline-none h-24 resize-none" />
+                                        </label>
+                                        
+                                        {/* Accent Color */}
+                                        <div>
+                                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Accent Color</span>
+                                           <div className="flex gap-2">
+                                              {['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#ffffff'].map((color) => (
+                                                  <button key={color} onClick={() => setHiloAccentColor(color)} className={`w-8 h-8 rounded-lg shadow-lg border-2 ${hiloAccentColor === color ? 'border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: color }} />
+                                              ))}
+                                           </div>
+                                        </div>
+                                        {/* Bg Color */}
+                                        <div>
+                                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block mt-4">Background Color</span>
+                                           <div className="flex gap-2">
+                                              {['#0a111a', '#1a0b16', '#0b161a', '#161a0b', '#1a0b0b'].map((color) => (
+                                                  <button key={color} onClick={() => setHiloBgColor(color)} className={`w-8 h-8 rounded-lg shadow-lg border-2 ${hiloBgColor === color ? 'border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: color }} />
+                                              ))}
+                                           </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Card Design Imagery</span>
+                                        <p className="text-xs text-slate-500">Personalize cards by uploading your image!</p>
+                                        <label className="border-2 border-dashed border-white/10 rounded-xl p-4 flex gap-4 items-center cursor-pointer hover:border-blue-500/50 bg-[#0a111a] transition-all">
+                                            {hiloCardBackImage ? <img src={hiloCardBackImage} className="w-10 h-16 object-cover rounded-md" /> : <div className="w-10 h-16 bg-white/5 rounded-md flex items-center justify-center"><ImageIcon size={16} /></div>}
+                                            <div>
+                                                 <span className="font-bold text-sm block">Card Back Cover</span>
+                                                 <span className="text-xs text-slate-500">Image on the back of all cards</span>
+                                            </div>
+                                            <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloCardBackImage, 400)} />
+                                        </label>
+                                        <label className="border-2 border-dashed border-white/10 rounded-xl p-4 flex gap-4 items-center cursor-pointer hover:border-blue-500/50 bg-[#0a111a] transition-all">
+                                            {hiloFaceJ ? <img src={hiloFaceJ} className="w-10 h-16 object-cover rounded-md" /> : <div className="w-10 h-16 bg-white/5 rounded-md flex items-center justify-center"><ImageIcon size={16} /></div>}
+                                            <div>
+                                                 <span className="font-bold text-sm block">Jack (J) Face</span>
+                                                 <span className="text-xs text-slate-500">Replaces J center image</span>
+                                            </div>
+                                            <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloFaceJ, 400)} />
+                                        </label>
+                                         <label className="border-2 border-dashed border-white/10 rounded-xl p-4 flex gap-4 items-center cursor-pointer hover:border-blue-500/50 bg-[#0a111a] transition-all">
+                                            {hiloFaceQ ? <img src={hiloFaceQ} className="w-10 h-16 object-cover rounded-md" /> : <div className="w-10 h-16 bg-white/5 rounded-md flex items-center justify-center"><ImageIcon size={16} /></div>}
+                                            <div>
+                                                 <span className="font-bold text-sm block">Queen (Q) Face</span>
+                                                 <span className="text-xs text-slate-500">Replaces Q center image</span>
+                                            </div>
+                                            <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloFaceQ, 400)} />
+                                        </label>
+                                         <label className="border-2 border-dashed border-white/10 rounded-xl p-4 flex gap-4 items-center cursor-pointer hover:border-blue-500/50 bg-[#0a111a] transition-all">
+                                            {hiloFaceK ? <img src={hiloFaceK} className="w-10 h-16 object-cover rounded-md" /> : <div className="w-10 h-16 bg-white/5 rounded-md flex items-center justify-center"><ImageIcon size={16} /></div>}
+                                            <div>
+                                                 <span className="font-bold text-sm block">King (K) Face</span>
+                                                 <span className="text-xs text-slate-500">Replaces K center image</span>
+                                            </div>
+                                            <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloFaceK, 400)} />
+                                        </label>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {gameType === 'hilo' && hiloActiveSection === 'audio' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Volume2 size={16} className="text-blue-400" /> Audio Setup
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                     <div className="space-y-4">
+                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Card Deal Sound</span>
+                                         <div className="grid grid-cols-1 gap-2">
+                                             {HILO_DEAL_SOUNDS.map(preset => (
+                                                 <button key={preset.id} onClick={() => setHiloDealSoundType(preset.id as any)} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${hiloDealSoundType === preset.id ? 'border-blue-500 bg-blue-500/10' : 'border-white/10 bg-[#0a111a] hover:border-white/20'}`}>
+                                                     <span className="text-xl">{preset.emoji}</span>
+                                                     <span className="font-bold text-sm">{preset.label}</span>
+                                                 </button>
+                                             ))}
+                                         </div>
+                                         {hiloDealSoundType === 'custom' && (
+                                            <label className="border border-white/20 rounded-lg p-3 flex gap-4 items-center cursor-pointer hover:bg-white/5">
+                                                <Upload size={16} /> <span className="text-sm font-medium">{hiloDealSoundFile ? "Custom File Loaded" : "Upload MP3/WAV File"}</span>
+                                                <input type="file" accept="audio/*" className="hidden" onChange={e => handleFileUpload(e, setHiloDealSoundFile)} />
+                                            </label>
+                                         )}
+                                     </div>
+
+                                     <div className="space-y-4">
+                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Lose / Bust Sound</span>
+                                         <div className="grid grid-cols-1 gap-2">
+                                             {HILO_LOSS_SOUNDS.map(preset => (
+                                                 <button key={preset.id} onClick={() => setHiloLossSoundType(preset.id as any)} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${hiloLossSoundType === preset.id ? 'border-blue-500 bg-blue-500/10' : 'border-white/10 bg-[#0a111a] hover:border-white/20'}`}>
+                                                     <span className="text-xl">{preset.emoji}</span>
+                                                     <span className="font-bold text-sm">{preset.label}</span>
+                                                 </button>
+                                             ))}
+                                         </div>
+                                         {hiloLossSoundType === 'custom' && (
+                                            <label className="border border-white/20 rounded-lg p-3 flex gap-4 items-center cursor-pointer hover:bg-white/5">
+                                                <Upload size={16} /> <span className="text-sm font-medium">{hiloLossSoundFile ? "Custom File Loaded" : "Upload MP3/WAV File"}</span>
+                                                <input type="file" accept="audio/*" className="hidden" onChange={e => handleFileUpload(e, setHiloLossSoundFile)} />
+                                            </label>
+                                         )}
+                                     </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {gameType === 'hilo' && hiloActiveSection === 'preview' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Rocket size={16} className="text-blue-400" /> Review & Publish
+                                </h3>
+                                
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                     {/* Thumbnail Block */}
+                                     <div className="bg-[#0a111a] p-6 rounded-2xl border border-white/10 relative overflow-hidden group">
+                                         <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                         <div className="flex gap-4 items-start relative z-10">
+                                             <label className={`w-32 h-32 shrink-0 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${hiloCoverImage ? 'border-transparent' : 'border-white/20 hover:border-white/40 hover:bg-white/5 bg-black/50'}`}>
+                                                 {hiloCoverImage ? (
+                                                     <img src={hiloCoverImage} className="w-full h-full object-cover rounded-xl" />
+                                                 ) : (
+                                                     <>
+                                                         <Upload size={24} className="text-slate-400 mb-2" />
+                                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Cover<br/>Image</span>
+                                                     </>
+                                                 )}
+                                                 <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloCoverImage, 800)} />
+                                             </label>
+                                             <div className="pt-2">
+                                                 <h4 className="text-2xl font-black text-white">{hiloGameName || "Untitled Game"}</h4>
+                                                 <p className="text-sm text-slate-400 mt-1 line-clamp-2">{hiloGameDescription || "No description provided."}</p>
+                                                 <div className="mt-4 flex gap-2">
+                                                     <div className="px-2 py-1 rounded bg-black/50 text-[10px] font-bold uppercase text-blue-400 tracking-wider">Hi-Lo Cards</div>
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+
+                                     {/* Settings Preview / Publishing */}
+                                     <div className="bg-[#0a111a] p-6 rounded-2xl border border-white/10 flex flex-col justify-between">
+                                         <div>
+                                             <h4 className="font-bold text-white mb-2 flex items-center gap-2">
+                                                 <ShieldCheck className="text-green-400" size={18} /> Ready to Ship
+                                             </h4>
+                                             <p className="text-sm text-slate-400 mb-4">You have set up your game theme, descriptions, colors, customized card imagery, and configured audio logic. Once published, your followers can play it in the Casino tab!</p>
+                                         </div>
+                                         <button
+                                              onClick={handlePublish}
+                                              disabled={isPublishing || !hiloGameName.trim() || !hiloCoverImage}
+                                              className={`w-full py-4 rounded-xl font-black text-lg tracking-widest uppercase transition-all flex justify-center items-center gap-2 ${isPublishing || !hiloGameName.trim() || !hiloCoverImage
+                                                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:brightness-110 hover:-translate-y-1 shadow-[0_5px_20px_rgba(59,130,246,0.3)]'
+                                              }`}
+                                          >
+                                              {isPublishing ? <><Loader2 className="animate-spin" size={20} /> Publishing...</> : <><Save size={20} /> Publish to Lobby</>}
+                                          </button>
+                                     </div>
+                                </div>
+                            </motion.div>
+                        )}
+
 
                     </div>
                 )}

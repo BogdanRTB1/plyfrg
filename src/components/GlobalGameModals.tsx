@@ -32,6 +32,9 @@ import CustomPlinkoModal from "@/components/CustomPlinkoModal";
 import CustomMinesModal from "@/components/CustomMinesModal";
 import CustomCrashModal from "@/components/CustomCrashModal";
 import CustomScratchModal from "@/components/CustomScratchModal";
+import CustomWheelModal from "@/components/CustomWheelModal";
+import CustomCaseModal from "@/components/CustomCaseModal";
+import CustomHiloModal from "@/components/CustomHiloModal";
 import AIGameModal from "@/components/AIGameModal";
 
 // Other modals
@@ -63,6 +66,9 @@ export default function GlobalGameModals() {
     const [isCustomMinesOpen, setIsCustomMinesOpen] = useState(false);
     const [isCustomCrashOpen, setIsCustomCrashOpen] = useState(false);
     const [isCustomScratchOpen, setIsCustomScratchOpen] = useState(false);
+    const [isCustomWheelOpen, setIsCustomWheelOpen] = useState(false);
+    const [isCustomCaseOpen, setIsCustomCaseOpen] = useState(false);
+    const [isCustomHiloOpen, setIsCustomHiloOpen] = useState(false);
     const [isAIGameOpen, setIsAIGameOpen] = useState(false);
 
     const [isCreatorAppOpen, setIsCreatorAppOpen] = useState(false);
@@ -167,6 +173,9 @@ export default function GlobalGameModals() {
                 else if (data.type === 'mines') setIsCustomMinesOpen(true);
                 else if (data.type === 'crash') setIsCustomCrashOpen(true);
                 else if (data.type === 'scratch') setIsCustomScratchOpen(true);
+                else if (data.type === 'wheel') setIsCustomWheelOpen(true);
+                else if (data.type === 'case') setIsCustomCaseOpen(true);
+                else if (data.type === 'hilo') setIsCustomHiloOpen(true);
                 // Record activity for custom game
                 recordGameActivity(label);
                 return;
@@ -255,6 +264,9 @@ export default function GlobalGameModals() {
             <CustomMinesModal isOpen={isCustomMinesOpen} onClose={() => setIsCustomMinesOpen(false)} gameData={activeCustomGame} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
             <CustomCrashModal isOpen={isCustomCrashOpen} onClose={() => setIsCustomCrashOpen(false)} gameData={activeCustomGame} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
             <CustomScratchModal isOpen={isCustomScratchOpen} onClose={() => setIsCustomScratchOpen(false)} gameData={activeCustomGame} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <CustomWheelModal isOpen={isCustomWheelOpen} onClose={() => setIsCustomWheelOpen(false)} gameData={activeCustomGame} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <CustomCaseModal isOpen={isCustomCaseOpen} onClose={() => setIsCustomCaseOpen(false)} gameData={activeCustomGame} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <CustomHiloModal isOpen={isCustomHiloOpen} onClose={() => setIsCustomHiloOpen(false)} gameConfig={activeCustomGame} gameName={activeCustomGame?.name} />
             
             {activeCustomGame && (
                 <AIGameModal isOpen={isAIGameOpen} onClose={() => setIsAIGameOpen(false)} gameData={activeCustomGame} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
