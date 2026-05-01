@@ -314,9 +314,7 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                 </div>
                             ))}
                         </div>
-                        <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-                            <X className="text-slate-400 hover:text-white" />
-                        </button>
+
                     </div>
 
                     <div className="flex-1 relative flex items-center justify-center">
