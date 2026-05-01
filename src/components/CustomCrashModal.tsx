@@ -40,13 +40,14 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
 
     const currentMultiplierRef = useRef(1.00);
 
-    const ROCKET_IMAGE = gameData?.config?.rocketImage;
-    const CRASH_IMAGE = gameData?.config?.crashImage;
+    const config = gameData?.crashConfig || gameData?.config || {};
+    const ROCKET_IMAGE = config.rocketImage;
+    const CRASH_IMAGE = config.crashImage;
+    const THEME_COLOR = config.themeColor || '#10b981'; // Emerald 500
 
-    // Read creator-configured engine params (with fallbacks)
-    const configAcceleration = gameData?.config?.accelerationCurve || 0.08;
-    const configHouseEdge = gameData?.config?.houseEdge || 5;
-    const configMaxMultiplier = gameData?.config?.maxMultiplier || 1000;
+    const configAcceleration = config.accelerationCurve || 0.08;
+    const configHouseEdge = config.houseEdge || 5;
+    const configMaxMultiplier = config.maxMultiplier || 1000;
 
     // We pre-load images to draw them on canvas
     const [rocketImgObj, setRocketImgObj] = useState<HTMLImageElement | null>(null);

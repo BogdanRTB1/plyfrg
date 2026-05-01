@@ -96,6 +96,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
         }, 300); // Match animation duration
     };
 
+    const refreshAfterLogin = () => {
+        router.refresh();
+        // Force a full client reload so creator-dependent UI is recalculated everywhere.
+        setTimeout(() => {
+            window.location.reload();
+        }, 120);
+    };
+
     // ... handleEmailAuth and handleSocialLogin remain same ...
 
     const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
@@ -164,7 +172,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
 
                     toast.success("Successfully authenticated");
                     handleClose();
-                    router.refresh();
+                    refreshAfterLogin();
                     return;
                 }
 
@@ -211,7 +219,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                 }
 
                 handleClose();
-                router.refresh();
+                refreshAfterLogin();
             } else {
                 if (password !== confirmPassword) {
                     throw new Error("Passwords do not match");

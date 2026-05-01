@@ -31,10 +31,11 @@ export default function CustomScratchModal({
 
     // Send config on engine ready
     const sendConfig = useCallback(() => {
-        if (!iframeRef.current?.contentWindow || !gameData?.scratchConfig) return;
+        const config = gameData?.scratchConfig || gameData?.config;
+        if (!iframeRef.current?.contentWindow || !config) return;
         iframeRef.current.contentWindow.postMessage({
             type: 'SCRATCH_CONFIG',
-            config: gameData.scratchConfig
+            config: config
         }, '*');
     }, [gameData]);
 

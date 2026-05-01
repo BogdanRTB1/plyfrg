@@ -48,6 +48,8 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
 
     const [playerHand, setPlayerHand] = useState<Card[]>([]);
     const [dealerHand, setDealerHand] = useState<Card[]>([]);
+    const dealerTimeoutRef = useRef<number | null>(null);
+    const roundIdRef = useRef(0);
 
     // simple deck logic
     const drawCard = (): Card => {
@@ -79,8 +81,36 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
         return total;
     };
 
+    const getHandTotals = (hand: Card[]) => {
+        let total = 0;
+        let aces = 0;
+        hand.forEach(c => {
+            if (!c.hidden) {
+                total += c.numValue;
+                if (c.value === 'A') aces += 1;
+            }
+        });
+
+        let acesCountedAsEleven = aces;
+        while (total > 21 && acesCountedAsEleven > 0) {
+            total -= 10;
+            acesCountedAsEleven -= 1;
+        }
+
+        return { total, isSoft: acesCountedAsEleven > 0 };
+    };
+
+    const clearDealerTimeout = () => {
+        if (dealerTimeoutRef.current !== null) {
+            window.clearTimeout(dealerTimeoutRef.current);
+            dealerTimeoutRef.current = null;
+        }
+    };
+
     const startGame = () => {
         if (balance < betAmount || betAmount <= 0) return;
+        clearDealerTimeout();
+        roundIdRef.current += 1;
 
         if (currencyType === 'GC') {
             setDiamonds((prev: number) => prev - betAmount);
@@ -122,18 +152,24 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
     const stand = (pHand = playerHand) => {
         if (gameState !== 'PLAYING') return;
         setGameState('DEALER_TURN');
+        clearDealerTimeout();
+        const activeRoundId = roundIdRef.current;
 
         let dHand: Card[] = dealerHand.map(c => ({ ...c, hidden: false }));
-        let dTotal = calculateHand(dHand);
 
-        // simple dealer logic (hit soft 17)
+        // Dealer should hit on totals below 17 and on soft 17.
         const playDealer = () => {
-            if (dTotal < 17) {
-                setTimeout(() => {
+            if (activeRoundId !== roundIdRef.current || !isOpen) return;
+
+            const { total: dTotal, isSoft } = getHandTotals(dHand);
+            const shouldHit = dTotal < 17 || (dTotal === 17 && isSoft);
+
+            if (shouldHit) {
+                dealerTimeoutRef.current = window.setTimeout(() => {
+                    if (activeRoundId !== roundIdRef.current || !isOpen) return;
                     const newCard = drawCard();
                     dHand = [...dHand, newCard];
                     setDealerHand(dHand);
-                    dTotal = calculateHand(dHand);
                     playDealer();
                 }, 800);
             } else {
@@ -186,6 +222,8 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
 
     useEffect(() => {
         if (!isOpen) {
+            clearDealerTimeout();
+            roundIdRef.current += 1;
             // Save session to history if any bets were made
             if (sessionWagered > 0) {
                 // Record session for consolidated history
@@ -211,8 +249,18 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
         }
     }, [isOpen, sessionWagered, sessionPayout]);
 
+    useEffect(() => {
+        return () => {
+            clearDealerTimeout();
+        };
+    }, []);
+
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
+
+    const placeholderCard: Card = { suit: 'Spades', value: 'A', numValue: 11, hidden: true };
+    const dealerCardsToRender = dealerHand.length > 0 ? dealerHand : [placeholderCard];
+    const playerCardsToRender = playerHand.length > 0 ? playerHand : [placeholderCard];
 
     const renderCard = (c: Card, idx: number) => {
         if (c.hidden) {
@@ -357,7 +405,7 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
                         </div>
                         <div className="flex flex-row">
                             <AnimatePresence>
-                                {dealerHand.map((card, i) => renderCard(card, i))}
+                                {dealerCardsToRender.map((card, i) => renderCard(card, i))}
                             </AnimatePresence>
                         </div>
                     </div>
@@ -386,7 +434,7 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
                     <div className="relative z-10 flex flex-col items-center bottom-0 mt-4 sm:mt-8">
                         <div className="flex flex-row">
                             <AnimatePresence>
-                                {playerHand.map((card, i) => renderCard(card, i))}
+                                {playerCardsToRender.map((card, i) => renderCard(card, i))}
                             </AnimatePresence>
                         </div>
                         <div className="flex gap-2 items-center mt-4 px-4 py-1.5 bg-black/40 rounded-full border border-white/10 shadow-lg">

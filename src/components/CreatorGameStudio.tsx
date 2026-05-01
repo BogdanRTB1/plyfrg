@@ -34,6 +34,8 @@ import {
 import {
   HiLoConfig, DEFAULT_HILO_CONFIG, HILO_DEAL_SOUNDS, HILO_LOSS_SOUNDS
 } from '@/types/hiloConfig';
+import CustomHiloModal from './CustomHiloModal';
+import { createClient } from '@/utils/supabase/client';
 
 // ─── Sound Helper ──────────────────────────────────────────────────────────
 const playSynthSound = (type: string) => {
@@ -247,6 +249,12 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
     const cols = gridPreset.cols;
 
     // ─── Listen for engine messages ────────────────────────────────────────
+    useEffect(() => {
+        setEngineReady(false);
+        setCrashEngineReady(false);
+        setScratchEngineReady(false);
+    }, [gameType]);
+
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
             if (!event.data || typeof event.data !== 'object') return;
@@ -597,14 +605,148 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
         }));
     };
 
+    const DATA_URL_SIZE_LIMIT = 120_000;
+    const MAX_PUBLISHED_GAMES = 50;
+    const GAME_ASSETS_BUCKET = 'game-assets';
+    const FALLBACK_ASSETS_BUCKET = 'avatars';
+    const supabase = createClient();
+
+    const compactLargeDataUrls = (value: any): any => {
+        if (typeof value === 'string' && value.startsWith('data:') && value.length > DATA_URL_SIZE_LIMIT) {
+            return null;
+        }
+
+        if (Array.isArray(value)) {
+            return value.map(compactLargeDataUrls);
+        }
+
+        if (value && typeof value === 'object') {
+            const compacted: Record<string, any> = {};
+            Object.entries(value).forEach(([key, nestedValue]) => {
+                compacted[key] = compactLargeDataUrls(nestedValue);
+            });
+            return compacted;
+        }
+
+        return value;
+    };
+
+    const persistPublishedGames = (games: any[]) => {
+        const trimmedToLimit = games.slice(0, MAX_PUBLISHED_GAMES);
+
+        try {
+            localStorage.setItem('custom_published_games', JSON.stringify(trimmedToLimit));
+            window.dispatchEvent(new Event('storage'));
+            return true;
+        } catch (error) {
+            console.warn('Failed to store full game payload, trying compact mode.', error);
+        }
+
+        const compacted = trimmedToLimit.map(compactLargeDataUrls);
+        for (let keep = compacted.length; keep >= 1; keep -= 1) {
+            try {
+                localStorage.setItem('custom_published_games', JSON.stringify(compacted.slice(0, keep)));
+                window.dispatchEvent(new Event('storage'));
+                if (keep < compacted.length) {
+                    alert('Storage was almost full. Older games were trimmed to save the latest publish.');
+                } else {
+                    alert('Storage was full. Large embedded assets were trimmed from saved games.');
+                }
+                return true;
+            } catch {
+                // Continue trimming until payload fits.
+            }
+        }
+
+        return false;
+    };
+
+    const getFileExtensionForDataUrl = (dataUrl: string) => {
+        const mime = dataUrl.match(/^data:(.*?);base64,/)?.[1] || '';
+        if (mime.includes('png')) return 'png';
+        if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
+        if (mime.includes('gif')) return 'gif';
+        if (mime.includes('svg')) return 'svg';
+        if (mime.includes('mp3')) return 'mp3';
+        if (mime.includes('wav')) return 'wav';
+        if (mime.includes('ogg')) return 'ogg';
+        if (mime.includes('webp')) return 'webp';
+        return 'bin';
+    };
+
+    const dataUrlToBlob = async (dataUrl: string) => {
+        const response = await fetch(dataUrl);
+        return response.blob();
+    };
+
+    const uploadDataUrlToSupabase = async (dataUrl: string, folderPrefix: string) => {
+        const ext = getFileExtensionForDataUrl(dataUrl);
+        const filePath = `${folderPrefix}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const blob = await dataUrlToBlob(dataUrl);
+
+        const uploadToBucket = async (bucket: string) => {
+            const { error } = await supabase.storage.from(bucket).upload(filePath, blob, {
+                upsert: false,
+                contentType: blob.type || undefined
+            });
+            if (error) throw error;
+            const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+            return data.publicUrl;
+        };
+
+        try {
+            return await uploadToBucket(GAME_ASSETS_BUCKET);
+        } catch {
+            return await uploadToBucket(FALLBACK_ASSETS_BUCKET);
+        }
+    };
+
+    const moveEmbeddedAssetsToSupabase = async (value: any, folderPrefix: string, cache: Map<string, string>): Promise<any> => {
+        if (typeof value === 'string' && value.startsWith('data:')) {
+            if (cache.has(value)) return cache.get(value);
+            const publicUrl = await uploadDataUrlToSupabase(value, folderPrefix);
+            cache.set(value, publicUrl);
+            return publicUrl;
+        }
+
+        if (Array.isArray(value)) {
+            const mapped = [];
+            for (const entry of value) {
+                mapped.push(await moveEmbeddedAssetsToSupabase(entry, folderPrefix, cache));
+            }
+            return mapped;
+        }
+
+        if (value && typeof value === 'object') {
+            const mapped: Record<string, any> = {};
+            for (const [key, nestedValue] of Object.entries(value)) {
+                mapped[key] = await moveEmbeddedAssetsToSupabase(nestedValue, folderPrefix, cache);
+            }
+            return mapped;
+        }
+
+        return value;
+    };
+
+    const prepareGameForStorage = async (game: any) => {
+        const creatorId = creatorData?.id || 'unknown-creator';
+        const folderPrefix = `creator-games/${creatorId}/${game.type || 'generic'}`;
+        const cache = new Map<string, string>();
+        try {
+            return await moveEmbeddedAssetsToSupabase(game, folderPrefix, cache);
+        } catch (error) {
+            console.warn('Failed to offload game assets to Supabase storage.', error);
+            return game;
+        }
+    };
+
     // ─── Delete Game ───────────────────────────────────────────────────────
     const deleteGame = (gameId: string) => {
         const data = localStorage.getItem('custom_published_games');
         if (data) {
             const allGames = JSON.parse(data);
             const filtered = allGames.filter((g: any) => g.id !== gameId);
-            localStorage.setItem('custom_published_games', JSON.stringify(filtered));
-            window.dispatchEvent(new Event('storage'));
+            persistPublishedGames(filtered);
         }
     };
 
@@ -623,7 +765,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
             setIsPublishing(true);
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 const slotConfig = buildConfig();
                 const newGame = {
                     id: 'slot_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
@@ -640,11 +782,15 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                     winSound,
                     publishedAt: new Date().toISOString()
                 };
+                const preparedGame = await prepareGameForStorage(newGame);
 
                 const gamesStr = localStorage.getItem('custom_published_games');
                 const games = gamesStr ? JSON.parse(gamesStr) : [];
-                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
-                window.dispatchEvent(new Event('storage'));
+                if (!persistPublishedGames([preparedGame, ...games])) {
+                    setIsPublishing(false);
+                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    return;
+                }
                 setIsPublishing(false);
                 setIsSuccess(true);
 
@@ -669,7 +815,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
             setIsPublishing(true);
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 const crashConfig = buildCrashConfig();
                 const newGame = {
                     id: 'crash_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
@@ -689,11 +835,15 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                     winSound,
                     publishedAt: new Date().toISOString()
                 };
+                const preparedGame = await prepareGameForStorage(newGame);
 
                 const gamesStr = localStorage.getItem('custom_published_games');
                 const games = gamesStr ? JSON.parse(gamesStr) : [];
-                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
-                window.dispatchEvent(new Event('storage'));
+                if (!persistPublishedGames([preparedGame, ...games])) {
+                    setIsPublishing(false);
+                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    return;
+                }
                 setIsPublishing(false);
                 setIsSuccess(true);
 
@@ -718,7 +868,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
             setIsPublishing(true);
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 const scratchConfig = buildScratchConfig();
                 const newGame = {
                     id: 'scratch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
@@ -735,11 +885,15 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                     winSound,
                     publishedAt: new Date().toISOString()
                 };
+                const preparedGame = await prepareGameForStorage(newGame);
 
                 const gamesStr = localStorage.getItem('custom_published_games');
                 const games = gamesStr ? JSON.parse(gamesStr) : [];
-                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
-                window.dispatchEvent(new Event('storage'));
+                if (!persistPublishedGames([preparedGame, ...games])) {
+                    setIsPublishing(false);
+                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    return;
+                }
                 setIsPublishing(false);
                 setIsSuccess(true);
 
@@ -764,7 +918,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
             setIsPublishing(true);
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 const wheelConfig = buildWheelConfig();
                 const newGame = {
                     id: 'wheel_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
@@ -781,11 +935,15 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                     winSound,
                     publishedAt: new Date().toISOString()
                 };
+                const preparedGame = await prepareGameForStorage(newGame);
 
                 const gamesStr = localStorage.getItem('custom_published_games');
                 const games = gamesStr ? JSON.parse(gamesStr) : [];
-                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
-                window.dispatchEvent(new Event('storage'));
+                if (!persistPublishedGames([preparedGame, ...games])) {
+                    setIsPublishing(false);
+                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    return;
+                }
                 setIsPublishing(false);
                 setIsSuccess(true);
 
@@ -810,7 +968,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
             setIsPublishing(true);
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 const minesConfig = buildMinesConfig();
                 const newGame = {
                     id: 'mines_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
@@ -827,11 +985,15 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                     winSound,
                     publishedAt: new Date().toISOString()
                 };
+                const preparedGame = await prepareGameForStorage(newGame);
 
                 const gamesStr = localStorage.getItem('custom_published_games');
                 const games = gamesStr ? JSON.parse(gamesStr) : [];
-                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
-                window.dispatchEvent(new Event('storage'));
+                if (!persistPublishedGames([preparedGame, ...games])) {
+                    setIsPublishing(false);
+                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    return;
+                }
                 setIsPublishing(false);
                 setIsSuccess(true);
 
@@ -862,7 +1024,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
             setIsPublishing(true);
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 const caseConfig = buildCaseConfig();
                 const newGame = {
                     id: 'case_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
@@ -879,11 +1041,15 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                     winSound,
                     publishedAt: new Date().toISOString()
                 };
+                const preparedGame = await prepareGameForStorage(newGame);
 
                 const gamesStr = localStorage.getItem('custom_published_games');
                 const games = gamesStr ? JSON.parse(gamesStr) : [];
-                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
-                window.dispatchEvent(new Event('storage'));
+                if (!persistPublishedGames([preparedGame, ...games])) {
+                    setIsPublishing(false);
+                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    return;
+                }
                 setIsPublishing(false);
                 setIsSuccess(true);
 
@@ -907,7 +1073,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
             setIsPublishing(true);
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 const hiloConfig = buildHiloConfig();
                 const newGame = {
                     id: 'hilo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
@@ -924,11 +1090,15 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                     winSound,
                     publishedAt: new Date().toISOString()
                 };
+                const preparedGame = await prepareGameForStorage(newGame);
 
                 const gamesStr = localStorage.getItem('custom_published_games');
                 const games = gamesStr ? JSON.parse(gamesStr) : [];
-                localStorage.setItem('custom_published_games', JSON.stringify([newGame, ...games]));
-                window.dispatchEvent(new Event('storage'));
+                if (!persistPublishedGames([preparedGame, ...games])) {
+                    setIsPublishing(false);
+                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    return;
+                }
                 setIsPublishing(false);
                 setIsSuccess(true);
 
@@ -958,17 +1128,18 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
     // ─── Section Nav ───────────────────────────────────────────────────────
     const sections = [
-        { id: 'design', icon: <Palette size={16} />, label: 'Design' },
-        { id: 'grid', icon: <Grid3X3 size={16} />, label: 'Grid' },
-        { id: 'paytable', icon: <Zap size={16} />, label: 'Paytable' },
-        { id: 'features', icon: <Settings2 size={16} />, label: 'Features' },
-        { id: 'preview', icon: <Eye size={16} />, label: 'Preview' },
+        { id: 'design', icon: <Palette size={16} />, label: 'Design & Assets' },
+        { id: 'grid', icon: <Grid3X3 size={16} />, label: 'Grid Layout' },
+        { id: 'paytable', icon: <Zap size={16} />, label: 'Paytable & Odds' },
+        { id: 'features', icon: <Settings2 size={16} />, label: 'Special Mechanics' },
+        { id: 'preview', icon: <Eye size={16} />, label: 'Preview & Publish' },
     ] as const;
 
     // ════════════════════════════════════════════════════════════════════════
     // RENDER
     // ════════════════════════════════════════════════════════════════════════
     return (
+        <>
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full space-y-6">
             <div className="bg-[#0b1622]/90 backdrop-blur-xl rounded-[32px] p-6 sm:p-8 border border-white/10 relative overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)]">
 
@@ -1198,9 +1369,9 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                         {gameType === 'hilo' && (
                         <div className="flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
                             {[
-                                { id: 'design', icon: <Palette size={16} />, label: 'Design' },
-                                { id: 'audio', icon: <Volume2 size={16} />, label: 'Audio' },
-                                { id: 'preview', icon: <Eye size={16} />, label: 'Preview' },
+                                { id: 'design', icon: <Palette size={16} />, label: 'Design & Assets' },
+                                { id: 'audio', icon: <Volume2 size={16} />, label: 'Audio Setup' },
+                                { id: 'preview', icon: <Eye size={16} />, label: 'Preview & Publish' },
                             ].map((s) => (
                                 <button
                                     key={s.id}
@@ -1285,28 +1456,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                                 <button className="text-[10px] text-slate-500 hover:text-red-400 mt-1 transition-colors" onClick={() => setBackgroundImage(null)}>Remove</button>
                                             )}
                                         </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
-                                                Lobby Cover Image <span className="text-red-400">*</span>
-                                            </label>
-                                            <label className="relative w-full aspect-video rounded-xl bg-[#0a111a] border border-dashed border-white/20 flex flex-col items-center justify-center overflow-hidden hover:border-purple-400 group cursor-pointer transition-all block">
-                                                {coverImage ? (
-                                                    <>
-                                                        <img src={coverImage} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
-                                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                            <span className="text-white font-bold bg-white/10 px-4 py-2 rounded-lg border border-white/20 backdrop-blur-md">Change</span>
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <ImageIcon size={24} className="text-slate-500 group-hover:text-purple-400 mb-1 transition-colors" />
-                                                        <span className="text-xs text-slate-400 font-bold">Upload Cover</span>
-                                                        <span className="text-[10px] text-red-400/80 mt-1 font-bold">Required to publish</span>
-                                                    </>
-                                                )}
-                                                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => handleFileUpload(e, setCoverImage)} />
-                                            </label>
-                                        </div>
+
                                     </div>
                                 </div>
 
@@ -1546,41 +1696,14 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     {/* Engine Preview */}
                                     <div className="lg:col-span-2 space-y-3">
-                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative" style={{ boxShadow: `0 0 40px ${accentColor}15` }}>
-                                            <iframe
-                                                ref={iframeRef}
-                                                src="/engines/slot-engine.html"
-                                                className="w-full h-full border-0"
-                                                sandbox="allow-scripts"
-                                                title="Slot Engine Preview"
-                                            />
-                                            {!engineReady && (
-                                                <div className="absolute inset-0 bg-[#060b11] flex items-center justify-center">
-                                                    <div className="flex flex-col items-center gap-3">
-                                                        <Loader2 className="animate-spin text-purple-400" size={32} />
-                                                        <span className="text-slate-500 text-sm font-bold uppercase tracking-wider">Loading Engine...</span>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Test Controls */}
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={handleTestSpin}
-                                                disabled={!engineReady || isTesting}
-                                                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:brightness-110 disabled:opacity-50 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-500/20"
-                                            >
-                                                {isTesting ? <Loader2 className="animate-spin" size={16} /> : <Play size={16} />}
-                                                {isTesting ? 'Spinning...' : 'Test Spin'}
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    iframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
-                                                }}
-                                                className="bg-[#1a2c38] hover:bg-[#2f4553] text-slate-300 px-6 py-3 rounded-xl font-bold flex items-center gap-2 border border-white/5 transition-colors"
-                                            >
-                                                <RotateCcw size={16} /> Reset
+                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative flex flex-col items-center justify-center p-8 text-center" style={{ boxShadow: `0 0 40px ${accentColor}15` }}>
+                                            <div className="w-24 h-32 bg-[#121c22] rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center mb-6 shadow-2xl relative overflow-hidden">
+                                                <Gamepad2 className="text-purple-500/50" size={40} />
+                                            </div>
+                                            <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Slot Engine Ready</h4>
+                                            <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom symbols, grid layouts, and logic in a fully functional preview environment.</p>
+                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'slot_engine', slotConfig: buildConfig(), name: gameName, isPreview: true } }))} className="bg-gradient-to-r from-purple-600 to-purple-700 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-purple-500/20">
+                                                <Play size={20} /> Launch Full Preview
                                             </button>
                                         </div>
                                     </div>
@@ -1614,6 +1737,24 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                                     </div>
                                                 ))}
                                             </div>
+                                        </div>
+
+                                        {/* Cover Image Upload */}
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <h4 className="text-xs font-black text-white uppercase tracking-widest">Lobby Cover Image</h4>
+                                                {coverImage && <button onClick={() => setCoverImage(null)} className="text-xs text-red-400 hover:text-red-300">Remove</button>}
+                                            </div>
+                                            {coverImage ? (
+                                                <img src={coverImage} alt="Cover" className="w-full h-40 object-cover rounded-lg border border-white/10" />
+                                            ) : (
+                                                <label className="flex flex-col items-center gap-2 text-slate-400 cursor-pointer hover:text-purple-400 transition-colors bg-white/5 rounded-xl p-8 justify-center border-2 border-dashed border-white/10 hover:border-purple-500/30">
+                                                    <ImageIcon size={24} />
+                                                    <span className="text-xs font-bold">Upload Cover Image</span>
+                                                    <span className="text-[10px] text-slate-600">Required for publishing</span>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setCoverImage, 800)} />
+                                                </label>
+                                            )}
                                         </div>
 
                                         {/* Publish Button */}
@@ -1706,28 +1847,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                                 <button className="text-[10px] text-slate-500 hover:text-red-400 mt-1 transition-colors" onClick={() => setCrashBgImage(null)}>Remove</button>
                                             )}
                                         </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
-                                                Lobby Cover Image <span className="text-red-400">*</span>
-                                            </label>
-                                            <label className="relative w-full aspect-video rounded-xl bg-[#0a111a] border border-dashed border-white/20 flex flex-col items-center justify-center overflow-hidden hover:border-emerald-400 group cursor-pointer transition-all block">
-                                                {crashCoverImage ? (
-                                                    <>
-                                                        <img src={crashCoverImage} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
-                                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                            <span className="text-white font-bold bg-white/10 px-4 py-2 rounded-lg border border-white/20 backdrop-blur-md">Change</span>
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <ImageIcon size={24} className="text-slate-500 group-hover:text-emerald-400 mb-1 transition-colors" />
-                                                        <span className="text-xs text-slate-400 font-bold">Upload Cover</span>
-                                                        <span className="text-[10px] text-red-400/80 mt-1 font-bold">Required to publish</span>
-                                                    </>
-                                                )}
-                                                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => handleFileUpload(e, setCrashCoverImage)} />
-                                            </label>
-                                        </div>
+
                                     </div>
                                 </div>
 
@@ -1927,42 +2047,14 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     {/* Engine Preview */}
                                     <div className="lg:col-span-2 space-y-3">
-                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative" style={{ boxShadow: `0 0 40px ${crashGraphColor}15` }}>
-                                            <iframe
-                                                ref={crashIframeRef}
-                                                src="/engines/crash-engine.html"
-                                                className="w-full h-full border-0"
-                                                sandbox="allow-scripts"
-                                                title="Crash Engine Preview"
-                                            />
-                                            {!crashEngineReady && (
-                                                <div className="absolute inset-0 bg-[#060b11] flex items-center justify-center">
-                                                    <div className="flex flex-col items-center gap-3">
-                                                        <Loader2 className="animate-spin text-emerald-400" size={32} />
-                                                        <span className="text-slate-500 text-sm font-bold uppercase tracking-wider">Loading Crash Engine...</span>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Test Controls */}
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={handleTestCrash}
-                                                disabled={!crashEngineReady || isTesting}
-                                                className="flex-1 bg-gradient-to-r from-emerald-600 to-green-600 hover:brightness-110 disabled:opacity-50 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
-                                            >
-                                                {isTesting ? <Loader2 className="animate-spin" size={16} /> : <Rocket size={16} />}
-                                                {isTesting ? 'Flying...' : 'Test Flight'}
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    crashIframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
-                                                    setIsTesting(false);
-                                                }}
-                                                className="bg-[#1a2c38] hover:bg-[#2f4553] text-slate-300 px-6 py-3 rounded-xl font-bold flex items-center gap-2 border border-white/5 transition-colors"
-                                            >
-                                                <RotateCcw size={16} /> Reset
+                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative flex flex-col items-center justify-center p-8 text-center" style={{ boxShadow: `0 0 40px ${crashGraphColor}15` }}>
+                                            <div className="w-24 h-32 bg-[#121c22] rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center mb-6 shadow-2xl relative overflow-hidden">
+                                                <Rocket className="text-emerald-500/50" size={40} />
+                                            </div>
+                                            <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Crash Engine Ready</h4>
+                                            <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom graphics, multipliers, and game logic in a fully functional preview environment.</p>
+                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'crash', crashConfig: buildCrashConfig(), name: crashGameName, isPreview: true } }))} className="bg-gradient-to-r from-emerald-600 to-green-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-emerald-500/20">
+                                                <Play size={20} /> Launch Full Preview
                                             </button>
                                         </div>
                                     </div>
@@ -1992,6 +2084,24 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
   accelerationCurve: crashAcceleration,
 }, null, 2)}
                                             </pre>
+                                        </div>
+
+                                        {/* Cover Image Upload */}
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <h4 className="text-xs font-black text-white uppercase tracking-widest">Lobby Cover Image</h4>
+                                                {crashCoverImage && <button onClick={() => setCrashCoverImage(null)} className="text-xs text-red-400 hover:text-red-300">Remove</button>}
+                                            </div>
+                                            {crashCoverImage ? (
+                                                <img src={crashCoverImage} alt="Cover" className="w-full h-40 object-cover rounded-lg border border-white/10" />
+                                            ) : (
+                                                <label className="flex flex-col items-center gap-2 text-slate-400 cursor-pointer hover:text-emerald-400 transition-colors bg-white/5 rounded-xl p-8 justify-center border-2 border-dashed border-white/10 hover:border-emerald-500/30">
+                                                    <ImageIcon size={24} />
+                                                    <span className="text-xs font-bold">Upload Cover Image</span>
+                                                    <span className="text-[10px] text-slate-600">Required for publishing</span>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setCrashCoverImage, 800)} />
+                                                </label>
+                                            )}
                                         </div>
 
                                         {/* Publish Button */}
@@ -2076,28 +2186,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                                 <button className="text-[10px] text-slate-500 hover:text-red-400 mt-1 transition-colors" onClick={() => setScratchCoverImage(null)}>Remove</button>
                                             )}
                                         </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
-                                                Lobby Cover Image <span className="text-red-400">*</span>
-                                            </label>
-                                            <label className="relative w-full aspect-video rounded-xl bg-[#0a111a] border border-dashed border-white/20 flex flex-col items-center justify-center overflow-hidden hover:border-amber-400 group cursor-pointer transition-all block">
-                                                {scratchLobbyCover ? (
-                                                    <>
-                                                        <img src={scratchLobbyCover} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
-                                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                            <span className="text-white font-bold bg-white/10 px-4 py-2 rounded-lg border border-white/20 backdrop-blur-md">Change</span>
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <ImageIcon size={24} className="text-slate-500 group-hover:text-amber-400 mb-1 transition-colors" />
-                                                        <span className="text-xs text-slate-400 font-bold">Upload Cover</span>
-                                                        <span className="text-[10px] text-red-400/80 mt-1 font-bold">Required to publish</span>
-                                                    </>
-                                                )}
-                                                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => handleFileUpload(e, setScratchLobbyCover)} />
-                                            </label>
-                                        </div>
+
                                     </div>
                                 </div>
 
@@ -2296,42 +2385,14 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     {/* Engine Preview */}
                                     <div className="lg:col-span-2 space-y-3">
-                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative" style={{ boxShadow: `0 0 40px ${scratchAccentColor}15` }}>
-                                            <iframe
-                                                ref={scratchIframeRef}
-                                                src="/engines/scratch-engine.html"
-                                                className="w-full h-full border-0"
-                                                sandbox="allow-scripts"
-                                                title="Scratch Card Preview"
-                                            />
-                                            {!scratchEngineReady && (
-                                                <div className="absolute inset-0 bg-[#060b11] flex items-center justify-center">
-                                                    <div className="flex flex-col items-center gap-3">
-                                                        <Loader2 className="animate-spin text-amber-400" size={32} />
-                                                        <span className="text-slate-500 text-sm font-bold uppercase tracking-wider">Loading Scratch Engine...</span>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Test Controls */}
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={handleTestScratch}
-                                                disabled={!scratchEngineReady || isTesting}
-                                                className="flex-1 bg-gradient-to-r from-amber-600 to-yellow-600 hover:brightness-110 disabled:opacity-50 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
-                                            >
-                                                {isTesting ? <Loader2 className="animate-spin" size={16} /> : <Play size={16} />}
-                                                {isTesting ? 'Generating...' : 'New Card'}
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    scratchIframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
-                                                    setIsTesting(false);
-                                                }}
-                                                className="bg-[#1a2c38] hover:bg-[#2f4553] text-slate-300 px-6 py-3 rounded-xl font-bold flex items-center gap-2 border border-white/5 transition-colors"
-                                            >
-                                                <RotateCcw size={16} /> Reset
+                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative flex flex-col items-center justify-center p-8 text-center" style={{ boxShadow: `0 0 40px ${scratchAccentColor}15` }}>
+                                            <div className="w-24 h-32 bg-[#121c22] rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center mb-6 shadow-2xl relative overflow-hidden">
+                                                {scratchCoverImage ? <img src={scratchCoverImage} className="absolute inset-0 w-full h-full object-cover" /> : <ImageIcon className="text-amber-500/50" size={40} />}
+                                            </div>
+                                            <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Scratch Engine Ready</h4>
+                                            <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom card designs, scratching logic, and win animations in a fully functional preview environment.</p>
+                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'scratch', scratchConfig: buildScratchConfig(), name: scratchGameName, isPreview: true } }))} className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-amber-500/20">
+                                                <Play size={20} /> Launch Full Preview
                                             </button>
                                         </div>
                                     </div>
@@ -2362,6 +2423,24 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
   payouts: scratchSymbols.map(s => ({ name: s.name, payout: s.payout })),
 }, null, 2)}
                                             </pre>
+                                        </div>
+
+                                        {/* Cover Image Upload */}
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <h4 className="text-xs font-black text-white uppercase tracking-widest">Lobby Cover Image</h4>
+                                                {scratchLobbyCover && <button onClick={() => setScratchLobbyCover(null)} className="text-xs text-red-400 hover:text-red-300">Remove</button>}
+                                            </div>
+                                            {scratchLobbyCover ? (
+                                                <img src={scratchLobbyCover} alt="Cover" className="w-full h-40 object-cover rounded-lg border border-white/10" />
+                                            ) : (
+                                                <label className="flex flex-col items-center gap-2 text-slate-400 cursor-pointer hover:text-amber-400 transition-colors bg-white/5 rounded-xl p-8 justify-center border-2 border-dashed border-white/10 hover:border-amber-500/30">
+                                                    <ImageIcon size={24} />
+                                                    <span className="text-xs font-bold">Upload Cover Image</span>
+                                                    <span className="text-[10px] text-slate-600">Required for publishing</span>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setScratchLobbyCover, 800)} />
+                                                </label>
+                                            )}
                                         </div>
 
                                         {/* Publish Button */}
@@ -2446,28 +2525,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                                 <button className="text-[10px] text-slate-500 hover:text-red-400 mt-1 transition-colors" onClick={() => setWheelBgImage(null)}>Remove</button>
                                             )}
                                         </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
-                                                Lobby Cover Image <span className="text-red-400">*</span>
-                                            </label>
-                                            <label className="relative w-full aspect-video rounded-xl bg-[#0a111a] border border-dashed border-white/20 flex flex-col items-center justify-center overflow-hidden hover:border-rose-400 group cursor-pointer transition-all block">
-                                                {wheelCoverImage ? (
-                                                    <>
-                                                        <img src={wheelCoverImage} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
-                                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                            <span className="text-white font-bold bg-white/10 px-4 py-2 rounded-lg border border-white/20 backdrop-blur-md">Change</span>
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <ImageIcon size={24} className="text-slate-500 group-hover:text-rose-400 mb-1 transition-colors" />
-                                                        <span className="text-xs text-slate-400 font-bold">Upload Cover</span>
-                                                        <span className="text-[10px] text-red-400/80 mt-1 font-bold">Required to publish</span>
-                                                    </>
-                                                )}
-                                                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => handleFileUpload(e, setWheelCoverImage)} />
-                                            </label>
-                                        </div>
+
                                     </div>
                                 </div>
 
@@ -2717,69 +2775,15 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     {/* Wheel Preview Canvas */}
                                     <div className="lg:col-span-2 space-y-3">
-                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative flex items-center justify-center" style={{ boxShadow: `0 0 40px ${wheelAccentColor}15`, backgroundColor: wheelBgColor }}>
-                                            {wheelBgImage && <img src={wheelBgImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />}
-                                            <div className="absolute inset-0 bg-black/30"></div>
-
-                                            {/* Pointer preview */}
-                                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
-                                                {wheelPointerStyle === 'custom' && wheelPointerImage ? (
-                                                    <img src={wheelPointerImage} alt="ptr" className="w-8 h-10 object-contain drop-shadow-lg" />
-                                                ) : wheelPointerStyle === 'finger' ? (
-                                                    <span className="text-3xl">👆</span>
-                                                ) : wheelPointerStyle === 'sword' ? (
-                                                    <span className="text-3xl">⚔️</span>
-                                                ) : wheelPointerStyle === 'microphone' ? (
-                                                    <span className="text-3xl">🎤</span>
-                                                ) : (
-                                                    <div className="w-7 h-9 border-2 border-white drop-shadow-md"
-                                                        style={{ backgroundColor: wheelAccentColor, clipPath: 'polygon(50% 100%, 0 0, 100% 0)' }} />
-                                                )}
+                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative flex flex-col items-center justify-center p-8 text-center" style={{ boxShadow: `0 0 40px ${wheelAccentColor}15` }}>
+                                            <div className="w-24 h-32 bg-[#121c22] rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center mb-6 shadow-2xl relative overflow-hidden">
+                                                {wheelCoverImage ? <img src={wheelCoverImage} className="absolute inset-0 w-full h-full object-cover" /> : <RotateCcw className="text-rose-500/50" size={40} />}
                                             </div>
-
-                                            {/* Static wheel preview using CSS conic-gradient */}
-                                            <div className="relative z-10 w-72 h-72 sm:w-80 sm:h-80">
-                                                {(() => {
-                                                    const totalW = wheelSegments.reduce((s, seg) => s + seg.visualWeight, 0);
-                                                    let cumDeg = 0;
-                                                    const stops = wheelSegments.map((seg) => {
-                                                        const start = cumDeg;
-                                                        const arcDeg = (seg.visualWeight / totalW) * 360;
-                                                        cumDeg += arcDeg;
-                                                        return `${seg.color} ${start}deg ${cumDeg}deg`;
-                                                    });
-                                                    return (
-                                                        <div className="w-full h-full rounded-full border-4 overflow-hidden relative"
-                                                            style={{
-                                                                background: `conic-gradient(from -90deg, ${stops.join(', ')})`,
-                                                                borderColor: wheelTexture === 'neon' ? wheelAccentColor + '60' : 'rgba(255,255,255,0.15)',
-                                                                boxShadow: wheelTexture === 'neon' ? `0 0 40px ${wheelAccentColor}30, inset 0 0 20px ${wheelAccentColor}10` : 'none',
-                                                            }}>
-                                                            {/* Segment labels */}
-                                                            {wheelSegments.map((seg, i) => {
-                                                                const tw = wheelSegments.reduce((s, se) => s + se.visualWeight, 0);
-                                                                let angle = -90;
-                                                                for (let j = 0; j < i; j++) angle += (wheelSegments[j].visualWeight / tw) * 360;
-                                                                angle += (seg.visualWeight / tw) * 360 / 2;
-                                                                const rad = (angle * Math.PI) / 180;
-                                                                const r = 38;
-                                                                const x = 50 + Math.cos(rad) * r;
-                                                                const y = 50 + Math.sin(rad) * r;
-                                                                return (
-                                                                    <div key={seg.id} className="absolute text-white font-black text-[10px] sm:text-xs drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
-                                                                        style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%,-50%)', textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
-                                                                        {seg.specialType ? (seg.specialType === 'respin' ? '🔄' : '×2') : seg.multiplier + 'x'}
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                            {/* Center dot */}
-                                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                                <div className="w-8 h-8 rounded-full bg-[#1a1a2e] border-2" style={{ borderColor: wheelTexture === 'neon' ? wheelAccentColor + '60' : 'rgba(255,255,255,0.2)' }} />
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </div>
+                                            <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Wheel Engine Ready</h4>
+                                            <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom wheel segments, physics logic, and animations in a fully functional preview environment.</p>
+                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'wheel', wheelConfig: buildWheelConfig(), name: wheelGameName, isPreview: true } }))} className="bg-gradient-to-r from-rose-600 to-pink-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-rose-500/20">
+                                                <Play size={20} /> Launch Full Preview
+                                            </button>
                                         </div>
                                     </div>
 
@@ -2816,6 +2820,24 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                                     </div>
                                                 ))}
                                             </div>
+                                        </div>
+
+                                        {/* Cover Image Upload */}
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <h4 className="text-xs font-black text-white uppercase tracking-widest">Lobby Cover Image</h4>
+                                                {wheelCoverImage && <button onClick={() => setWheelCoverImage(null)} className="text-xs text-red-400 hover:text-red-300">Remove</button>}
+                                            </div>
+                                            {wheelCoverImage ? (
+                                                <img src={wheelCoverImage} alt="Cover" className="w-full h-40 object-cover rounded-lg border border-white/10" />
+                                            ) : (
+                                                <label className="flex flex-col items-center gap-2 text-slate-400 cursor-pointer hover:text-rose-400 transition-colors bg-white/5 rounded-xl p-8 justify-center border-2 border-dashed border-white/10 hover:border-rose-500/30">
+                                                    <ImageIcon size={24} />
+                                                    <span className="text-xs font-bold">Upload Cover Image</span>
+                                                    <span className="text-[10px] text-slate-600">Required for publishing</span>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setWheelCoverImage, 800)} />
+                                                </label>
+                                            )}
                                         </div>
 
                                         {/* Publish Button */}
@@ -3099,63 +3121,19 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                     <Eye size={16} className="text-orange-400" /> Preview & Publish
                                 </h3>
 
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    {/* Grid Preview */}
-                                    <div className="space-y-4">
-                                        <h4 className="text-xs font-black text-white uppercase tracking-widest">Grid Preview</h4>
-                                        <div className="rounded-2xl p-6 border border-white/10 relative overflow-hidden" style={{ backgroundColor: minesBgColor }}>
-                                            {/* Watermark */}
-                                            {minesWatermarkImage && (
-                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                                                    <img src={minesWatermarkImage} alt="" className="w-3/4 h-3/4 object-contain opacity-10" />
-                                                </div>
-                                            )}
-                                            {/* Background */}
-                                            {minesBgImage && (
-                                                <div className="absolute inset-0 z-0">
-                                                    <img src={minesBgImage} alt="" className="w-full h-full object-cover opacity-20" />
-                                                </div>
-                                            )}
-                                            <div className="relative z-10 grid gap-2 max-w-[300px] mx-auto" style={{ gridTemplateColumns: `repeat(${MINES_GRID_PRESETS[minesGridSize].cols}, 1fr)` }}>
-                                                {Array(MINES_GRID_PRESETS[minesGridSize].total).fill(0).map((_, idx) => {
-                                                    const showMine = idx === 3 || idx === 7;
-                                                    const showGem = idx === 0 || idx === 4;
-                                                    return (
-                                                        <div
-                                                            key={idx}
-                                                            className={`aspect-square rounded-xl flex items-center justify-center transition-all ${
-                                                                showMine ? 'bg-red-950/60 border border-red-500/30' :
-                                                                showGem ? 'bg-[#0a1114] border border-white/5' :
-                                                                'border border-white/5'
-                                                            }`}
-                                                            style={{ backgroundColor: !showMine && !showGem ? minesTileColor : undefined }}
-                                                        >
-                                                            {showMine && (
-                                                                minesMineImage ? <img src={minesMineImage} alt="" className="w-6 h-6 object-contain" /> :
-                                                                <span className="text-red-500 text-lg">💣</span>
-                                                            )}
-                                                            {showGem && (
-                                                                minesGemImage ? <img src={minesGemImage} alt="" className="w-6 h-6 object-contain" /> :
-                                                                <span className="text-green-400 text-lg">💎</span>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* Preview Block */}
+                                    <div className="lg:col-span-2 space-y-3">
+                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative flex flex-col items-center justify-center p-8 text-center" style={{ boxShadow: `0 0 40px #f9731615` }}>
+                                            <div className="w-24 h-32 bg-[#121c22] rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center mb-6 shadow-2xl relative overflow-hidden">
+                                                {minesCoverImage ? <img src={minesCoverImage} className="absolute inset-0 w-full h-full object-cover" /> : <Gamepad2 className="text-orange-500/50" size={40} />}
                                             </div>
+                                            <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Mines Engine Ready</h4>
+                                            <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom grid logic, bomb placements, and animations in a fully functional preview environment.</p>
+                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'mines', minesConfig: buildMinesConfig(), name: minesGameName, isPreview: true } }))} className="bg-gradient-to-r from-orange-600 to-amber-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-orange-500/20">
+                                                <Play size={20} /> Launch Full Preview
+                                            </button>
                                         </div>
-
-                                        {/* Bust Preview */}
-                                        {minesBustImage && minesBustStyle === 'fullscreen_image' && (
-                                            <div className="bg-[#0a111a] border border-white/10 rounded-xl p-4">
-                                                <h4 className="text-xs font-black text-white uppercase tracking-widest mb-2">Bust Overlay Preview</h4>
-                                                <div className="relative rounded-lg overflow-hidden bg-black/50 aspect-video flex items-center justify-center">
-                                                    <img src={minesBustImage} alt="Bust" className="max-w-full max-h-full object-contain opacity-70" />
-                                                    <div className="absolute inset-0 flex items-center justify-center">
-                                                        <span className="text-5xl font-black text-red-500 uppercase tracking-widest drop-shadow-[0_0_20px_rgba(255,0,0,0.8)]" style={{ textShadow: '0 0 30px rgba(255,0,0,0.5)' }}>BUSTED</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
 
                                     {/* Config Summary & Publish */}
@@ -3507,43 +3485,15 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     {/* Preview container */}
                                     <div className="lg:col-span-2 space-y-3">
-                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative flex flex-col items-center justify-center p-6" style={{ boxShadow: `0 0 40px ${caseAccentColor}15`, backgroundColor: caseBgColor }}>
-                                            {caseBgImage && <img src={caseBgImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />}
-                                            <div className="absolute inset-0 bg-black/30 z-0"></div>
-
-                                            {/* Big preview case */}
-                                            <div className="relative z-10 flex flex-col items-center gap-4">
-                                                {caseDesign === 'custom' && caseImage ? (
-                                                    <img src={caseImage} alt="Case Info" className="w-32 h-32 object-contain drop-shadow-2xl" />
-                                                ) : (
-                                                    <div className="text-8xl filter drop-shadow-2xl" style={{ textShadow: `0 0 40px ${caseAccentColor}50` }}>
-                                                        {CASE_DESIGN_PRESETS.find(d => d.id === caseDesign)?.emoji}
-                                                    </div>
-                                                )}
-                                                <h2 className="text-3xl font-black text-white uppercase tracking-widest">{caseCollectionName}</h2>
-                                                
-                                                <div className="mt-8 flex gap-2 overflow-x-auto max-w-[500px] pb-4 custom-scrollbar">
-                                                    {caseItems.slice(0, 5).map(item => (
-                                                        <div key={item.id} className="w-20 h-24 shrink-0 rounded-xl flex flex-col items-center justify-center border-2" 
-                                                             style={{ 
-                                                                 borderColor: caseEnableRarityGlow ? RARITY_CONFIG[item.rarity].glowColor : 'rgba(255,255,255,0.1)', 
-                                                                 backgroundColor: item.color + '40'
-                                                             }}>
-                                                            {item.image ? (
-                                                                <img src={item.image} alt="" className="w-10 h-10 object-contain p-1" />
-                                                            ) : (
-                                                                <span className="text-lg font-black text-white">{item.multiplier}x</span>
-                                                            )}
-                                                            <span className="text-[9px] text-white/50 font-bold uppercase truncate max-w-full px-1">{item.name}</span>
-                                                        </div>
-                                                    ))}
-                                                    {caseItems.length > 5 && (
-                                                        <div className="w-20 h-24 shrink-0 rounded-xl flex items-center justify-center border border-dashed border-white/20 bg-white/5">
-                                                            <span className="text-xs text-white/50 font-bold">+{caseItems.length - 5} More</span>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative flex flex-col items-center justify-center p-8 text-center" style={{ boxShadow: `0 0 40px ${caseAccentColor}15` }}>
+                                            <div className="w-24 h-32 bg-[#121c22] rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center mb-6 shadow-2xl relative overflow-hidden">
+                                                {caseImage ? <img src={caseImage} className="absolute inset-0 w-full h-full object-contain" /> : <div className="text-4xl">{CASE_DESIGN_PRESETS.find(d => d.id === caseDesign)?.emoji}</div>}
                                             </div>
+                                            <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Case Engine Ready</h4>
+                                            <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom items, probabilities, and unboxing animation in a fully functional preview environment.</p>
+                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'case', caseConfig: buildCaseConfig(), name: caseGameName, isPreview: true } }))} className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-indigo-500/20">
+                                                <Play size={20} /> Launch Full Preview
+                                            </button>
                                         </div>
                                     </div>
 
@@ -3617,60 +3567,90 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                         </label>
                                         
                                         {/* Accent Color */}
-                                        <div>
-                                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Accent Color</span>
-                                           <div className="flex gap-2">
-                                              {['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#ffffff'].map((color) => (
-                                                  <button key={color} onClick={() => setHiloAccentColor(color)} className={`w-8 h-8 rounded-lg shadow-lg border-2 ${hiloAccentColor === color ? 'border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: color }} />
-                                              ))}
-                                           </div>
-                                        </div>
-                                        {/* Bg Color */}
-                                        <div>
-                                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block mt-4">Background Color</span>
-                                           <div className="flex gap-2">
-                                              {['#0a111a', '#1a0b16', '#0b161a', '#161a0b', '#1a0b0b'].map((color) => (
-                                                  <button key={color} onClick={() => setHiloBgColor(color)} className={`w-8 h-8 rounded-lg shadow-lg border-2 ${hiloBgColor === color ? 'border-white scale-110' : 'border-transparent'}`} style={{ backgroundColor: color }} />
-                                              ))}
-                                           </div>
+                                        {/* Colors */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Accent Color</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={hiloAccentColor} onChange={(e) => setHiloAccentColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-xs">{hiloAccentColor}</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Background Color</label>
+                                                <div className="flex items-center gap-3 bg-[#0a111a] border border-white/10 rounded-xl p-3">
+                                                    <input type="color" value={hiloBgColor} onChange={(e) => setHiloBgColor(e.target.value)}
+                                                        className="w-10 h-10 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                    <span className="text-white font-mono text-xs">{hiloBgColor}</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
                                     <div className="space-y-4">
                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Card Design Imagery</span>
                                         <p className="text-xs text-slate-500">Personalize cards by uploading your image!</p>
-                                        <label className="border-2 border-dashed border-white/10 rounded-xl p-4 flex gap-4 items-center cursor-pointer hover:border-blue-500/50 bg-[#0a111a] transition-all">
-                                            {hiloCardBackImage ? <img src={hiloCardBackImage} className="w-10 h-16 object-cover rounded-md" /> : <div className="w-10 h-16 bg-white/5 rounded-md flex items-center justify-center"><ImageIcon size={16} /></div>}
-                                            <div>
-                                                 <span className="font-bold text-sm block">Card Back Cover</span>
-                                                 <span className="text-xs text-slate-500">Image on the back of all cards</span>
-                                            </div>
-                                            <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloCardBackImage, 400)} />
-                                        </label>
-                                        <label className="border-2 border-dashed border-white/10 rounded-xl p-4 flex gap-4 items-center cursor-pointer hover:border-blue-500/50 bg-[#0a111a] transition-all">
-                                            {hiloFaceJ ? <img src={hiloFaceJ} className="w-10 h-16 object-cover rounded-md" /> : <div className="w-10 h-16 bg-white/5 rounded-md flex items-center justify-center"><ImageIcon size={16} /></div>}
-                                            <div>
-                                                 <span className="font-bold text-sm block">Jack (J) Face</span>
-                                                 <span className="text-xs text-slate-500">Replaces J center image</span>
-                                            </div>
-                                            <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloFaceJ, 400)} />
-                                        </label>
-                                         <label className="border-2 border-dashed border-white/10 rounded-xl p-4 flex gap-4 items-center cursor-pointer hover:border-blue-500/50 bg-[#0a111a] transition-all">
-                                            {hiloFaceQ ? <img src={hiloFaceQ} className="w-10 h-16 object-cover rounded-md" /> : <div className="w-10 h-16 bg-white/5 rounded-md flex items-center justify-center"><ImageIcon size={16} /></div>}
-                                            <div>
-                                                 <span className="font-bold text-sm block">Queen (Q) Face</span>
-                                                 <span className="text-xs text-slate-500">Replaces Q center image</span>
-                                            </div>
-                                            <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloFaceQ, 400)} />
-                                        </label>
-                                         <label className="border-2 border-dashed border-white/10 rounded-xl p-4 flex gap-4 items-center cursor-pointer hover:border-blue-500/50 bg-[#0a111a] transition-all">
-                                            {hiloFaceK ? <img src={hiloFaceK} className="w-10 h-16 object-cover rounded-md" /> : <div className="w-10 h-16 bg-white/5 rounded-md flex items-center justify-center"><ImageIcon size={16} /></div>}
-                                            <div>
-                                                 <span className="font-bold text-sm block">King (K) Face</span>
-                                                 <span className="text-xs text-slate-500">Replaces K center image</span>
-                                            </div>
-                                            <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloFaceK, 400)} />
-                                        </label>
+                                        <div className="border-2 border-dashed border-white/10 rounded-xl p-4 flex justify-between items-center bg-[#0a111a] transition-all hover:border-blue-500/50">
+                                            <label className="flex gap-4 items-center cursor-pointer flex-1">
+                                                {hiloCardBackImage ? <img src={hiloCardBackImage} className="w-10 h-16 object-cover rounded-md" /> : <div className="w-10 h-16 bg-white/5 rounded-md flex items-center justify-center"><ImageIcon size={16} /></div>}
+                                                <div>
+                                                     <span className="font-bold text-sm block">Card Back Cover</span>
+                                                     <span className="text-xs text-slate-500">Image on the back of all cards</span>
+                                                </div>
+                                                <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloCardBackImage, 400)} />
+                                            </label>
+                                            {hiloCardBackImage && (
+                                                <button onClick={() => setHiloCardBackImage(null)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg ml-2">
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="border-2 border-dashed border-white/10 rounded-xl p-4 flex justify-between items-center bg-[#0a111a] transition-all hover:border-blue-500/50">
+                                            <label className="flex gap-4 items-center cursor-pointer flex-1">
+                                                {hiloFaceJ ? <img src={hiloFaceJ} className="w-10 h-16 object-cover rounded-md" /> : <div className="w-10 h-16 bg-white/5 rounded-md flex items-center justify-center"><ImageIcon size={16} /></div>}
+                                                <div>
+                                                     <span className="font-bold text-sm block">Jack (J) Face</span>
+                                                     <span className="text-xs text-slate-500">Replaces J center image</span>
+                                                </div>
+                                                <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloFaceJ, 400)} />
+                                            </label>
+                                            {hiloFaceJ && (
+                                                <button onClick={() => setHiloFaceJ(null)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg ml-2">
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
+                                        </div>
+                                         <div className="border-2 border-dashed border-white/10 rounded-xl p-4 flex justify-between items-center bg-[#0a111a] transition-all hover:border-blue-500/50">
+                                            <label className="flex gap-4 items-center cursor-pointer flex-1">
+                                                {hiloFaceQ ? <img src={hiloFaceQ} className="w-10 h-16 object-cover rounded-md" /> : <div className="w-10 h-16 bg-white/5 rounded-md flex items-center justify-center"><ImageIcon size={16} /></div>}
+                                                <div>
+                                                     <span className="font-bold text-sm block">Queen (Q) Face</span>
+                                                     <span className="text-xs text-slate-500">Replaces Q center image</span>
+                                                </div>
+                                                <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloFaceQ, 400)} />
+                                            </label>
+                                            {hiloFaceQ && (
+                                                <button onClick={() => setHiloFaceQ(null)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg ml-2">
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
+                                         </div>
+                                         <div className="border-2 border-dashed border-white/10 rounded-xl p-4 flex justify-between items-center bg-[#0a111a] transition-all hover:border-blue-500/50">
+                                            <label className="flex gap-4 items-center cursor-pointer flex-1">
+                                                {hiloFaceK ? <img src={hiloFaceK} className="w-10 h-16 object-cover rounded-md" /> : <div className="w-10 h-16 bg-white/5 rounded-md flex items-center justify-center"><ImageIcon size={16} /></div>}
+                                                <div>
+                                                     <span className="font-bold text-sm block">King (K) Face</span>
+                                                     <span className="text-xs text-slate-500">Replaces K center image</span>
+                                                </div>
+                                                <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloFaceK, 400)} />
+                                            </label>
+                                            {hiloFaceK && (
+                                                <button onClick={() => setHiloFaceK(null)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg ml-2">
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
+                                         </div>
                                     </div>
                                 </div>
                             </motion.div>
@@ -3727,40 +3707,56 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                     <Rocket size={16} className="text-blue-400" /> Review & Publish
                                 </h3>
                                 
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                     {/* Thumbnail Block */}
-                                     <div className="bg-[#0a111a] p-6 rounded-2xl border border-white/10 relative overflow-hidden group">
-                                         <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                         <div className="flex gap-4 items-start relative z-10">
-                                             <label className={`w-32 h-32 shrink-0 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${hiloCoverImage ? 'border-transparent' : 'border-white/20 hover:border-white/40 hover:bg-white/5 bg-black/50'}`}>
-                                                 {hiloCoverImage ? (
-                                                     <img src={hiloCoverImage} className="w-full h-full object-cover rounded-xl" />
-                                                 ) : (
-                                                     <>
-                                                         <Upload size={24} className="text-slate-400 mb-2" />
-                                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Cover<br/>Image</span>
-                                                     </>
-                                                 )}
-                                                 <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setHiloCoverImage, 800)} />
-                                             </label>
-                                             <div className="pt-2">
-                                                 <h4 className="text-2xl font-black text-white">{hiloGameName || "Untitled Game"}</h4>
-                                                 <p className="text-sm text-slate-400 mt-1 line-clamp-2">{hiloGameDescription || "No description provided."}</p>
-                                                 <div className="mt-4 flex gap-2">
-                                                     <div className="px-2 py-1 rounded bg-black/50 text-[10px] font-bold uppercase text-blue-400 tracking-wider">Hi-Lo Cards</div>
-                                                 </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                     {/* Preview Trigger */}
+                                     <div className="lg:col-span-2 space-y-3">
+                                         <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative flex flex-col items-center justify-center p-8 text-center" style={{ boxShadow: `0 0 40px ${hiloAccentColor}15` }}>
+                                             <div className="w-24 h-32 bg-[#121c22] rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center mb-6 shadow-2xl relative overflow-hidden">
+                                                {hiloCardBackImage ? <img src={hiloCardBackImage} className="absolute inset-0 w-full h-full object-cover" /> : <ShieldCheck className="text-blue-500/50" size={40} />}
                                              </div>
+                                             <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Hi-Lo Engine Ready</h4>
+                                             <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom card designs, colors, and audio logic in a fully functional preview environment.</p>
+                                             <button
+                                                  onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'hilo', hiloConfig: buildHiloConfig(), name: hiloGameName, isPreview: true } }))}
+                                                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-blue-500/20"
+                                              >
+                                                  <Play size={20} /> Launch Preview
+                                              </button>
                                          </div>
                                      </div>
 
                                      {/* Settings Preview / Publishing */}
-                                     <div className="bg-[#0a111a] p-6 rounded-2xl border border-white/10 flex flex-col justify-between">
-                                         <div>
-                                             <h4 className="font-bold text-white mb-2 flex items-center gap-2">
-                                                 <ShieldCheck className="text-green-400" size={18} /> Ready to Ship
-                                             </h4>
-                                             <p className="text-sm text-slate-400 mb-4">You have set up your game theme, descriptions, colors, customized card imagery, and configured audio logic. Once published, your followers can play it in the Casino tab!</p>
+                                     <div className="space-y-4">
+                                         <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                             <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2">Configuration</h4>
+                                             <div className="space-y-2 text-xs">
+                                                 <div className="flex justify-between"><span className="text-slate-500 font-bold">Type</span><span className="text-blue-400 font-bold">Hi-Lo</span></div>
+                                                 <div className="flex justify-between"><span className="text-slate-500 font-bold">Accent</span><div className="w-4 h-4 rounded" style={{backgroundColor: hiloAccentColor}}></div></div>
+                                                 <div className="flex justify-between"><span className="text-slate-500 font-bold">Bg</span><div className="w-4 h-4 rounded" style={{backgroundColor: hiloBgColor}}></div></div>
+                                                 <div className="flex justify-between"><span className="text-slate-500 font-bold">Custom Faces</span><span className="text-white font-mono">{[hiloFaceJ, hiloFaceQ, hiloFaceK, hiloFaceA].filter(Boolean).length}/4</span></div>
+                                                 <div className="flex justify-between"><span className="text-slate-500 font-bold">Card Back</span><span className={hiloCardBackImage ? 'text-green-400' : 'text-slate-600'}>{hiloCardBackImage ? 'Custom' : 'Default'}</span></div>
+                                             </div>
                                          </div>
+
+                                         {/* Cover Image Upload */}
+                                         <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                             <div className="flex justify-between items-center">
+                                                 <h4 className="text-xs font-black text-white uppercase tracking-widest">Lobby Cover Image</h4>
+                                                 {hiloCoverImage && <button onClick={() => setHiloCoverImage(null)} className="text-xs text-red-400 hover:text-red-300">Remove</button>}
+                                             </div>
+                                             {hiloCoverImage ? (
+                                                 <img src={hiloCoverImage} alt="Cover" className="w-full h-40 object-cover rounded-lg border border-white/10" />
+                                             ) : (
+                                                 <label className="flex flex-col items-center gap-2 text-slate-400 cursor-pointer hover:text-blue-400 transition-colors bg-white/5 rounded-xl p-8 justify-center border-2 border-dashed border-white/10 hover:border-blue-500/30">
+                                                     <ImageIcon size={24} />
+                                                     <span className="text-xs font-bold">Upload Cover Image</span>
+                                                     <span className="text-[10px] text-slate-600">Required for publishing</span>
+                                                     <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setHiloCoverImage, 800)} />
+                                                 </label>
+                                             )}
+                                         </div>
+
+                                         {/* Publish Button */}
                                          <button
                                               onClick={handlePublish}
                                               disabled={isPublishing || !hiloGameName.trim() || !hiloCoverImage}
@@ -3781,5 +3777,6 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                 )}
             </div>
         </motion.div>
+        </>
     );
 }

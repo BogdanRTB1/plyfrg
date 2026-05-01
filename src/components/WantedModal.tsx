@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Siren, Skull, Zap } from "lucide-react";
+import { X, Trophy, Skull, Zap, ChevronLeft, ChevronRight } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
@@ -21,28 +21,142 @@ export const WANTED_CONFIG = {
     }
 };
 
+type Lane = 0 | 1 | 2;
+type GameState = "IDLE" | "COUNTDOWN" | "PLAYING" | "BUSTED" | "CASHED_OUT";
+
+type Obstacle = {
+    id: number;
+    lane: Lane;
+    x: number;
+};
+
+type RuntimeState = {
+    elapsedMs: number;
+    multiplier: number;
+    nextSpawnInMs: number;
+    obstacleId: number;
+    obstacles: Obstacle[];
+};
+
 export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, forgesCoins, setForgesCoins }: any) {
     const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
     const balance = currencyType === 'GC' ? diamonds : forgesCoins;
     const [betAmount, setBetAmount] = useState(10);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC', mult: number } | null>(null);
 
-    // Session Tracking
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
 
-    const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'CRASHED' | 'WON'>('IDLE');
-    const [multiplier, setMultiplier] = useState(1.00);
-    const [stars, setStars] = useState(1);
-    const [obstacles, setObstacles] = useState<{ id: number, x: number, passed: boolean }[]>([]);
-    const [nearMisses, setNearMisses] = useState<{ id: number, x: number, y: number }[]>([]);
+    const [gameState, setGameState] = useState<GameState>("IDLE");
+    const [countdown, setCountdown] = useState(3);
+    const [multiplier, setMultiplier] = useState(1);
+    const [playerLane, setPlayerLane] = useState<Lane>(1);
+    const [obstacles, setObstacles] = useState<Obstacle[]>([]);
+    const [elapsedMs, setElapsedMs] = useState(0);
+    const [nearMissFlash, setNearMissFlash] = useState(false);
 
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
-    const obsIdRef = useRef(0);
-    const nearMissIdRef = useRef(0);
+    const intervalRef = useRef<number | null>(null);
+    const countdownRef = useRef<number | null>(null);
+    const nearMissTimeoutRef = useRef<number | null>(null);
+    const runtimeRef = useRef<RuntimeState>({
+        elapsedMs: 0,
+        multiplier: 1,
+        nextSpawnInMs: 1000,
+        obstacleId: 1,
+        obstacles: [],
+    });
+    const roundIdRef = useRef(0);
+    const playerLaneRef = useRef<Lane>(1);
+
+    const SAFE_WINDOW_MS = 1400;
+    const TICK_MS = 50;
+    const PLAYER_X = 16;
+    const COLLISION_MIN_X = 10;
+    const COLLISION_MAX_X = 24;
+
+    const clearAllTimers = () => {
+        if (intervalRef.current !== null) {
+            window.clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+        if (countdownRef.current !== null) {
+            window.clearInterval(countdownRef.current);
+            countdownRef.current = null;
+        }
+        if (nearMissTimeoutRef.current !== null) {
+            window.clearTimeout(nearMissTimeoutRef.current);
+            nearMissTimeoutRef.current = null;
+        }
+    };
+
+    const clampLane = (lane: number): Lane => {
+        if (lane <= 0) return 0;
+        if (lane >= 2) return 2;
+        return lane as Lane;
+    };
+
+    const computeMultiplier = (elapsed: number) => {
+        const seconds = elapsed / 1000;
+        const raw = 1 + (seconds * 0.11) + Math.pow(seconds, 1.4) * 0.02;
+        return Number(raw.toFixed(2));
+    };
+
+    const spawnObstacle = (state: RuntimeState): RuntimeState => {
+        const lane = Math.floor(Math.random() * 3) as Lane;
+        return {
+            ...state,
+            obstacleId: state.obstacleId + 1,
+            obstacles: [...state.obstacles, { id: state.obstacleId, lane, x: 110 }],
+        };
+    };
+
+    const advanceObstacles = (state: RuntimeState): RuntimeState => {
+        const difficulty = Math.max(0, state.multiplier - 1);
+        const speed = 1.8 + difficulty * 0.55;
+        const moved = state.obstacles
+            .map((obstacle) => ({ ...obstacle, x: obstacle.x - speed }))
+            .filter((obstacle) => obstacle.x > -12);
+        return { ...state, obstacles: moved };
+    };
+
+    const checkCollision = (state: RuntimeState): boolean => {
+        if (state.elapsedMs < SAFE_WINDOW_MS) return false;
+        return state.obstacles.some((obstacle) => (
+            obstacle.lane === playerLaneRef.current &&
+            obstacle.x <= COLLISION_MAX_X &&
+            obstacle.x >= COLLISION_MIN_X
+        ));
+    };
+
+    const triggerNearMiss = () => {
+        setNearMissFlash(true);
+        if (nearMissTimeoutRef.current !== null) {
+            window.clearTimeout(nearMissTimeoutRef.current);
+        }
+        nearMissTimeoutRef.current = window.setTimeout(() => {
+            setNearMissFlash(false);
+        }, 180);
+    };
+
+    const moveLane = (dir: -1 | 0 | 1) => {
+        if (gameState !== "PLAYING" && gameState !== "COUNTDOWN") return;
+        const target = dir === 0 ? 1 : playerLaneRef.current + dir;
+        const nextLane = clampLane(target);
+        playerLaneRef.current = nextLane;
+        setPlayerLane(nextLane);
+    };
+
+    const endRoundAsBusted = (roundId: number) => {
+        if (roundId !== roundIdRef.current) return;
+        clearAllTimers();
+        setGameState("BUSTED");
+    };
 
     const startGame = () => {
         if (balance < betAmount || betAmount <= 0) return;
+        clearAllTimers();
+        roundIdRef.current += 1;
+        const activeRoundId = roundIdRef.current;
 
         if (currencyType === 'GC') {
             setDiamonds((prev: number) => prev - betAmount);
@@ -51,66 +165,81 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
         }
 
         setSessionWagered(prev => prev + betAmount);
-
-        setGameState('PLAYING');
-        setMultiplier(1.00);
-        setStars(1);
+        setGameState("COUNTDOWN");
+        setCountdown(3);
+        setMultiplier(1);
+        setElapsedMs(0);
+        setPlayerLane(1);
+        playerLaneRef.current = 1;
         setObstacles([]);
-        setNearMisses([]);
-        obsIdRef.current = 0;
-        nearMissIdRef.current = 0;
+        setNearMissFlash(false);
 
-        if (timerRef.current) clearInterval(timerRef.current);
+        runtimeRef.current = {
+            elapsedMs: 0,
+            multiplier: 1,
+            nextSpawnInMs: 1000,
+            obstacleId: 1,
+            obstacles: [],
+        };
 
-        let currentMult = 1.00;
-        let currentObs: { id: number, x: number, passed: boolean }[] = [];
+        countdownRef.current = window.setInterval(() => {
+            if (activeRoundId !== roundIdRef.current) return;
 
-        timerRef.current = setInterval(() => {
-            currentMult += 0.005 + (currentMult * 0.002);
-
-            const currentStars = Math.min(5, Math.floor(currentMult / 1.5) + 1);
-
-            // Move obstacles (speed scales slightly with multiplier)
-            const speed = 2 + (currentMult * 0.1);
-            currentObs = currentObs.map(o => ({ ...o, x: o.x - speed })).filter(o => o.x > -20);
-
-            // Spawn obstacles
-            if (Math.random() < 0.04 + (currentStars * 0.01) && currentObs.every(o => o.x < 70)) {
-                currentObs.push({ id: obsIdRef.current++, x: 100, passed: false });
-            }
-
-            // Check collisions (player is at roughly x = 20)
-            let crashed = false;
-            currentObs.forEach((o, index) => {
-                if (!o.passed && o.x < 25) {
-                    o.passed = true;
-                    // Trip chance depends on game speed/stars
-                    const tripChance = 0.15 + (currentStars * 0.05);
-                    if (Math.random() < tripChance) {
-                        crashed = true;
-                    } else {
-                        // Dodge! Near miss effect
-                        setNearMisses(prev => [...prev.slice(-3), { id: nearMissIdRef.current++, x: 25, y: 50 + Math.random() * 20 }]);
+            setCountdown((prev) => {
+                if (prev <= 1) {
+                    if (countdownRef.current !== null) {
+                        window.clearInterval(countdownRef.current);
+                        countdownRef.current = null;
                     }
-                }
-            });
+                    setGameState("PLAYING");
 
-            if (crashed) {
-                if (timerRef.current) clearInterval(timerRef.current);
-                setGameState('CRASHED');
-            } else {
-                setMultiplier(Number(currentMult.toFixed(2)));
-                setStars(currentStars);
-                setObstacles(currentObs);
-            }
-        }, 50);
+                    intervalRef.current = window.setInterval(() => {
+                        if (activeRoundId !== roundIdRef.current) return;
+
+                        let next = { ...runtimeRef.current };
+                        next.elapsedMs += TICK_MS;
+                        next.multiplier = computeMultiplier(next.elapsedMs);
+                        next = advanceObstacles(next);
+
+                        const difficulty = Math.max(0, next.multiplier - 1);
+                        next.nextSpawnInMs -= TICK_MS;
+                        if (next.nextSpawnInMs <= 0) {
+                            next = spawnObstacle(next);
+                            const baseCooldown = Math.max(330, 1100 - difficulty * 180);
+                            next.nextSpawnInMs = baseCooldown + Math.floor(Math.random() * 220);
+                        }
+
+                        const nearMiss = next.obstacles.some((obstacle) => (
+                            obstacle.lane !== playerLaneRef.current &&
+                            Math.abs(obstacle.lane - playerLaneRef.current) === 1 &&
+                            obstacle.x <= 22 &&
+                            obstacle.x >= 13
+                        ));
+                        if (nearMiss) triggerNearMiss();
+
+                        if (checkCollision(next)) {
+                            runtimeRef.current = next;
+                            endRoundAsBusted(activeRoundId);
+                            return;
+                        }
+
+                        runtimeRef.current = next;
+                        setMultiplier(next.multiplier);
+                        setElapsedMs(next.elapsedMs);
+                        setObstacles(next.obstacles);
+                    }, TICK_MS);
+
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
     };
 
     const cashOut = () => {
-        if (gameState !== 'PLAYING') return;
-        if (timerRef.current) clearInterval(timerRef.current);
-
-        setGameState('WON');
+        if (gameState !== "PLAYING") return;
+        clearAllTimers();
+        setGameState("CASHED_OUT");
         const winAmount = betAmount * multiplier;
         setLastWin({ amount: winAmount, currency: currencyType, mult: multiplier });
 
@@ -121,12 +250,11 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
         }
 
         setSessionPayout(prev => prev + winAmount);
-
-        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     };
 
     const handleBetChange = (amount: number) => {
-        if (gameState === 'PLAYING') return;
+        if (gameState === "PLAYING" || gameState === "COUNTDOWN") return;
         let newAmount = Math.max(0, amount);
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
@@ -138,7 +266,7 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
             if (sessionWagered > 0) {
                 window.dispatchEvent(new CustomEvent('game_session_complete', {
                     detail: { 
-                        gameName: "Wanted Runner", 
+                        gameName: "Wanted", 
                         gameImage: "/images/game-influencer-run.png", 
                         wagered: sessionWagered, 
                         payout: sessionPayout, 
@@ -149,24 +277,55 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
                 setSessionPayout(0);
             }
 
-            if (timerRef.current) clearInterval(timerRef.current);
-            setGameState('IDLE');
-        
+            clearAllTimers();
+            roundIdRef.current += 1;
+            setGameState("IDLE");
+            setCountdown(3);
+            setMultiplier(1);
+            setElapsedMs(0);
+            setPlayerLane(1);
+            playerLaneRef.current = 1;
+            setObstacles([]);
+            setNearMissFlash(false);
         }
     }, [isOpen, sessionWagered, sessionPayout, currencyType]);
 
     useEffect(() => {
-        // Cleanup near misses automatically after a short delay
-        if (nearMisses.length > 0) {
-            const timer = setTimeout(() => {
-                setNearMisses(prev => prev.filter(nm => nm.id !== nearMisses[0]?.id));
-            }, 800);
-            return () => clearTimeout(timer);
-        }
-    }, [nearMisses]);
+        if (!isOpen) return;
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "ArrowLeft" || event.key.toLowerCase() === "a") {
+                event.preventDefault();
+                moveLane(-1);
+            } else if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") {
+                event.preventDefault();
+                moveLane(1);
+            } else if (event.key === "ArrowDown" || event.key.toLowerCase() === "s") {
+                event.preventDefault();
+                moveLane(0);
+            } else if (event.code === "Space") {
+                event.preventDefault();
+                if (gameState === "PLAYING") cashOut();
+            }
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [isOpen, gameState, multiplier]);
+
+    useEffect(() => {
+        return () => clearAllTimers();
+    }, []);
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
+
+    const laneToY = (lane: Lane) => {
+        if (lane === 0) return "22%";
+        if (lane === 1) return "50%";
+        return "78%";
+    };
+    const canStart = balance >= betAmount && betAmount > 0;
+    const cashoutPreview = betAmount * multiplier;
+    const survivalSeconds = (elapsedMs / 1000).toFixed(1);
 
     return createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -176,12 +335,11 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
                 exit={{ scale: 0.9, opacity: 0 }}
                 className={`${WANTED_CONFIG.theme.background} rounded-2xl w-full max-w-5xl border border-blue-500/20 shadow-[0_0_50px_rgba(59,130,246,0.15)] overflow-hidden flex flex-col md:flex-row h-[600px] sm:h-[700px]`}
             >
-                {/* ADVANCED BETTING MENU */}
                 <div className={`w-full md:w-80 ${WANTED_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
                             <Skull className={WANTED_CONFIG.theme.accent} />
-                            <h2 className="text-xl font-black uppercase italic tracking-widest">{WANTED_CONFIG.names.title}</h2>
+                            <h2 className="text-xl font-black uppercase tracking-widest">Wanted Pursuit</h2>
                             <FavoriteToggle gameName={WANTED_CONFIG.names.title} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
@@ -210,9 +368,9 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
                             />
                         </div>
                         <div className="grid grid-cols-4 gap-2">
-                            <button onClick={() => handleBetChange(betAmount / 2)} disabled={gameState === 'PLAYING'} className="bg-[#1a1f2e] hover:bg-[#252b3b] text-blue-200 hover:text-white text-xs font-bold py-2 rounded-lg border border-blue-500/20 transition-colors">1/2</button>
-                            <button onClick={() => handleBetChange(betAmount * 2)} disabled={gameState === 'PLAYING'} className="bg-[#1a1f2e] hover:bg-[#252b3b] text-blue-200 hover:text-white text-xs font-bold py-2 rounded-lg border border-blue-500/20 transition-colors">2X</button>
-                            <button onClick={() => handleBetChange(balance)} disabled={gameState === 'PLAYING'} className={`bg-[#1a1f2e] hover:bg-[#252b3b] ${WANTED_CONFIG.theme.accent} text-xs font-black py-2 rounded-lg border border-blue-500/30 transition-colors`}>MAX</button>
+                            <button onClick={() => handleBetChange(betAmount / 2)} disabled={gameState === "PLAYING" || gameState === "COUNTDOWN"} className="bg-[#1a1f2e] hover:bg-[#252b3b] text-blue-200 hover:text-white text-xs font-bold py-2 rounded-lg border border-blue-500/20 transition-colors">1/2</button>
+                            <button onClick={() => handleBetChange(betAmount * 2)} disabled={gameState === "PLAYING" || gameState === "COUNTDOWN"} className="bg-[#1a1f2e] hover:bg-[#252b3b] text-blue-200 hover:text-white text-xs font-bold py-2 rounded-lg border border-blue-500/20 transition-colors">2X</button>
+                            <button onClick={() => handleBetChange(balance)} disabled={gameState === "PLAYING" || gameState === "COUNTDOWN"} className={`bg-[#1a1f2e] hover:bg-[#252b3b] ${WANTED_CONFIG.theme.accent} text-xs font-black py-2 rounded-lg border border-blue-500/30 transition-colors`}>MAX</button>
                         </div>
                     </div>
 
@@ -231,233 +389,144 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
                     </div>
 
                     <div className="mt-auto space-y-3">
-                        {gameState === 'PLAYING' ? (
+                        {gameState === "PLAYING" ? (
                             <button onClick={cashOut} className="w-full bg-green-500 hover:bg-green-400 text-black h-16 rounded-xl font-black text-xl tracking-widest uppercase transition-all shadow-[0_5px_20px_rgba(34,197,94,0.4)] relative overflow-hidden group">
                                 <span className="relative z-10 flex flex-col items-center justify-center">
                                     <span className="text-base flex items-center gap-2"><Trophy size={18} /> CASHOUT</span>
-                                    <span className="text-xs font-mono opacity-80 mt-[-2px]">Win {(betAmount * multiplier).toFixed(2)}</span>
+                                    <span className="text-xs font-mono opacity-80 mt-[-2px]">Win {cashoutPreview.toFixed(2)}</span>
                                 </span>
                             </button>
                         ) : (
-                            <button onClick={startGame} disabled={balance < betAmount || betAmount <= 0} className={`w-full ${WANTED_CONFIG.theme.buttonAccent} hover:brightness-110 text-white h-14 rounded-xl font-black text-xl tracking-widest uppercase transition-all shadow-[0_5px_20px_rgba(59,130,246,0.4)] disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-1 relative overflow-hidden group`}>
+                            <button onClick={startGame} disabled={!canStart} className={`w-full ${WANTED_CONFIG.theme.buttonAccent} hover:brightness-110 text-white h-14 rounded-xl font-black text-xl tracking-widest uppercase transition-all shadow-[0_5px_20px_rgba(59,130,246,0.4)] disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-1 relative overflow-hidden group`}>
                                 <span className="relative z-10 flex gap-2 items-center justify-center">
                                     <Zap size={20} /> START RUN
                                 </span>
                             </button>
                         )}
+                        <div className="text-[11px] text-slate-500 text-center font-mono">
+                            Controls: A/D or Arrow Left/Right, S for center, Space cashout
+                        </div>
                     </div>
                 </div>
 
-                {/* GAME AREA */}
                 <div className={`flex-1 relative ${WANTED_CONFIG.theme.gameBg} overflow-hidden shadow-inner flex flex-col`}>
+                    <div className="absolute inset-0 bg-gradient-to-b from-[#0b1325] via-[#060b16] to-[#030406]" />
+                    <div className={`absolute inset-0 transition-opacity duration-200 ${nearMissFlash ? "opacity-100 bg-yellow-200/5" : "opacity-0"}`} />
 
-                    {/* Screenshake Container */}
-                    <motion.div
-                        animate={gameState === 'PLAYING' && stars >= 4 ? { x: [-2, 2, -2, 2, 0], y: [-1, 1, -2, 1, 0] } : {}}
-                        transition={{ duration: 0.5, repeat: Infinity, repeatType: "mirror" }}
-                        className="absolute inset-0 z-0"
-                    >
-                        {/* Parallax Background */}
-                        <div className="absolute inset-0 overflow-hidden flex z-0 opacity-60 pointer-events-none">
-                            <motion.div
-                                animate={gameState === 'PLAYING' ? { x: ["0%", "-50%"] } : {}}
-                                transition={{ repeat: Infinity, ease: "linear", duration: 6 / (multiplier * 0.5 || 1) }}
-                                className="flex w-[200%] h-full"
-                            >
-                                <div className="w-1/2 h-full bg-[url('/images/game-influencer-run.png')] bg-cover bg-bottom filter blur-[2px]"></div>
-                                <div className="w-1/2 h-full bg-[url('/images/game-influencer-run.png')] bg-cover bg-bottom filter blur-[2px]"></div>
-                            </motion.div>
-                        </div>
-                    </motion.div>
-
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60 z-0"></div>
-
-                    {/* Top HUD */}
-                    <div className="relative z-20 flex justify-between items-start p-6 w-full">
-                        <div className="flex gap-1">
-                            {[1, 2, 3, 4, 5].map(s => (
-                                <motion.div
-                                    key={s}
-                                    animate={stars >= s && gameState === 'PLAYING' ? { scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] } : {}}
-                                    transition={{ repeat: Infinity, duration: 0.5, delay: s * 0.1 }}
-                                >
-                                    <svg className={`w-8 h-8 drop-shadow-lg ${stars >= s ? 'text-yellow-400 drop-shadow-[0_0_12px_rgba(250,204,21,0.8)]' : 'text-slate-800/80'}`} fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                    </svg>
-                                </motion.div>
-                            ))}
-                        </div>
-
-                        <div className="flex flex-col items-end gap-2">
-                            <motion.div
-                                animate={gameState === 'PLAYING' ? { scale: [1, 1.1, 1] } : {}}
-                                transition={{ repeat: Infinity, duration: 1 }}
-                                className="bg-black/80 border-[3px] border-blue-500 shadow-[0_0_25px_rgba(59,130,246,0.6)] px-8 py-3 rounded-2xl"
-                            >
-                                <span className="text-5xl font-black text-white font-mono">{multiplier.toFixed(2)}x</span>
-                            </motion.div>
-                            {gameState === 'PLAYING' && (
-                                <div className="text-blue-400 font-mono text-sm font-bold opacity-80 bg-black/50 px-3 py-1 rounded-full border border-blue-500/30">
-                                    Dist: {Math.floor((multiplier - 1) * 1000)}m
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Near Miss Text Popups */}
-                    <AnimatePresence>
-                        {nearMisses.map(miss => (
-                            <motion.div
-                                key={miss.id}
-                                initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                                animate={{ opacity: 1, y: -50, scale: 1.2 }}
-                                exit={{ opacity: 0, y: -100 }}
-                                transition={{ duration: 0.8 }}
-                                className="absolute z-50 pointer-events-none font-black text-xl italic text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.8)] tracking-wider"
-                                style={{ bottom: `${miss.y}%`, left: `${miss.x + 5}%` }}
-                            >
-                                DODGED!
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
-
-                    {/* Platform/Floor */}
-                    <div className="absolute bottom-[10%] w-full h-[5%] bg-blue-900/30 border-t border-blue-500/20 z-0">
-                        <motion.div
-                            animate={gameState === 'PLAYING' ? { backgroundPositionX: ["0px", "-100px"] } : {}}
-                            transition={{ repeat: Infinity, ease: "linear", duration: 0.5 }}
-                            className="w-full h-full opacity-30"
-                            style={{ backgroundImage: "repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px)" }}
-                        />
-                    </div>
-
-                    {/* Action Area (Bottom) */}
-                    <div className="absolute bottom-[15%] w-full h-40 z-10 flex items-end px-4">
-
-                        {/* Obstacles Layer */}
-                        {obstacles.map(obs => (
-                            <div key={obs.id} className="absolute bottom-0 text-6xl drop-shadow-2xl z-30 filter drop-shadow-[0_10px_10px_rgba(0,0,0,0.8)]" style={{ left: `${obs.x}%` }}>
-                                🚧
+                    <div className="relative z-20 p-6">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="bg-black/50 border border-white/10 rounded-xl px-4 py-2">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-400">State</p>
+                                <p className="text-sm font-bold text-white">{gameState}</p>
                             </div>
+                            <div className="bg-black/50 border border-blue-500/30 rounded-xl px-5 py-2 min-w-[170px] text-center">
+                                <p className="text-[10px] uppercase tracking-wider text-blue-300">Multiplier</p>
+                                <p className="text-3xl font-black text-white font-mono">{multiplier.toFixed(2)}x</p>
+                            </div>
+                            <div className="bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-right">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-400">Survival</p>
+                                <p className="text-sm font-bold text-white">{survivalSeconds}s</p>
+                            </div>
+                        </div>
+                        <div className="mt-3 text-sm text-slate-300 font-medium">
+                            Payout Preview: <span className="font-mono font-bold text-green-400">{cashoutPreview.toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    <div className="relative z-10 flex-1 mx-6 mb-5 rounded-2xl border border-white/10 bg-black/30 overflow-hidden">
+                        {[0, 1, 2].map((lane) => (
+                            <div
+                                key={lane}
+                                className="absolute left-0 right-0 border-t border-white/10"
+                                style={{ top: laneToY(lane as Lane), transform: "translateY(-50%)" }}
+                            />
                         ))}
 
-                        {/* Player Character */}
-                        <div className="absolute bottom-2 left-[20%] z-40">
-                            {gameState === 'CRASHED' ? (
-                                <motion.div initial={{ rotate: 0, y: 0, x: 0 }} animate={{ rotate: 90, y: 20, x: 30 }} className="text-7xl drop-shadow-[0_0_20px_rgba(255,255,255,0.5)] border-red-500">
-                                    🏃‍♂️
-                                </motion.div>
-                            ) : (
-                                <motion.div
-                                    animate={gameState === 'PLAYING' ? {
-                                        y: nearMisses.length > 0 ? [-20, -60, -20] : [0, -20, 0],
-                                        rotate: nearMisses.length > 0 ? [0, 15, 0] : 0
-                                    } : {}}
-                                    transition={{ repeat: Infinity, duration: nearMisses.length > 0 ? 0.5 : 0.4 }}
-                                    className="text-7xl drop-shadow-[0_0_20px_rgba(255,255,255,0.8)] filter drop-shadow-[0_10px_15px_rgba(0,0,0,0.5)]"
-                                >
-                                    🏃‍♂️
-                                </motion.div>
-                            )}
-                        </div>
+                        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "repeating-linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.08) 2px, transparent 2px, transparent 40px)" }} />
 
-                        {/* Enemies (Behind player, based on stars) */}
-                        <div className="absolute bottom-2 left-[2%] z-30">
-                            {stars === 1 && (
-                                <motion.div
-                                    animate={gameState === 'PLAYING' || gameState === 'CRASHED' ? { x: gameState === 'CRASHED' ? 100 : [0, 5, 0], y: [0, -10, 0] } : {}}
-                                    transition={{ repeat: gameState === 'CRASHED' ? 0 : Infinity, duration: 0.4 }}
-                                    className="text-6xl drop-shadow-[0_0_15px_rgba(255,0,0,0.5)]"
-                                >
-                                    <span className="scale-x-[-1] inline-block">👮‍♂️</span>
-                                </motion.div>
-                            )}
-                            {stars === 2 && (
-                                <motion.div
-                                    animate={gameState === 'PLAYING' || gameState === 'CRASHED' ? { x: gameState === 'CRASHED' ? 100 : [0, 5, 0], y: [0, -10, 0] } : {}}
-                                    transition={{ repeat: gameState === 'CRASHED' ? 0 : Infinity, duration: 0.4 }}
-                                    className="text-6xl drop-shadow-[0_0_15px_rgba(255,0,0,0.5)] flex"
-                                >
-                                    <span className="scale-x-[-1] inline-block">👮‍♂️</span>
-                                    <span className="scale-x-[-1] inline-block -ml-4 mt-2">👮‍♀️</span>
-                                </motion.div>
-                            )}
-                            {stars >= 3 && (
-                                <motion.div
-                                    animate={gameState === 'PLAYING' || gameState === 'CRASHED' ? { x: gameState === 'CRASHED' ? 120 : [0, 5, 0], y: [0, -2, 0] } : {}}
-                                    transition={{ repeat: gameState === 'CRASHED' ? 0 : Infinity, duration: 0.2 }}
-                                    className="text-[5rem] drop-shadow-[0_0_30px_rgba(59,130,246,0.8)] relative"
-                                >
-                                    <span className="scale-x-[-1] inline-block">🚓</span>
-                                    {/* Police Lights */}
-                                    <motion.div animate={{ opacity: [1, 0, 1] }} transition={{ repeat: Infinity, duration: 0.2 }} className="absolute top-2 left-6 w-5 h-5 bg-red-500 rounded-full blur-[4px] shadow-[0_0_20px_red]"></motion.div>
-                                    <motion.div animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 0.2 }} className="absolute top-2 right-8 w-5 h-5 bg-blue-500 rounded-full blur-[4px] shadow-[0_0_20px_blue]"></motion.div>
-                                </motion.div>
-                            )}
-                        </div>
+                        <motion.div
+                            className="absolute h-12 w-12 rounded-xl bg-cyan-400/90 border-2 border-white shadow-[0_0_20px_rgba(34,211,238,0.5)] flex items-center justify-center"
+                            animate={{ top: laneToY(playerLane), left: `${PLAYER_X}%` }}
+                            transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                            style={{ transform: "translate(-50%, -50%)" }}
+                        >
+                            <span className="text-[#02222d] font-black">YOU</span>
+                        </motion.div>
 
-                        {/* Helicopter */}
-                        {stars >= 4 && (
+                        {obstacles.map((obstacle) => (
                             <motion.div
-                                animate={gameState === 'PLAYING' || gameState === 'CRASHED' ? { x: gameState === 'CRASHED' ? 150 : [0, 30, -10, 0], y: [0, 15, -10, 0] } : {}}
-                                transition={{ repeat: gameState === 'CRASHED' ? 0 : Infinity, duration: 2.5 }}
-                                className="absolute bottom-[200px] left-[5%] z-50 text-[6rem] drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-                            >
-                                <span className="scale-x-[-1] inline-block relative">
-                                    🚁
-                                    {/* Spotlight beam */}
-                                    <motion.div
-                                        animate={{ rotate: [-15, 15, -15], opacity: [0.3, 0.6, 0.3] }}
-                                        transition={{ repeat: Infinity, duration: 1.5 }}
-                                        className="absolute top-[80px] right-[-80px] w-[300px] h-[400px] origin-top pointer-events-none"
-                                        style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.8) 0%, transparent 100%)', clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)' }}
-                                    />
-                                </span>
-                            </motion.div>
-                        )}
+                                key={obstacle.id}
+                                className="absolute h-10 w-10 rounded-lg bg-red-500 border border-red-300 shadow-[0_0_12px_rgba(239,68,68,0.55)]"
+                                style={{
+                                    top: laneToY(obstacle.lane),
+                                    left: `${obstacle.x}%`,
+                                    transform: "translate(-50%, -50%)",
+                                }}
+                            />
+                        ))}
 
-                        {/* SWAT Truck for 5 stars */}
-                        {stars >= 5 && (
-                            <motion.div
-                                animate={gameState === 'PLAYING' || gameState === 'CRASHED' ? { x: gameState === 'CRASHED' ? 150 : [-20, 10, -20], y: [0, -2, 0] } : {}}
-                                transition={{ repeat: gameState === 'CRASHED' ? 0 : Infinity, duration: 0.15 }}
-                                className="absolute bottom-0 -left-10 z-20 text-[6rem] drop-shadow-[0_0_40px_rgba(255,0,0,0.8)]"
-                            >
-                                <span className="scale-x-[-1] inline-block filter hue-rotate-180 brightness-50 contrast-125">🚐</span>
-                                <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ repeat: Infinity, duration: 0.1 }} className="absolute -top-2 left-10 w-8 h-8 bg-red-600 rounded-full blur-[6px] shadow-[0_0_30px_red]"></motion.div>
-                            </motion.div>
+                        {gameState === "COUNTDOWN" && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/45">
+                                <div className="text-center">
+                                    <p className="text-xs uppercase tracking-widest text-slate-300 mb-2">Get Ready</p>
+                                    <p className="text-7xl font-black text-white">{countdown}</p>
+                                </div>
+                            </div>
                         )}
                     </div>
 
-                    {/* Result overlay */}
+                    <div className="relative z-20 mb-6 px-6">
+                        <div className="grid grid-cols-3 gap-3">
+                            <button
+                                onClick={() => moveLane(-1)}
+                                disabled={gameState !== "PLAYING" && gameState !== "COUNTDOWN"}
+                                className="h-12 rounded-xl bg-[#141922] border border-white/10 text-white font-bold hover:bg-[#1b2330] disabled:opacity-40 flex items-center justify-center gap-2"
+                            >
+                                <ChevronLeft size={16} /> LEFT
+                            </button>
+                            <button
+                                onClick={() => moveLane(0)}
+                                disabled={gameState !== "PLAYING" && gameState !== "COUNTDOWN"}
+                                className="h-12 rounded-xl bg-[#141922] border border-white/10 text-white font-bold hover:bg-[#1b2330] disabled:opacity-40"
+                            >
+                                CENTER
+                            </button>
+                            <button
+                                onClick={() => moveLane(1)}
+                                disabled={gameState !== "PLAYING" && gameState !== "COUNTDOWN"}
+                                className="h-12 rounded-xl bg-[#141922] border border-white/10 text-white font-bold hover:bg-[#1b2330] disabled:opacity-40 flex items-center justify-center gap-2"
+                            >
+                                RIGHT <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    </div>
+
                     <AnimatePresence>
-                        {gameState === 'CRASHED' && (
+                        {gameState === "BUSTED" && (
                             <motion.div
                                 initial={{ opacity: 0, scale: 0.5 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="absolute inset-0 flex items-center justify-center z-[60] bg-red-950/80 backdrop-blur-md pointer-events-none"
+                                className="absolute inset-0 flex items-center justify-center z-[60] bg-red-950/65 backdrop-blur-sm pointer-events-none"
                             >
-                                <div className="text-center drop-shadow-[0_0_50px_rgba(239,68,68,0.8)] border-4 border-red-500/50 p-12 rounded-[3rem] bg-black/60 shadow-[inset_0_0_100px_rgba(239,68,68,0.3)]">
-                                    <Skull className="w-32 h-32 text-red-500 mx-auto mb-6 animate-pulse" />
-                                    <h1 className="text-6xl font-black text-white uppercase tracking-[0.4em] font-mono mb-4 text-shadow-xl text-red-500" style={{ textShadow: '0 0 20px rgba(255,0,0,1)' }}>BUSTED!</h1>
-                                    <p className="text-red-400 font-bold text-2xl tracking-widest bg-red-950/50 px-6 py-2 rounded-full inline-block border border-red-500/30">Loss: {betAmount.toFixed(2)} {currencyType}</p>
+                                <div className="text-center border border-red-400/40 p-10 rounded-3xl bg-black/70">
+                                    <Skull className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                                    <h1 className="text-4xl font-black text-red-400 uppercase tracking-wider mb-2">Busted</h1>
+                                    <p className="text-red-200 font-mono">Lost {betAmount.toFixed(2)} {currencyType}</p>
                                 </div>
                             </motion.div>
                         )}
-                        {gameState === 'WON' && (
+                        {gameState === "CASHED_OUT" && (
                             <motion.div
                                 initial={{ opacity: 0, scale: 0.5 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="absolute inset-0 flex items-center justify-center z-[60] bg-green-950/80 backdrop-blur-md pointer-events-none"
+                                className="absolute inset-0 flex items-center justify-center z-[60] bg-green-950/65 backdrop-blur-sm pointer-events-none"
                             >
-                                <div className="text-center drop-shadow-[0_0_50px_rgba(34,197,94,0.8)] bg-black/80 p-10 rounded-[3rem] border-4 border-green-500 shadow-[inset_0_0_100px_rgba(34,197,94,0.3)]">
-                                    <h1 className="text-6xl font-black text-green-400 uppercase tracking-[0.2em] font-mono mb-6" style={{ textShadow: '0 0 20px rgba(0,255,0,0.8)' }}>ESCAPED!</h1>
-                                    <div className="bg-green-500/10 px-8 py-4 rounded-3xl border border-green-500/30 inline-block">
-                                        <p className="text-white font-black text-5xl mb-2 drop-shadow-lg">{multiplier.toFixed(2)}x</p>
-                                        <p className="text-green-300 font-bold text-2xl">+{lastWin?.amount.toFixed(2)} {currencyType}</p>
-                                    </div>
+                                <div className="text-center border border-green-400/40 p-10 rounded-3xl bg-black/70">
+                                    <h1 className="text-4xl font-black text-green-400 uppercase tracking-wider mb-2">Escaped</h1>
+                                    <p className="text-white font-mono text-xl">{multiplier.toFixed(2)}x</p>
+                                    <p className="text-green-300 font-mono mt-1">+{lastWin?.amount.toFixed(2)} {currencyType}</p>
                                 </div>
                             </motion.div>
                         )}

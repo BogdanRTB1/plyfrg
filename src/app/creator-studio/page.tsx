@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, Users, Presentation, Target, DollarSign, Activity, Gamepad2, Edit, Layers, Play, Sparkles, Clock, Trash2, Eye } from 'lucide-react';
 import EditCreatorModal from '@/components/EditCreatorModal';
 import CreatorGameStudio from '@/components/CreatorGameStudio';
 import { createClient } from '@/utils/supabase/client';
+import { migratePublishedGamesAssetsToSupabase } from '@/utils/publishedGamesStorage';
 
 export default function CreatorStudioPage() {
     const [creatorData, setCreatorData] = useState<any>(null);
@@ -15,6 +16,7 @@ export default function CreatorStudioPage() {
     const [earnings, setEarnings] = useState<any[]>([]);
     const [gamePlays, setGamePlays] = useState<any[]>([]);
     const [profileViews, setProfileViews] = useState<any[]>([]);
+    const hasMigratedAssetsRef = useRef(false);
 
     useEffect(() => {
         const checkCreatorStatus = async () => {
@@ -31,7 +33,12 @@ export default function CreatorStudioPage() {
                 .from('creators')
                 .select('*')
                 .eq('id', user.id)
-                .single();
+                .maybeSingle();
+
+            if (error) {
+                console.error('Failed to verify creator status:', error);
+                return;
+            }
 
             if (dbCreator) {
                 // Map DB fields to UI expectations if necessary
@@ -53,26 +60,37 @@ export default function CreatorStudioPage() {
 
     // Load published games
     useEffect(() => {
-        const loadPublishedGames = () => {
-            const data = localStorage.getItem('custom_published_games');
-            if (data) {
-                try {
-                    const allGames = JSON.parse(data);
-                    if (creatorData) {
-                        const myGames = allGames.filter((g: any) =>
-                            g.creatorId === (creatorData.id || creatorData.name) ||
-                            g.creatorName === creatorData.name
-                        );
-                        setPublishedGames(myGames);
-                    }
-                } catch (e) {
-                    console.error(e);
+        const loadPublishedGames = async () => {
+            try {
+                if (!hasMigratedAssetsRef.current) {
+                    await migratePublishedGamesAssetsToSupabase();
+                    hasMigratedAssetsRef.current = true;
                 }
+
+                const data = localStorage.getItem('custom_published_games');
+                if (!data || !creatorData) {
+                    setPublishedGames([]);
+                    return;
+                }
+
+                const allGames = JSON.parse(data);
+                const myGames = allGames.filter((g: any) =>
+                    g.creatorId === (creatorData.id || creatorData.name) ||
+                    g.creatorName === creatorData.name
+                );
+                setPublishedGames(myGames);
+            } catch (e) {
+                console.error(e);
             }
         };
-        loadPublishedGames();
-        window.addEventListener('storage', loadPublishedGames);
-        return () => window.removeEventListener('storage', loadPublishedGames);
+
+        const handleStorage = () => {
+            void loadPublishedGames();
+        };
+
+        void loadPublishedGames();
+        window.addEventListener('storage', handleStorage);
+        return () => window.removeEventListener('storage', handleStorage);
     }, [creatorData]);
 
     // Load earnings
@@ -598,50 +616,60 @@ export default function CreatorStudioPage() {
                                             key={game.id}
                                             initial={{ opacity: 0, scale: 0.9 }}
                                             animate={{ opacity: 1, scale: 1 }}
-                                            className="group relative bg-[#0b1622]/80 rounded-2xl overflow-hidden border border-white/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl flex flex-col backdrop-blur-xl"
+                                            className="group relative h-[270px] bg-[#0b1622]/90 rounded-2xl overflow-hidden border border-white/10 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl backdrop-blur-xl"
                                             style={{ boxShadow: `0 0 0 0 transparent` }}
                                             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = `${game.themeColor || '#a855f7'}50`; (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 30px ${game.themeColor || '#a855f7'}20`; }}
                                             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = ''; (e.currentTarget as HTMLElement).style.boxShadow = ''; }}
                                         >
-                                            <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                                                <div className="absolute inset-0 bg-[#152a3a] overflow-hidden">
-                                                    {game.coverImage ? (
-                                                        <img src={game.coverImage} alt={game.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" style={{ display: 'block' }} />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-5xl">{game.themeEmoji || '🎮'}</div>
-                                                    )}
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a111a] via-transparent to-transparent pointer-events-none" />
-                                                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-green-500/20 text-green-400 text-[10px] font-bold px-2 py-1 rounded-full border border-green-500/30 backdrop-blur-sm">
-                                                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                                                        LIVE
-                                                    </div>
-                                                    {game.type === 'slot_engine' && (
-                                                        <div className="absolute top-2 left-2 bg-purple-500/20 text-purple-400 text-[10px] font-bold px-2 py-1 rounded-full border border-purple-500/30 backdrop-blur-sm">
-                                                            🎰 SLOT
-                                                        </div>
-                                                    )}
-                                                    {game.type === 'crash' && (
-                                                        <div className="absolute top-2 left-2 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-1 rounded-full border border-emerald-500/30 backdrop-blur-sm">
-                                                            🚀 CRASH
-                                                        </div>
-                                                    )}
-                                                    {game.type === 'scratch' && (
-                                                        <div className="absolute top-2 left-2 bg-amber-500/20 text-amber-400 text-[10px] font-bold px-2 py-1 rounded-full border border-amber-500/30 backdrop-blur-sm">
-                                                            🎟️ SCRATCH
-                                                        </div>
-                                                    )}
-                                                    {(game.type === 'ai_generated' || game.type === 'manual_template') && (
-                                                        <div className="absolute top-2 left-2 bg-cyan-500/20 text-cyan-400 text-[10px] font-bold px-2 py-1 rounded-full border border-cyan-500/30 backdrop-blur-sm">
-                                                            ✨ AI
-                                                        </div>
-                                                    )}
-                                                </div>
+                                            <div className="absolute inset-0 bg-[#152a3a]">
+                                                {game.coverImage ? (
+                                                    <img
+                                                        src={game.coverImage}
+                                                        alt={game.name}
+                                                        className="w-full h-full object-cover transition-[filter,opacity] duration-300 ease-out group-hover:brightness-110 group-hover:opacity-95"
+                                                        style={{ display: 'block' }}
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-5xl">{game.themeEmoji || '🎮'}</div>
+                                                )}
                                             </div>
-                                            <div className="p-4 flex-1 flex flex-col">
+
+                                            <div
+                                                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+                                                style={{ background: `radial-gradient(120% 70% at 50% 0%, ${(game.themeColor || '#a855f7')}44 0%, transparent 70%)` }}
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-[#08131f]/35 to-[#0b1622] pointer-events-none" />
+
+                                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-green-500/20 text-green-400 text-[10px] font-bold px-2 py-1 rounded-full border border-green-500/30 backdrop-blur-sm z-10">
+                                                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                                                LIVE
+                                            </div>
+                                            {game.type === 'slot_engine' && (
+                                                <div className="absolute top-2 left-2 bg-purple-500/20 text-purple-400 text-[10px] font-bold px-2 py-1 rounded-full border border-purple-500/30 backdrop-blur-sm z-10">
+                                                    🎰 SLOT
+                                                </div>
+                                            )}
+                                            {game.type === 'crash' && (
+                                                <div className="absolute top-2 left-2 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-1 rounded-full border border-emerald-500/30 backdrop-blur-sm z-10">
+                                                    🚀 CRASH
+                                                </div>
+                                            )}
+                                            {game.type === 'scratch' && (
+                                                <div className="absolute top-2 left-2 bg-amber-500/20 text-amber-400 text-[10px] font-bold px-2 py-1 rounded-full border border-amber-500/30 backdrop-blur-sm z-10">
+                                                    🎟️ SCRATCH
+                                                </div>
+                                            )}
+                                            {(game.type === 'ai_generated' || game.type === 'manual_template') && (
+                                                <div className="absolute top-2 left-2 bg-cyan-500/20 text-cyan-400 text-[10px] font-bold px-2 py-1 rounded-full border border-cyan-500/30 backdrop-blur-sm z-10">
+                                                    ✨ AI
+                                                </div>
+                                            )}
+
+                                            <div className="absolute inset-x-0 bottom-0 p-4 z-10">
                                                 <h4 className="text-white font-black text-sm truncate mb-1">{game.name}</h4>
-                                                <p className="text-slate-500 text-[11px] truncate mb-3 flex-1">{game.gameDescription || 'Custom game'}</p>
+                                                <p className="text-slate-400 text-[11px] truncate mb-3">{game.gameDescription || 'Custom game'}</p>
                                                 <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                                                    <div className="flex items-center gap-1 text-[10px] text-slate-400/90">
                                                         <Clock size={10} />
                                                         {new Date(game.publishedAt).toLocaleDateString()}
                                                     </div>

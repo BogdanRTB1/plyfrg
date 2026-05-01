@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Wallet, ArrowDownCircle, ArrowUpCircle, Gift, CreditCard, Bitcoin, Clock, Loader2, Check } from "lucide-react";
+import { X, Wallet, ArrowDownCircle, ArrowUpCircle, Gift, Bitcoin, Clock, Loader2, Check, ExternalLink, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
@@ -43,7 +43,8 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
     // Deposit/Purchase state
     const [selectedBundle, setSelectedBundle] = useState<number | null>(null);
-    const [depositMethod, setDepositMethod] = useState<'card' | 'crypto'>('card');
+
+    const [pendingInvoiceUrl, setPendingInvoiceUrl] = useState<string | null>(null);
 
     // Redeem state
     const [redeemAmount, setRedeemAmount] = useState("");
@@ -115,45 +116,54 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
         if (!bundle) return;
 
         setLoading(true);
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        const newDiamonds = diamonds + bundle.diamonds;
-        const newForgesCoins = Number((forgesCoins + bundle.forgesCoins).toFixed(2));
-
-        setDiamonds(newDiamonds);
-        setForgesCoins(newForgesCoins);
-
-        // Sync to localStorage immediately so all other pages/modals update
-        localStorage.setItem('user_diamonds', newDiamonds.toString());
-        localStorage.setItem('user_forges_coins', newForgesCoins.toString());
-        window.dispatchEvent(new Event('balance_updated'));
-
-        // Add transaction
-        const newTx: Transaction = {
-            id: Math.random().toString(36).substr(2, 9),
-            type: 'purchase',
-            amount: bundle.price,
-            date: new Date(),
-            status: 'completed',
-            method: depositMethod === 'card' ? 'Credit Card' : 'Crypto'
-        };
-        setTransactions(prev => [newTx, ...prev]);
-
-        setSelectedBundle(null);
-        toast.success(`Purchased ${bundle.diamonds.toLocaleString()} Diamonds + ${bundle.forgesCoins} Forges Coins Bonus!`);
 
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                await supabase.from('notifications').insert({
-                    user_id: user.id,
-                    title: 'Bundle Purchased',
-                    message: `You successfully purchased a bundle containing ${bundle.diamonds.toLocaleString()} Diamonds and ${bundle.forgesCoins} Forges Coins.`
-                });
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                toast.error('Please log in to make a deposit');
+                setLoading(false);
+                return;
             }
+
+            const res = await fetch('/api/crypto/create-payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                    bundleId: selectedBundle,
+                    payCurrency: 'btc',
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                toast.error(data.error || 'Failed to create payment');
+                setLoading(false);
+                return;
+            }
+
+            // Open NOWPayments invoice in new tab
+            setPendingInvoiceUrl(data.invoiceUrl);
+            window.open(data.invoiceUrl, '_blank');
+
+            const newTx: Transaction = {
+                id: data.invoiceId || Math.random().toString(36).substr(2, 9),
+                type: 'purchase',
+                amount: bundle.price,
+                date: new Date(),
+                status: 'pending',
+                method: 'Bitcoin (BTC)'
+            };
+            setTransactions(prev => [newTx, ...prev]);
+
+            toast.success('Payment invoice created! Complete the payment in the new tab.', { duration: 6000 });
+            setSelectedBundle(null);
         } catch (error) {
-            console.error('Failed to add notification:', error);
+            console.error('Crypto deposit error:', error);
+            toast.error('Failed to create crypto payment. Please try again.');
         }
 
         setLoading(false);
@@ -162,40 +172,68 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
     const handleRedeem = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
+
         if (Number(redeemAmount) > forgesCoins) {
             toast.error("Insufficient Forges Coins");
             setLoading(false);
             return;
         }
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        setForgesCoins(prev => prev - Number(redeemAmount));
-
-        // Add transaction
-        const newTx: Transaction = {
-            id: Math.random().toString(36).substr(2, 9),
-            type: 'redeem',
-            amount: Number(redeemAmount),
-            date: new Date(),
-            status: 'pending',
-            method: 'Crypto'
-        };
-        setTransactions(prev => [newTx, ...prev]);
-
-        setRedeemAmount("");
-        setRedeemAddress("");
-        toast.success(`Redemption request for ${redeemAmount} Forges Coins submitted`);
+        if (Number(redeemAmount) < 10) {
+            toast.error("Minimum withdrawal is 10 Forges Coins");
+            setLoading(false);
+            return;
+        }
 
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                await supabase.from('notifications').insert({
-                    user_id: user.id,
-                    title: 'Redemption Request Submitted',
-                    message: `Your request to redeem ${redeemAmount} Forges Coins has been received and is being processed.`
-                });
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                toast.error('Please log in to withdraw');
+                setLoading(false);
+                return;
             }
+
+            const res = await fetch('/api/crypto/create-payout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                    amount: Number(redeemAmount),
+                    address: redeemAddress,
+                    currency: 'btc',
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                toast.error(data.error || 'Failed to create withdrawal');
+                setLoading(false);
+                return;
+            }
+
+            // Update local balance
+            setForgesCoins(data.newBalance);
+            localStorage.setItem('user_forges_coins', data.newBalance.toString());
+            window.dispatchEvent(new Event('balance_updated'));
+
+            const newTx: Transaction = {
+                id: data.payoutId || Math.random().toString(36).substr(2, 9),
+                type: 'redeem',
+                amount: Number(redeemAmount),
+                date: new Date(),
+                status: 'pending',
+                method: 'Bitcoin (BTC)'
+            };
+            setTransactions(prev => [newTx, ...prev]);
+
+            setRedeemAmount("");
+            setRedeemAddress("");
+            toast.success(`Withdrawal of ${redeemAmount} Forges Coins submitted! Processing...`);
         } catch (error) {
-            console.error('Failed to add notification:', error);
+            console.error('Withdraw error:', error);
+            toast.error('Failed to submit withdrawal. Please try again.');
         }
 
         setLoading(false);
@@ -205,7 +243,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
         setLoading(true);
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        const bonusAmount = (Math.random() * 2 + 1).toFixed(2);
+        const bonusAmount = (Math.random() * 0.15 + 0.05).toFixed(2);
         setForgesCoins(prev => prev + Number(bonusAmount));
 
         // Add transaction
@@ -353,28 +391,29 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                             >
                                 {activeTab === 'deposit' && (
                                     <div className="space-y-6 pb-4">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <button
-                                                onClick={() => setDepositMethod('card')}
-                                                className={`p-4 border rounded-xl flex flex-col items-center gap-3 transition-all ${depositMethod === 'card'
-                                                    ? 'bg-[#00b9f0]/10 border-[#00b9f0] text-white shadow-[0_0_15px_rgba(0,185,240,0.15)]'
-                                                    : 'bg-[#0a161f]/50 border-white/5 text-slate-400 hover:border-white/20'
-                                                    }`}
-                                            >
-                                                <CreditCard size={24} className={depositMethod === 'card' ? 'text-[#00b9f0]' : ''} />
-                                                <span className="font-bold text-sm">Credit Card</span>
-                                            </button>
-                                            <button
-                                                onClick={() => setDepositMethod('crypto')}
-                                                className={`p-4 border rounded-xl flex flex-col items-center gap-3 transition-all ${depositMethod === 'crypto'
-                                                    ? 'bg-[#00b9f0]/10 border-[#00b9f0] text-white shadow-[0_0_15px_rgba(0,185,240,0.15)]'
-                                                    : 'bg-[#0a161f]/50 border-white/5 text-slate-400 hover:border-white/20'
-                                                    }`}
-                                            >
-                                                <Bitcoin size={24} className={depositMethod === 'crypto' ? 'text-[#00b9f0]' : ''} />
-                                                <span className="font-bold text-sm">Crypto</span>
-                                            </button>
+                                        <div className="flex items-center gap-3 p-4 bg-[#f7931a]/5 border border-[#f7931a]/20 rounded-xl">
+                                            <Bitcoin size={24} className="text-[#f7931a]" />
+                                            <div>
+                                                <p className="text-white font-bold text-sm">Bitcoin Deposit</p>
+                                                <p className="text-slate-400 text-xs">Pay securely with Bitcoin (BTC)</p>
+                                            </div>
                                         </div>
+
+                                        {pendingInvoiceUrl && (
+                                            <div className="bg-[#f7931a]/10 border border-[#f7931a]/30 rounded-xl p-4 flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-[#f7931a] text-xs font-bold">⏳ Payment Pending</p>
+                                                    <p className="text-[#f7931a]/60 text-[10px] mt-0.5">Complete payment in the opened tab</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => window.open(pendingInvoiceUrl, '_blank')}
+                                                    className="flex items-center gap-1.5 bg-[#f7931a] text-black text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#f7931a]/80 transition-colors"
+                                                >
+                                                    <ExternalLink size={14} />
+                                                    Open
+                                                </button>
+                                            </div>
+                                        )}
 
                                         <form onSubmit={handleDeposit} className="space-y-6">
                                             <div className="space-y-3">
@@ -408,10 +447,10 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                             <button
                                                 type="submit"
                                                 disabled={loading || selectedBundle === null}
-                                                className="w-full bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] h-12 rounded-xl font-bold text-sm transition-all shadow-[0_0_20px_rgba(0,185,240,0.2)] hover:shadow-[0_0_30px_rgba(0,185,240,0.4)] hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                                className="w-full bg-[#f7931a] hover:bg-[#f7931a]/80 text-black h-12 rounded-xl font-bold text-sm transition-all shadow-[0_0_20px_rgba(247,147,26,0.2)] hover:shadow-[0_0_30px_rgba(247,147,26,0.4)] hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                             >
-                                                {loading ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />}
-                                                {loading ? 'Processing...' : 'Purchase Bundle'}
+                                                {loading ? <Loader2 className="animate-spin" size={20} /> : <Bitcoin size={20} />}
+                                                {loading ? 'Processing...' : 'Pay with Bitcoin'}
                                             </button>
                                         </form>
                                     </div>
@@ -421,14 +460,22 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                     <div className="space-y-6">
                                         <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6">
                                             <p className="text-amber-500 text-xs font-bold text-center mb-1">
-                                                Redemptions are processed within 24 hours.
+                                                Withdrawals are processed within 24 hours.
                                             </p>
                                             <p className="text-amber-500/70 text-[10px] text-center font-medium">
-                                                Note: Forges Coins must be played through at least 3 times before they can be redeemed.
+                                                Minimum withdrawal: 10 Forges Coins. Must be played through at least 3x.
                                             </p>
                                         </div>
 
                                         <form onSubmit={handleRedeem} className="space-y-6">
+                                            <div className="flex items-center gap-3 p-4 bg-[#f7931a]/5 border border-[#f7931a]/20 rounded-xl">
+                                                <Bitcoin size={24} className="text-[#f7931a]" />
+                                                <div>
+                                                    <p className="text-white font-bold text-sm">Bitcoin Withdrawal</p>
+                                                    <p className="text-slate-400 text-xs">Withdraw to your Bitcoin wallet</p>
+                                                </div>
+                                            </div>
+
                                             <div className="space-y-2">
                                                 <div className="flex justify-between">
                                                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Amount</label>
@@ -442,7 +489,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                                         type="number"
                                                         value={redeemAmount}
                                                         onChange={(e) => setRedeemAmount(e.target.value)}
-                                                        placeholder="0.00"
+                                                        placeholder="Min. 10 FC"
                                                         className="w-full bg-[#0a161f] border border-white/10 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 font-bold"
                                                         min="10"
                                                         max={forgesCoins}
@@ -452,24 +499,36 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                             </div>
 
                                             <div className="space-y-2">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Redemption Address (Crypto)</label>
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                    BTC Wallet Address
+                                                </label>
                                                 <input
                                                     type="text"
                                                     value={redeemAddress}
                                                     onChange={(e) => setRedeemAddress(e.target.value)}
-                                                    placeholder="Enter wallet address"
+                                                    placeholder="Enter your BTC address"
                                                     className="w-full bg-[#0a161f] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 font-medium text-sm"
                                                     required
                                                 />
                                             </div>
 
+                                            {redeemAmount && Number(redeemAmount) >= 10 && (
+                                                <div className="bg-[#0a161f] border border-white/5 rounded-xl p-3 text-center">
+                                                    <p className="text-[10px] text-slate-500 font-bold uppercase">You will receive approximately</p>
+                                                    <p className="text-lg font-black text-white mt-1">
+                                                        ~${Number(redeemAmount).toFixed(2)} USD
+                                                        <span className="text-xs text-slate-400 font-medium ml-2">in BTC</span>
+                                                    </p>
+                                                </div>
+                                            )}
+
                                             <button
                                                 type="submit"
-                                                disabled={loading || !redeemAmount || !redeemAddress}
+                                                disabled={loading || !redeemAmount || !redeemAddress || Number(redeemAmount) < 10}
                                                 className="w-full bg-white hover:bg-slate-200 text-[#0f212e] h-12 rounded-xl font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                             >
                                                 {loading ? <Loader2 className="animate-spin" size={20} /> : <ArrowUpCircle size={20} />}
-                                                {loading ? 'Processing...' : 'Request Redemption'}
+                                                {loading ? 'Processing...' : 'Withdraw to Bitcoin'}
                                             </button>
                                         </form>
                                     </div>

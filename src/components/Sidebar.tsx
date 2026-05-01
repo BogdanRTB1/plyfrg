@@ -45,11 +45,16 @@ export default function Sidebar() {
                 return;
             }
 
-            const { data: dbCreator } = await supabase
+            const { data: dbCreator, error } = await supabase
                 .from('creators')
                 .select('id')
                 .eq('id', user.id)
-                .single();
+                .maybeSingle();
+
+            if (error) {
+                console.error('Failed to check creator status:', error);
+                return;
+            }
 
             setIsCreator(!!dbCreator);
         };

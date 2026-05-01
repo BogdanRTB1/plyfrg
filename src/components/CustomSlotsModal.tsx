@@ -23,7 +23,8 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
     const [spinningReels, setSpinningReels] = useState<boolean[]>([false, false, false]);
     const [winMultiplier, setWinMultiplier] = useState(0);
 
-    const SYMBOLS = gameData?.config?.symbols || [];
+    const config = gameData?.slotsConfig || gameData?.config || {};
+    const SYMBOLS = config.symbols || [];
 
     const spinReels = () => {
         if (!gameData || balance < betAmount || betAmount <= 0) return;
@@ -35,6 +36,12 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
         }
 
         setSessionWagered(prev => prev + betAmount);
+
+        if (SYMBOLS.length === 0) {
+            setGameState('IDLE');
+            setSpinningReels([false, false, false]);
+            return;
+        }
 
         setGameState('SPINNING');
         setWinMultiplier(0);
