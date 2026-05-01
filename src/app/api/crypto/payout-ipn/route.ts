@@ -4,7 +4,7 @@ import crypto from "crypto";
 
 const IPN_SECRET = process.env.NOWPAYMENTS_IPN_SECRET!;
 
-const supabaseAdmin = createClient(
+const getSupabaseAdmin = () => createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Find the payout record
-        const { data: payouts, error: fetchError } = await supabaseAdmin
+        const { data: payouts, error: fetchError } = await getSupabaseAdmin()
             .from("crypto_payouts")
             .select("*")
             .eq("nowpayments_id", String(batchId));
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Update payout record
-        await supabaseAdmin
+        await getSupabaseAdmin()
             .from("crypto_payouts")
             .update({
                 payout_status: mappedStatus,
@@ -71,11 +71,11 @@ export async function POST(req: NextRequest) {
 
         // If failed, refund the user's ForgesCoins
         if (mappedStatus === "failed") {
-            const { data: userData } = await supabaseAdmin.auth.admin.getUserById(payout.user_id);
+            const { data: userData } = await getSupabaseAdmin().auth.admin.getUserById(payout.user_id);
             if (userData?.user) {
                 const meta = userData.user.user_metadata || {};
                 const currentFC = Number(meta.forges_coins || 0);
-                await supabaseAdmin.auth.admin.updateUserById(payout.user_id, {
+                await getSupabaseAdmin().auth.admin.updateUserById(payout.user_id, {
                     user_metadata: {
                         ...meta,
                         forges_coins: Number((currentFC + Number(payout.forges_coins_amount)).toFixed(2)),
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
                 });
             }
 
-            await supabaseAdmin.from("notifications").insert({
+            await getSupabaseAdmin().from("notifications").insert({
                 user_id: payout.user_id,
                 title: "❌ Withdrawal Failed",
                 message: `Your withdrawal of ${payout.forges_coins_amount} Forges Coins has failed. The amount has been refunded to your account.`,
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 
         // If completed, notify user
         if (mappedStatus === "completed") {
-            await supabaseAdmin.from("notifications").insert({
+            await getSupabaseAdmin().from("notifications").insert({
                 user_id: payout.user_id,
                 title: "✅ Withdrawal Completed!",
                 message: `Your withdrawal of ${payout.forges_coins_amount} Forges Coins ($${payout.usd_amount}) has been sent to your wallet.${txHash ? ` TX: ${txHash}` : ""}`,

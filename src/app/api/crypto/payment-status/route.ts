@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseAdmin = createClient(
+const getSupabaseAdmin = () => createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
@@ -14,13 +14,13 @@ export async function GET(req: NextRequest) {
         }
 
         const token = authHeader.replace("Bearer ", "");
-        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+        const { data: { user }, error: authError } = await getSupabaseAdmin().auth.getUser(token);
         if (authError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         // Get recent payments
-        const { data: payments } = await supabaseAdmin
+        const { data: payments } = await getSupabaseAdmin()
             .from("crypto_payments")
             .select("*")
             .eq("user_id", user.id)
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
             .limit(20);
 
         // Get recent payouts
-        const { data: payouts } = await supabaseAdmin
+        const { data: payouts } = await getSupabaseAdmin()
             .from("crypto_payouts")
             .select("*")
             .eq("user_id", user.id)

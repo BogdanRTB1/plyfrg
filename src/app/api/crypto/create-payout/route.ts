@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 const NOWPAYMENTS_API_KEY = process.env.NOWPAYMENTS_API_KEY!;
 const NOWPAYMENTS_BASE = process.env.NOWPAYMENTS_API_URL || "https://api.nowpayments.io/v1";
 
-const supabaseAdmin = createClient(
+const getSupabaseAdmin = () => createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
         }
 
         const token = authHeader.replace("Bearer ", "");
-        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+        const { data: { user }, error: authError } = await getSupabaseAdmin().auth.getUser(token);
         if (authError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
 
         // Deduct balance immediately (optimistic — will be restored if payout fails)
         const newForgesCoins = Number((currentForgesCoins - fcAmount).toFixed(2));
-        await supabaseAdmin.auth.admin.updateUserById(user.id, {
+        await getSupabaseAdmin().auth.admin.updateUserById(user.id, {
             user_metadata: {
                 ...currentMeta,
                 forges_coins: newForgesCoins,
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
         });
 
         // Store payout request in database
-        const { data: payoutRecord, error: dbError } = await supabaseAdmin
+        const { data: payoutRecord, error: dbError } = await getSupabaseAdmin()
             .from("crypto_payouts")
             .insert({
                 user_id: user.id,
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
 
         if (dbError) {
             // Restore balance on failure
-            await supabaseAdmin.auth.admin.updateUserById(user.id, {
+            await getSupabaseAdmin().auth.admin.updateUserById(user.id, {
                 user_metadata: { ...currentMeta, forges_coins: currentForgesCoins }
             });
             console.error("DB error storing payout:", dbError);
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
 
             if (payoutRes.ok) {
                 const payoutData = await payoutRes.json();
-                await supabaseAdmin
+                await getSupabaseAdmin()
                     .from("crypto_payouts")
                     .update({
                         nowpayments_id: payoutData.id,
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Create notification
-        await supabaseAdmin.from("notifications").insert({
+        await getSupabaseAdmin().from("notifications").insert({
             user_id: user.id,
             title: "🏦 Withdrawal Request Submitted",
             message: `Your withdrawal of ${fcAmount} Forges Coins ($${usdAmount.toFixed(2)}) to ${address.slice(0, 8)}...${address.slice(-6)} is being processed.`,
