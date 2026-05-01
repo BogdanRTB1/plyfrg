@@ -4,7 +4,7 @@ import crypto from "crypto";
 
 const IPN_SECRET = process.env.NOWPAYMENTS_IPN_SECRET!;
 
-const supabaseAdmin = createClient(
+const getSupabaseAdmin = () => createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         console.log(`IPN received: payment_id=${payment_id}, status=${payment_status}, invoice=${invoice_id}`);
 
         // Find the payment record
-        let query = supabaseAdmin.from("crypto_payments").select("*");
+        let query = getSupabaseAdmin().from("crypto_payments").select("*");
         
         if (invoice_id) {
             query = query.eq("invoice_id", String(invoice_id));
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
         const payment = payments[0];
 
         // Update payment record
-        const { error: updateError } = await supabaseAdmin
+        const { error: updateError } = await getSupabaseAdmin()
             .from("crypto_payments")
             .update({
                 nowpayments_id: payment_id,
@@ -90,14 +90,14 @@ export async function POST(req: NextRequest) {
         if (payment_status === "finished" && !payment.credited) {
             // Credit diamonds and forges coins
             // First, get current balance from user metadata or a balance table
-            const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(payment.user_id);
+            const { data: userData, error: userError } = await getSupabaseAdmin().auth.admin.getUserById(payment.user_id);
             
             if (!userError && userData?.user) {
                 const currentMeta = userData.user.user_metadata || {};
                 const currentDiamonds = Number(currentMeta.diamonds || 0);
                 const currentForgesCoins = Number(currentMeta.forges_coins || 0);
 
-                await supabaseAdmin.auth.admin.updateUserById(payment.user_id, {
+                await getSupabaseAdmin().auth.admin.updateUserById(payment.user_id, {
                     user_metadata: {
                         ...currentMeta,
                         diamonds: currentDiamonds + payment.bundle_diamonds,
@@ -107,13 +107,13 @@ export async function POST(req: NextRequest) {
             }
 
             // Mark as credited
-            await supabaseAdmin
+            await getSupabaseAdmin()
                 .from("crypto_payments")
                 .update({ credited: true, updated_at: new Date().toISOString() })
                 .eq("id", payment.id);
 
             // Create notification
-            await supabaseAdmin.from("notifications").insert({
+            await getSupabaseAdmin().from("notifications").insert({
                 user_id: payment.user_id,
                 title: "💎 Crypto Deposit Confirmed!",
                 message: `Your crypto payment has been confirmed! ${payment.bundle_diamonds.toLocaleString()} Diamonds and ${payment.bundle_forges_coins} Forges Coins have been added to your account.`,
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
 
         // If payment failed or expired, notify user
         if (["failed", "expired", "refunded"].includes(payment_status)) {
-            await supabaseAdmin.from("notifications").insert({
+            await getSupabaseAdmin().from("notifications").insert({
                 user_id: payment.user_id,
                 title: "❌ Crypto Payment " + (payment_status === "expired" ? "Expired" : payment_status === "refunded" ? "Refunded" : "Failed"),
                 message: `Your crypto payment of $${payment.price_amount} has ${payment_status}. Please try again or contact support.`,

@@ -5,7 +5,7 @@ const NOWPAYMENTS_API_KEY = process.env.NOWPAYMENTS_API_KEY!;
 const NOWPAYMENTS_BASE = process.env.NOWPAYMENTS_API_URL || "https://api.nowpayments.io/v1";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://playforges.com";
 
-const supabaseAdmin = createClient(
+const getSupabaseAdmin = () => createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
         }
 
         const token = authHeader.replace("Bearer ", "");
-        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+        const { data: { user }, error: authError } = await getSupabaseAdmin().auth.getUser(token);
         if (authError || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
         const invoiceData = await invoiceResponse.json();
 
         // Store in database
-        const { error: dbError } = await supabaseAdmin.from("crypto_payments").insert({
+        const { error: dbError } = await getSupabaseAdmin().from("crypto_payments").insert({
             user_id: user.id,
             invoice_id: invoiceData.id,
             invoice_url: invoiceData.invoice_url,
