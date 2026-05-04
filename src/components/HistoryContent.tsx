@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Search, Filter, Download, ChevronLeft, ChevronRight, Calendar, Coins, TrendingUp, History, ShieldCheck } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { TrendingUp, History, ShieldCheck, Info, X } from "lucide-react";
 import Image from "next/image";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createClient } from "@/utils/supabase/client";
@@ -19,10 +19,19 @@ interface GameSession {
     currency?: 'GC' | 'FC';
 }
 
+function compactSessionTime(full: string) {
+    const d = new Date(full);
+    if (!Number.isNaN(d.getTime())) {
+        return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    }
+    return full.length > 24 ? `${full.slice(0, 24)}…` : full;
+}
+
 export default function HistoryContent() {
     const [filter, setFilter] = useState('all');
     const [historyData, setHistoryData] = useState<GameSession[]>([]);
     const [loading, setLoading] = useState(true);
+    const [mobileDetail, setMobileDetail] = useState<GameSession | null>(null);
 
     const fetchHistory = async () => {
         const supabase = createClient();
@@ -206,7 +215,8 @@ export default function HistoryContent() {
                     animate="show"
                     className="bg-[#0f212e] border border-white/5 rounded-2xl overflow-hidden shadow-xl"
                 >
-                    <div className="overflow-x-auto">
+                    {/* Desktop: full table */}
+                    <div className="hidden overflow-x-auto md:block">
                         <table className="w-full text-left">
                             <thead className="bg-[#1a2c38]/50 text-xs font-bold text-slate-500 uppercase tracking-wider">
                                 <tr>
@@ -227,7 +237,7 @@ export default function HistoryContent() {
                                             <td className="p-4 pl-6 font-bold text-white whitespace-nowrap">{session.game}</td>
                                             <td className="p-4 text-sm text-slate-400 whitespace-nowrap opacity-60 group-hover:opacity-100 transition-opacity">{session.time}</td>
                                             <td className="p-4 text-right text-slate-300 font-mono">
-                                                {session.bet.toFixed(2)} 
+                                                {session.bet.toFixed(2)}
                                                 {session.currency === 'GC' ? (
                                                      <DiamondIcon className="inline w-4 h-4 ml-1 align-sub" />
                                                 ) : (
@@ -257,12 +267,140 @@ export default function HistoryContent() {
                                 ) : (
                                     <tr><td colSpan={6} className="p-12 text-center text-slate-600 italic">No game history found. Play a game to see your results!</td></tr>
                                 )}
-
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Mobile: compact rows + detail sheet */}
+                    <div className="md:hidden">
+                        {loading ? (
+                            <div className="p-10 text-center text-sm font-bold text-slate-500 animate-pulse">Loading history…</div>
+                        ) : filteredData.length === 0 ? (
+                            <div className="p-10 text-center text-sm text-slate-500 italic">No game history yet. Play a game first.</div>
+                        ) : (
+                            <ul className="divide-y divide-white/5">
+                                {filteredData.map((session, idx) => {
+                                    const net = session.payout - session.bet;
+                                    const won = net >= 0;
+                                    return (
+                                        <li key={`m-${session.id}-${idx}`} className="flex items-stretch gap-3 p-4 active:bg-white/[0.03]">
+                                            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-[#1a2c38]">
+                                                <Image src={session.image} alt="" fill className="object-cover" sizes="48px" />
+                                            </div>
+                                            <div className="min-w-0 flex-1 py-0.5">
+                                                <p className="truncate font-bold text-white">{session.game}</p>
+                                                <p className="mt-0.5 text-[11px] text-slate-500">{compactSessionTime(session.time)}</p>
+                                                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                                    <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-black ${won ? "bg-green-500/15 text-green-400" : "bg-red-500/15 text-red-400"}`}>
+                                                        {session.multiplier.toFixed(2)}×
+                                                    </span>
+                                                    <span className="text-[10px] font-bold uppercase text-slate-500">{session.currency === "GC" ? "Diamonds" : "Forges"}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex shrink-0 flex-col items-end justify-between gap-2">
+                                                <p className={`text-right font-black tabular-nums ${won ? "text-green-400" : "text-red-400"}`}>
+                                                    {won ? "+" : ""}{net.toFixed(2)}
+                                                    <span className="ml-0.5 inline-flex align-middle">
+                                                        {session.currency === "GC" ? <DiamondIcon className="inline h-3.5 w-3.5" /> : <ForgesCoinIcon className="inline h-3.5 w-3.5" />}
+                                                    </span>
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setMobileDetail(session)}
+                                                    className="flex items-center gap-1 rounded-lg border border-[#00b9f0]/30 bg-[#00b9f0]/10 px-2.5 py-1.5 text-[11px] font-bold text-[#00b9f0] active:scale-[0.98]"
+                                                >
+                                                    <Info className="h-3.5 w-3.5" />
+                                                    Details
+                                                </button>
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </div>
                 </motion.div>
             </div>
+
+            <AnimatePresence>
+                {mobileDetail && (
+                    <motion.div
+                        key="history-detail"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[80] flex flex-col justify-end md:hidden"
+                        onClick={() => setMobileDetail(null)}
+                    >
+                        <motion.div
+                            initial={{ y: "100%" }}
+                            animate={{ y: 0 }}
+                            exit={{ y: "100%" }}
+                            transition={{ type: "spring", damping: 28, stiffness: 320 }}
+                            className="max-h-[min(85dvh,560px)] overflow-y-auto overscroll-contain rounded-t-2xl border border-white/10 border-b-0 bg-[#0f212e] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-white/20" />
+                            <div className="mb-4 flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <h3 className="truncate text-lg font-black text-white">{mobileDetail.game}</h3>
+                                    <p className="mt-1 text-xs text-slate-400 leading-relaxed">{mobileDetail.time}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setMobileDetail(null)}
+                                    className="shrink-0 rounded-xl border border-white/10 bg-[#1a2c38] p-2 text-slate-300"
+                                    aria-label="Close"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+                            <div className="relative mx-auto mb-4 h-24 w-40 overflow-hidden rounded-xl border border-white/10">
+                                <Image src={mobileDetail.image} alt="" fill className="object-cover" sizes="160px" />
+                            </div>
+                            <dl className="space-y-3 rounded-xl border border-white/5 bg-[#0a161f]/60 p-4 text-sm">
+                                <div className="flex justify-between gap-3">
+                                    <dt className="text-slate-500">Wagered</dt>
+                                    <dd className="font-mono font-bold text-white">
+                                        {mobileDetail.bet.toFixed(2)}
+                                        {mobileDetail.currency === "GC" ? <DiamondIcon className="ml-1 inline h-4 w-4 align-[-2px]" /> : <ForgesCoinIcon className="ml-1 inline h-4 w-4 align-[-2px]" />}
+                                    </dd>
+                                </div>
+                                <div className="flex justify-between gap-3">
+                                    <dt className="text-slate-500">Multiplier</dt>
+                                    <dd>
+                                        <span className={`rounded-md px-2 py-0.5 text-xs font-black ${mobileDetail.payout > mobileDetail.bet ? "bg-green-500/15 text-green-400" : "bg-red-500/15 text-red-400"}`}>
+                                            {mobileDetail.multiplier.toFixed(2)}×
+                                        </span>
+                                    </dd>
+                                </div>
+                                <div className="flex justify-between gap-3">
+                                    <dt className="text-slate-500">Payout</dt>
+                                    <dd className="font-mono font-bold text-white">{mobileDetail.payout.toFixed(2)}</dd>
+                                </div>
+                                <div className="flex justify-between gap-3 border-t border-white/5 pt-3">
+                                    <dt className="text-slate-500">Net result</dt>
+                                    <dd className={`font-black tabular-nums ${mobileDetail.payout - mobileDetail.bet >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                        {(mobileDetail.payout - mobileDetail.bet) >= 0 ? "+" : ""}{(mobileDetail.payout - mobileDetail.bet).toFixed(2)}
+                                        {mobileDetail.currency === "GC" ? <DiamondIcon className="ml-1 inline h-4 w-4 align-[-2px]" /> : <ForgesCoinIcon className="ml-1 inline h-4 w-4 align-[-2px]" />}
+                                    </dd>
+                                </div>
+                                <div className="flex items-center justify-center gap-2 border-t border-white/5 pt-3 text-xs text-slate-500">
+                                    <ShieldCheck className="h-4 w-4 text-[#00b9f0]" />
+                                    <span>Recorded session</span>
+                                </div>
+                            </dl>
+                            <button
+                                type="button"
+                                onClick={() => setMobileDetail(null)}
+                                className="mt-4 w-full rounded-xl border border-white/10 bg-[#1a2c38] py-3 text-sm font-bold text-white active:bg-white/10"
+                            >
+                                Done
+                            </button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

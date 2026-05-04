@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Wallet, ArrowDownCircle, ArrowUpCircle, Gift, Bitcoin, Clock, Loader2, Check, ExternalLink, ChevronDown } from "lucide-react";
+import { X, Wallet, ArrowDownCircle, ArrowUpCircle, Gift, Bitcoin, Clock, Loader2, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
@@ -284,104 +284,115 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
     if (typeof document === "undefined") return null;
 
     return createPortal(
-        <div className={`fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${show ? "opacity-100" : "opacity-0"}`}>
+        <div
+            role="presentation"
+            className={`fixed inset-0 z-[60] flex items-end justify-center bg-black/65 backdrop-blur-sm transition-opacity duration-300 md:items-center md:p-4 ${show ? "opacity-100" : "opacity-0"}`}
+            onClick={onClose}
+        >
             <motion.div
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                initial={{ scale: 0.98, opacity: 0, y: 24 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
-                className="bg-[#0f212e]/95 backdrop-blur-2xl rounded-2xl w-full max-w-2xl p-0 relative shadow-[0_0_50px_rgba(0,185,240,0.15)] border border-white/10 overflow-hidden"
+                exit={{ scale: 0.98, opacity: 0, y: 24 }}
+                transition={{ type: "spring", duration: 0.45, bounce: 0.22 }}
+                className="flex max-h-[100dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-white/10 bg-[#0f212e]/98 shadow-[0_0_50px_rgba(0,185,240,0.12)] backdrop-blur-2xl md:max-h-[min(90vh,720px)] md:rounded-2xl md:shadow-[0_0_50px_rgba(0,185,240,0.15)]"
+                style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="p-6 border-b border-white/5 flex items-center justify-between bg-[#0a161f]/50">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-[#00b9f0]/10 rounded-xl text-[#00b9f0]">
-                            <Wallet size={24} />
+                <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/5 bg-[#0a161f]/50 p-4 sm:p-6">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="shrink-0 rounded-xl bg-[#00b9f0]/10 p-2.5 text-[#00b9f0]">
+                            <Wallet size={22} />
                         </div>
-                        <div>
-                            <h2 className="text-xl font-bold text-white">Wallet</h2>
-                            <p className="text-slate-400 text-xs font-medium">Manage your funds</p>
+                        <div className="min-w-0">
+                            <h2 className="text-lg font-bold text-white sm:text-xl">Wallet</h2>
+                            <p className="text-[11px] font-medium text-slate-400 sm:text-xs">Buy Forges Coins &amp; manage funds</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <div className="bg-[#0a161f] border border-white/5 px-4 py-2 rounded-lg text-right hidden sm:block">
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Balances</p>
-                            <div className="flex items-center justify-end gap-3 mt-0.5">
-                                <div className="flex items-center gap-1.5" title="Diamonds">
-                                    <DiamondIcon className="w-4 h-4" />
-                                    <span className="text-sm font-bold text-white">{diamonds.toLocaleString()}</span>
+                    <div className="flex shrink-0 items-center gap-2">
+                        <div className="rounded-lg border border-white/5 bg-[#0a161f] px-2.5 py-1.5 text-right sm:px-4 sm:py-2">
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Balances</p>
+                            <div className="mt-0.5 flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
+                                <div className="flex items-center gap-1" title="Diamonds">
+                                    <DiamondIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                    <span className="text-xs font-bold text-white tabular-nums sm:text-sm">{diamonds.toLocaleString()}</span>
                                 </div>
-                                <div className="flex items-center gap-1.5" title="Forges Coins">
-                                    <ForgesCoinIcon className="w-4 h-4" />
-                                    <span className="text-sm font-bold text-white">{forgesCoins.toFixed(2)}</span>
+                                <div className="flex items-center gap-1" title="Forges Coins">
+                                    <ForgesCoinIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                    <span className="text-xs font-bold text-amber-100 tabular-nums sm:text-sm">{forgesCoins.toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>
                         <button
+                            type="button"
                             onClick={onClose}
-                            className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                            className="rounded-xl p-2.5 text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+                            aria-label="Close wallet"
                         >
                             <X size={20} />
                         </button>
                     </div>
                 </div>
 
-                <div className="flex flex-col md:flex-row h-[500px] md:h-[650px]">
-                    {/* Sidebar Tabs */}
-                    <div className="w-full md:w-48 bg-[#0a161f]/30 border-b md:border-b-0 md:border-r border-white/5 p-4 space-y-2">
+                <div className="flex min-h-0 flex-1 flex-col md:flex-row md:h-[580px]">
+                    {/* Tabs: horizontal chips on mobile, sidebar on desktop */}
+                    <div className="flex shrink-0 gap-2 overflow-x-auto overscroll-x-contain border-b border-white/5 bg-[#0a161f]/40 px-3 py-3 md:w-48 md:flex-col md:gap-2 md:border-b-0 md:border-r md:p-4 md:py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                         <button
+                            type="button"
                             onClick={() => setActiveTab('deposit')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all relative overflow-hidden ${activeTab === 'deposit'
-                                ? 'bg-[#00b9f0]/10 text-[#00b9f0] shadow-[0_0_15px_rgba(0,185,240,0.1)]'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            className={`relative flex min-w-[108px] shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all sm:min-w-0 sm:justify-start sm:px-4 sm:py-3 sm:text-sm md:w-full ${activeTab === 'deposit'
+                                ? 'bg-[#00b9f0]/15 text-[#00b9f0] shadow-[0_0_12px_rgba(0,185,240,0.12)]'
+                                : 'bg-[#1a2c38]/80 text-slate-400 active:bg-white/5'
                                 }`}
                         >
                             {activeTab === 'deposit' && (
                                 <motion.div
-                                    layoutId="activeTab"
-                                    className="absolute inset-0 bg-[#00b9f0]/5"
+                                    layoutId="activeWalletTab"
+                                    className="absolute inset-0 rounded-xl bg-[#00b9f0]/8 md:block"
                                     initial={false}
-                                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                    transition={{ type: "spring", stiffness: 500, damping: 32 }}
                                 />
                             )}
-                            <ArrowDownCircle size={18} className="relative z-10" />
+                            <ArrowDownCircle size={17} className="relative z-10 shrink-0 sm:h-[18px] sm:w-[18px]" />
                             <span className="relative z-10">Deposit</span>
                         </button>
                         <button
+                            type="button"
                             onClick={() => setActiveTab('redeem')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'redeem'
-                                ? 'bg-[#00b9f0]/10 text-[#00b9f0] shadow-[0_0_15px_rgba(0,185,240,0.1)]'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            className={`relative flex min-w-[108px] shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all sm:min-w-0 sm:justify-start sm:px-4 sm:py-3 sm:text-sm md:w-full ${activeTab === 'redeem'
+                                ? 'bg-[#00b9f0]/15 text-[#00b9f0] shadow-[0_0_12px_rgba(0,185,240,0.12)]'
+                                : 'bg-[#1a2c38]/80 text-slate-400 active:bg-white/5'
                                 }`}
                         >
-                            <ArrowUpCircle size={18} />
+                            <ArrowUpCircle size={17} className="shrink-0 sm:h-[18px] sm:w-[18px]" />
                             Redeem
                         </button>
                         <button
+                            type="button"
                             onClick={() => setActiveTab('history')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'history'
-                                ? 'bg-[#00b9f0]/10 text-[#00b9f0] shadow-[0_0_15px_rgba(0,185,240,0.1)]'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            className={`relative flex min-w-[108px] shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all sm:min-w-0 sm:justify-start sm:px-4 sm:py-3 sm:text-sm md:w-full ${activeTab === 'history'
+                                ? 'bg-[#00b9f0]/15 text-[#00b9f0] shadow-[0_0_12px_rgba(0,185,240,0.12)]'
+                                : 'bg-[#1a2c38]/80 text-slate-400 active:bg-white/5'
                                 }`}
                         >
-                            <Clock size={18} />
+                            <Clock size={17} className="shrink-0 sm:h-[18px] sm:w-[18px]" />
                             History
                         </button>
                         <button
+                            type="button"
                             onClick={() => setActiveTab('bonus')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'bonus'
-                                ? 'bg-amber-500/10 text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            className={`relative flex min-w-[118px] shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all sm:min-w-0 sm:justify-start sm:px-4 sm:py-3 sm:text-sm md:w-full ${activeTab === 'bonus'
+                                ? 'bg-amber-500/15 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.12)]'
+                                : 'bg-[#1a2c38]/80 text-slate-400 active:bg-white/5'
                                 }`}
                         >
-                            <Gift size={18} />
-                            Daily Bonus
+                            <Gift size={17} className="shrink-0 sm:h-[18px] sm:w-[18px]" />
+                            Bonus
                         </button>
                     </div>
 
                     {/* Content Area */}
-                    <div className="flex-1 p-6 md:p-8 overflow-y-auto custom-scrollbar relative">
+                    <div className="custom-scrollbar relative min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={activeTab}
@@ -392,64 +403,69 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                 className="h-full"
                             >
                                 {activeTab === 'deposit' && (
-                                    <div className="space-y-6 pb-4">
-                                        <div className="flex items-center gap-3 p-4 bg-[#f7931a]/5 border border-[#f7931a]/20 rounded-xl">
-                                            <Bitcoin size={24} className="text-[#f7931a]" />
-                                            <div>
-                                                <p className="text-white font-bold text-sm">Bitcoin Deposit</p>
-                                                <p className="text-slate-400 text-xs">Pay securely with Bitcoin (BTC)</p>
+                                    <div className="space-y-4 pb-2 md:space-y-6 md:pb-4">
+                                        <div className="flex items-center gap-3 rounded-xl border border-[#f7931a]/25 bg-gradient-to-r from-[#f7931a]/10 to-transparent p-3 sm:p-4">
+                                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f7931a]/20">
+                                                <Bitcoin size={22} className="text-[#f7931a]" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-bold text-white">Buy with Bitcoin</p>
+                                                <p className="text-[11px] leading-snug text-slate-400">Diamonds + bonus Forges Coins · secure checkout</p>
                                             </div>
                                         </div>
 
                                         {pendingInvoiceUrl && (
-                                            <div className="bg-[#f7931a]/10 border border-[#f7931a]/30 rounded-xl p-4 flex items-center justify-between">
-                                                <div>
-                                                    <p className="text-[#f7931a] text-xs font-bold">⏳ Payment Pending</p>
-                                                    <p className="text-[#f7931a]/60 text-[10px] mt-0.5">Complete payment in the opened tab</p>
+                                            <div className="flex flex-col gap-3 rounded-xl border border-[#f7931a]/30 bg-[#f7931a]/10 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+                                                <div className="min-w-0">
+                                                    <p className="text-xs font-bold text-[#f7931a]">Payment pending</p>
+                                                    <p className="mt-0.5 text-[10px] text-[#f7931a]/70">Finish payment in the tab we opened.</p>
                                                 </div>
                                                 <button
+                                                    type="button"
                                                     onClick={() => window.open(pendingInvoiceUrl, '_blank')}
-                                                    className="flex items-center gap-1.5 bg-[#f7931a] text-black text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#f7931a]/80 transition-colors"
+                                                    className="flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#f7931a] px-4 py-2.5 text-xs font-bold text-black transition-colors hover:bg-[#f7931a]/85 active:scale-[0.98]"
                                                 >
                                                     <ExternalLink size={14} />
-                                                    Open
+                                                    Open invoice
                                                 </button>
                                             </div>
                                         )}
 
-                                        <form onSubmit={handleDeposit} className="space-y-6">
-                                            <div className="space-y-3">
-                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Select Bundle</label>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <form onSubmit={handleDeposit} className="space-y-4 md:space-y-6">
+                                            <div className="space-y-2 md:space-y-3">
+                                                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Choose a bundle</label>
+                                                <div className="max-h-[min(42vh,320px)] overflow-y-auto overscroll-contain pr-0.5 md:max-h-none md:overflow-visible">
+                                                <div className="grid grid-cols-2 gap-2 sm:gap-3">
                                                     {bundles.map(bundle => (
                                                         <button
                                                             key={bundle.id}
                                                             type="button"
                                                             onClick={() => setSelectedBundle(bundle.id)}
-                                                            className={`p-3 border rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${selectedBundle === bundle.id
-                                                                ? 'bg-[#00b9f0]/10 border-[#00b9f0] shadow-[0_0_15px_rgba(0,185,240,0.2)]'
-                                                                : 'bg-[#0a161f] border-white/5 hover:border-white/20'
+                                                            className={`flex min-h-[100px] flex-col items-center justify-center gap-1 rounded-xl border p-2.5 transition-all active:scale-[0.98] sm:p-3 ${selectedBundle === bundle.id
+                                                                ? 'border-[#00b9f0] bg-[#00b9f0]/12 shadow-[0_0_18px_rgba(0,185,240,0.25)] ring-1 ring-[#00b9f0]/40'
+                                                                : 'border-white/10 bg-[#0a161f] hover:border-white/25'
                                                                 }`}
                                                         >
-                                                            <div className="flex items-center gap-1 text-blue-400 font-bold mb-1 border-b border-white/5 pb-1 w-full justify-center">
-                                                                <DiamondIcon className="w-3.5 h-3.5" /> <span>{bundle.diamonds.toLocaleString()}</span>
+                                                            <div className="mb-0.5 flex w-full items-center justify-center gap-1 border-b border-white/5 pb-1 text-[11px] font-bold text-blue-400 sm:text-xs">
+                                                                <DiamondIcon className="h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5" /> <span className="tabular-nums">{bundle.diamonds.toLocaleString()}</span>
                                                             </div>
-                                                            <div className="flex items-center gap-1.5 text-xs text-amber-500 font-bold mb-1">
-                                                                <ForgesCoinIcon className="w-3 h-3" />
-                                                                + {bundle.forgesCoins} FREE
+                                                            <div className="mb-0.5 flex items-center gap-1 text-[10px] font-bold text-amber-500 sm:text-xs">
+                                                                <ForgesCoinIcon className="h-3 w-3 shrink-0" />
+                                                                +{bundle.forgesCoins} FC
                                                             </div>
-                                                            <div className="text-white font-black text-lg pt-1">
+                                                            <div className="pt-0.5 text-base font-black text-white sm:text-lg">
                                                                 ${bundle.price.toFixed(2)}
                                                             </div>
                                                         </button>
                                                     ))}
+                                                </div>
                                                 </div>
                                             </div>
 
                                             <button
                                                 type="submit"
                                                 disabled={loading || selectedBundle === null}
-                                                className="w-full bg-[#f7931a] hover:bg-[#f7931a]/80 text-black h-12 rounded-xl font-bold text-sm transition-all shadow-[0_0_20px_rgba(247,147,26,0.2)] hover:shadow-[0_0_30px_rgba(247,147,26,0.4)] hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#f7931a] text-sm font-bold text-black shadow-[0_0_20px_rgba(247,147,26,0.2)] transition-all hover:bg-[#f7931a]/85 hover:shadow-[0_0_28px_rgba(247,147,26,0.35)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 md:hover:-translate-y-0.5"
                                             >
                                                 {loading ? <Loader2 className="animate-spin" size={20} /> : <Bitcoin size={20} />}
                                                 {loading ? 'Processing...' : 'Pay with Bitcoin'}
@@ -582,8 +598,8 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                                 </div>
                                             ) : (
                                                 transactions.map((tx) => (
-                                                    <div key={tx.id} className="bg-[#0a161f]/50 border border-white/5 rounded-xl p-4 flex items-center justify-between">
-                                                        <div className="flex items-center gap-4">
+                                                    <div key={tx.id} className="flex items-start justify-between gap-3 rounded-xl border border-white/5 bg-[#0a161f]/50 p-4">
+                                                        <div className="flex min-w-0 flex-1 items-center gap-3">
                                                             <div className={`p-2.5 rounded-lg ${tx.type === 'purchase' ? 'bg-green-500/10 text-green-500' :
                                                                 tx.type === 'redeem' ? 'bg-amber-500/10 text-amber-500' :
                                                                     'bg-blue-500/10 text-blue-500'
@@ -592,13 +608,13 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                                                     tx.type === 'redeem' ? <ArrowUpCircle size={20} /> :
                                                                         <Gift size={20} />}
                                                             </div>
-                                                            <div>
-                                                                <p className="font-bold text-white capitalize">{tx.type} {tx.method ? `• ${tx.method}` : ''}</p>
+                                                            <div className="min-w-0">
+                                                                <p className="truncate font-bold capitalize text-white">{tx.type} {tx.method ? `• ${tx.method}` : ''}</p>
                                                                 <p className="text-xs text-slate-500">{tx.date.toLocaleDateString()} {tx.date.toLocaleTimeString()}</p>
                                                             </div>
                                                         </div>
-                                                        <div className="text-right">
-                                                            <p className={`font-bold ${tx.type === 'redeem' ? 'text-white' : 'text-green-500'
+                                                        <div className="shrink-0 text-right">
+                                                            <p className={`font-bold tabular-nums ${tx.type === 'redeem' ? 'text-white' : 'text-green-500'
                                                                 }`}>
                                                                 {tx.type === 'redeem' ? '-' : '+'}
                                                                 {tx.type === 'purchase' ? `$${tx.amount.toFixed(2)}` : tx.amount.toFixed(2)}

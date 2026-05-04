@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Zap, Sparkles, Play, Loader2 } from "lucide-react";
+import { X, Trophy, Zap, Sparkles, Play, Loader2, Minus, Plus, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
 import FavoriteToggle from "./FavoriteToggle";
+import MobileGameHudBar from "./MobileGameHudBar";
 import { recordGameSession } from "@/utils/gameBridge";
 
 interface AIGameModalProps {
@@ -102,6 +103,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
     // Session tracking
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
+    const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
     // Determine which mode this game uses
     const isSlotEngine = gameData?.type === 'slot_engine' && gameData?.slotConfig;
@@ -233,6 +235,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
 
     useEffect(() => {
         if (!isOpen) {
+            setMobileMoreOpen(false);
             // Save session to history if any bets were made
             if (sessionWagered > 0) {
                 window.dispatchEvent(new CustomEvent('game_session_complete', {
@@ -337,6 +340,8 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
 
     const accentColor = gameData.themeColor || '#a855f7';
 
+    const bettingLocked = gameState === "PLAYING";
+
     return createPortal(
         <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black md:bg-black/85 backdrop-blur-none md:backdrop-blur-md">
             <motion.div
@@ -346,8 +351,47 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                 className="bg-[#0f212e] rounded-none md:rounded-2xl w-full max-w-5xl border shadow-2xl overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[700px] md:max-h-[90vh] min-h-0"
                 style={{ borderColor: `${accentColor}40` }}
             >
-                {/* BETTING PANEL (LEFT) */}
-                <div className="w-full md:w-80 max-h-[min(30vh,240px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain bg-[#121c22] p-3 flex flex-col gap-2 md:p-6 md:gap-4 border-r border-white/5 z-20">
+                <MobileGameHudBar
+                    style={{ backgroundColor: "#121c22" }}
+                    className="border-white/10"
+                    left={
+                        <>
+                            <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(Math.max(1, betAmount / 2))} className="shrink-0 rounded-lg border border-white/10 bg-[#0a1114] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
+                            <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(Math.min(balance, betAmount * 2))} className="shrink-0 rounded-lg border border-white/10 bg-[#0a1114] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
+                            <div className="flex min-w-0 max-w-[6.5rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
+                                <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(Math.max(1, betAmount - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
+                                <span className="min-w-0 truncate px-0.5 text-center text-[11px] font-mono font-bold text-white">{Number(betAmount).toFixed(currencyType === "GC" ? 0 : 2)}</span>
+                                <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
+                            </div>
+                        </>
+                    }
+                    center={
+                        <button
+                            type="button"
+                            onClick={startGame}
+                            disabled={balance < betAmount || betAmount <= 0 || bettingLocked || !gameReady}
+                            className="flex h-[68px] w-[68px] items-center justify-center rounded-full text-black active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+                            style={{
+                                background: bettingLocked ? "#334155" : `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`,
+                                color: bettingLocked ? "#94a3b8" : "#000",
+                                boxShadow: bettingLocked ? "none" : `0 0 22px ${accentColor}55`,
+                            }}
+                            aria-label={isSlotEngine ? "Spin" : "Bet"}
+                        >
+                            {!gameReady ? <Loader2 className="h-7 w-7 animate-spin text-white" /> : bettingLocked ? <Loader2 className="h-7 w-7 animate-spin text-white" /> : <Zap className="h-7 w-7" strokeWidth={2.2} />}
+                        </button>
+                    }
+                    right={
+                        <>
+                            <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(balance)} className="shrink-0 rounded-lg border px-3 py-3 text-xs font-black active:scale-95 disabled:opacity-40" style={{ color: accentColor, borderColor: `${accentColor}50`, background: "#0a1114" }}>MAX</button>
+                            <button type="button" disabled={bettingLocked} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase active:scale-95 disabled:opacity-40 ${currencyType === "GC" ? "bg-[#00b9f0]/30 text-cyan-200" : "bg-amber-500/30 text-amber-200"}`}>{currencyType}</button>
+                            <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#0a1114] p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
+                        </>
+                    }
+                />
+
+                {/* BETTING PANEL — desktop only */}
+                <div className="z-20 hidden md:flex md:w-80 md:max-h-none md:shrink-0 md:flex-col md:overflow-y-auto md:overscroll-contain bg-[#121c22] p-3 md:p-6 md:gap-4 border-r border-white/5 gap-2">
                     {/* Header */}
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
@@ -456,8 +500,16 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                     </div>
                 </div>
 
-                {/* GAME AREA (RIGHT) — Iframe */}
-                <div className="flex-1 relative bg-[#06090c] overflow-hidden">
+                {/* GAME AREA — iframe */}
+                <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#06090c]">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-slate-300 backdrop-blur-sm active:bg-white/10 md:hidden"
+                        aria-label="Close game"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
                     {!gameReady && (
                         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#06090c]">
                             <div className="relative">
@@ -472,7 +524,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                         <iframe
                             ref={iframeRef}
                             src="/engines/slot-engine.html"
-                            className="w-full h-full border-0"
+                            className="h-full min-h-0 w-full flex-1 border-0"
                             sandbox="allow-scripts"
                             title={gameData.name}
                             onLoad={() => {
@@ -485,7 +537,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                         <iframe
                             ref={iframeRef}
                             srcDoc={gameData?.htmlCode || ''}
-                            className="w-full h-full border-0"
+                            className="h-full min-h-0 w-full flex-1 border-0"
                             sandbox="allow-scripts"
                             title={gameData.name}
                             onLoad={() => {
@@ -497,6 +549,110 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                     )}
                 </div>
             </motion.div>
+
+            <AnimatePresence>
+                {mobileMoreOpen && (
+                    <motion.div
+                        key="ai-game-mobile-more"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[110] flex flex-col justify-end md:hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button type="button" className="min-h-0 flex-1 bg-black/55" aria-label="Close menu" onClick={() => setMobileMoreOpen(false)} />
+                        <motion.div
+                            initial={{ y: "100%" }}
+                            animate={{ y: 0 }}
+                            exit={{ y: "100%" }}
+                            transition={{ type: "spring", damping: 28, stiffness: 320 }}
+                            className="max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain rounded-t-2xl border border-white/10 border-b-0 bg-[#121c22] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
+                            <div className="mb-3 flex items-center justify-between gap-2">
+                                <h3 className="truncate text-base font-black text-white">{gameData.name}</h3>
+                                <FavoriteToggle gameName={gameData.name} />
+                            </div>
+                            <p className="mb-4 line-clamp-4 text-xs leading-relaxed text-slate-400">
+                                <Sparkles className="mb-0.5 inline h-3 w-3" style={{ color: accentColor }} />
+                                {gameData.gameDescription}
+                                {isSlotEngine && (
+                                    <span className="ml-2 inline-block rounded bg-purple-500/20 px-1.5 py-0.5 text-[9px] font-bold text-purple-400">SLOT ENGINE</span>
+                                )}
+                            </p>
+                            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">Currency</p>
+                            <div className="mb-4 flex rounded-xl border border-white/5 bg-[#0f171c] p-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setCurrencyType("GC")}
+                                    disabled={bettingLocked}
+                                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-3 text-xs font-black uppercase transition-all ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e] shadow-[0_0_12px_rgba(0,185,240,0.4)]" : "text-slate-400"}`}
+                                >
+                                    <DiamondIcon className="h-4 w-4" /> GC
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setCurrencyType("FC")}
+                                    disabled={bettingLocked}
+                                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-3 text-xs font-black uppercase transition-all ${currencyType === "FC" ? "bg-amber-500 text-black shadow-[0_0_12px_rgba(245,158,11,0.4)]" : "text-slate-400"}`}
+                                >
+                                    <ForgesCoinIcon className="h-4 w-4" /> FC
+                                </button>
+                            </div>
+                            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-slate-500">Bet amount</label>
+                            <div className="relative mb-4">
+                                <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
+                                    {currencyType === "GC" ? <DiamondIcon className="h-5 w-5 opacity-70" /> : <ForgesCoinIcon className="h-5 w-5 opacity-70" />}
+                                </div>
+                                <input
+                                    type="number"
+                                    value={betAmount}
+                                    onChange={(e) => handleBetChange(Number(e.target.value))}
+                                    disabled={bettingLocked}
+                                    className="w-full rounded-xl border border-white/10 bg-[#0a1114] py-3 pl-10 pr-4 font-mono text-lg font-bold text-white outline-none focus:border-[#00b9f0] disabled:opacity-50"
+                                />
+                                <p className="mt-1 text-right text-[10px] font-mono text-slate-500">Bal: {balance.toFixed(2)}</p>
+                            </div>
+                            <div className="mb-4 rounded-xl border border-green-500/20 bg-[#0a1114]/50 p-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Trophy className="h-4 w-4 text-green-500" />
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Last win</span>
+                                    </div>
+                                    {lastWin ? (
+                                        <span className="flex items-center gap-1 font-mono text-sm font-black text-green-400">
+                                            +{lastWin.amount.toFixed(2)} {lastWin.currency === "GC" ? <DiamondIcon className="h-3 w-3" /> : <ForgesCoinIcon className="h-3 w-3" />}
+                                            <span className="text-[10px] text-green-500/60">({lastWin.multiplier.toFixed(2)}x)</span>
+                                        </span>
+                                    ) : (
+                                        <span className="font-mono text-xs text-slate-600">—</span>
+                                    )}
+                                </div>
+                            </div>
+                            {gameState === "RESULT" && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        resetGame();
+                                        setMobileMoreOpen(false);
+                                    }}
+                                    className="mb-3 w-full rounded-xl border border-white/10 py-3 text-sm font-bold text-slate-200 transition-colors hover:bg-white/5"
+                                >
+                                    Play again
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => setMobileMoreOpen(false)}
+                                className="w-full rounded-xl border border-white/10 bg-[#1a2c38] py-3 text-sm font-bold text-white active:bg-white/10"
+                            >
+                                Done
+                            </button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>,
         document.body
     );
