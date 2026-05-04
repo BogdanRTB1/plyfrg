@@ -12,12 +12,14 @@ const getSupabaseAdmin = () => createClient(
 
 // Bundle definitions (same as frontend)
 const BUNDLES: Record<number, { price: number; diamonds: number; forgesCoins: number }> = {
-    1: { price: 5, diamonds: 5000, forgesCoins: 5 },
-    2: { price: 10, diamonds: 10000, forgesCoins: 10 },
-    3: { price: 20, diamonds: 20000, forgesCoins: 21 },
-    4: { price: 50, diamonds: 50000, forgesCoins: 55 },
+    1: { price: 35, diamonds: 35000, forgesCoins: 38 },
+    2: { price: 50, diamonds: 50000, forgesCoins: 55 },
+    3: { price: 70, diamonds: 70000, forgesCoins: 78 },
+    4: { price: 80, diamonds: 80000, forgesCoins: 90 },
     5: { price: 100, diamonds: 100000, forgesCoins: 115 },
-    6: { price: 250, diamonds: 250000, forgesCoins: 290 },
+    6: { price: 150, diamonds: 150000, forgesCoins: 175 },
+    7: { price: 250, diamonds: 250000, forgesCoins: 290 },
+    8: { price: 500, diamonds: 500000, forgesCoins: 600 },
 };
 
 export async function POST(req: NextRequest) {

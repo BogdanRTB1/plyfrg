@@ -189,26 +189,20 @@ export default function CreatorStudioPage() {
     const startMonthIdx = Math.max(0, currentMonthIdx - 5); // display up to 6 months
     const monthlyStats = [];
     
-    let maxRev = 0;
-    let maxPlayers = 0;
-    for (let i = startMonthIdx; i <= currentMonthIdx; i++) {
-        if ((groupedEarnings[months[i]] || 0) > maxRev) maxRev = groupedEarnings[months[i]];
-        const pCount = groupedPlayers[months[i]]?.size || 0;
-        if (pCount > maxPlayers) maxPlayers = pCount;
-    }
-
-    for (let i = startMonthIdx; i <= currentMonthIdx; i++) {
-        const rev = groupedEarnings[months[i]] || 0;
-        const pCount = groupedPlayers[months[i]]?.size || 0;
+    const fakeRevenues = [240, 180, 350, 420, 290, 385];
+    const fakePlayers = [12000, 15000, 24000, 31000, 28000, 35000];
+    
+    for (let i = 0; i < 6; i++) {
+        const monthIdx = (startMonthIdx + i) % 12;
+        const rev = fakeRevenues[i];
+        const pCount = fakePlayers[i];
         monthlyStats.push({
-            label: months[i],
-            revenue: maxRev > 0 ? (rev / maxRev) * 100 : (i === currentMonthIdx ? 5 : 0),
-            players: maxPlayers > 0 ? (pCount / maxPlayers) * 100 : (i === currentMonthIdx ? 15 : 0)
+            label: months[monthIdx],
+            revenue: (rev / 450) * 100, // max is 450
+            players: (pCount / 40000) * 100, // max is 40k
+            realRev: rev,
+            realPlayers: pCount
         });
-    }
-
-    if (monthlyStats.length === 0) {
-        monthlyStats.push({ label: months[currentMonthIdx], revenue: 5, players: 15 });
     }
 
     // Dynamic Active Players
@@ -318,129 +312,103 @@ export default function CreatorStudioPage() {
                             className="space-y-12"
                         >
 
-                            {/* KPI Cards Grid */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.1 }}
-                                className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-6"
-                            >
-                                <div className="bg-[#0b1622]/80 backdrop-blur-xl rounded-[24px] p-6 border border-white/10 relative overflow-hidden group hover:border-[#00b9f0]/40 transition-colors">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-[40px] pointer-events-none transition-all group-hover:bg-emerald-500/20"></div>
-                                    <div className="flex items-center gap-4 mb-4 relative z-10">
-                                        <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                                            <DollarSign size={24} />
-                                        </div>
-                                        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Est. Earnings</h3>
-                                    </div>
-                                    <div className="relative z-10">
-                                        <span className="text-4xl font-black text-white">${totalThisMonth.toFixed(2)}</span>
-                                        <div className="flex items-center gap-1 text-emerald-400 text-sm font-bold mt-2">
-                                            <TrendingUp size={16} />
-                                            <span>Current Month</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-[#0b1622]/80 backdrop-blur-xl rounded-[24px] p-6 border border-white/10 relative overflow-hidden group hover:border-purple-500/40 transition-colors">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-[40px] pointer-events-none transition-all group-hover:bg-purple-500/20"></div>
-                                    <div className="flex items-center gap-4 mb-4 relative z-10">
-                                        <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400">
-                                            <Users size={24} />
-                                        </div>
-                                        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Active Players</h3>
-                                    </div>
-                                    <div className="relative z-10">
-                                        <span className="text-4xl font-black text-white">{uniquePlayersThisMonth}</span>
-                                        <div className="flex items-center gap-1 text-emerald-400 text-sm font-bold mt-2">
-                                            <TrendingUp size={16} />
-                                            <span>Current Month</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-[#0b1622]/80 backdrop-blur-xl rounded-[24px] p-6 border border-white/10 relative overflow-hidden group hover:border-pink-500/40 transition-colors">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/10 rounded-full blur-[40px] pointer-events-none transition-all group-hover:bg-pink-500/20"></div>
-                                    <div className="flex items-center gap-4 mb-4 relative z-10">
-                                        <div className="w-12 h-12 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-400">
-                                            <Presentation size={24} />
-                                        </div>
-                                        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Profile Views</h3>
-                                    </div>
-                                    <div className="relative z-10">
-                                        <span className="text-4xl font-black text-white">{viewsThisMonthCount >= 1000 ? (viewsThisMonthCount / 1000).toFixed(1) + 'K' : viewsThisMonthCount}</span>
-                                        <div className="flex items-center gap-1 text-pink-400 text-sm font-bold mt-2">
-                                            <Activity size={16} />
-                                            <span>Current Month</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-[#0b1622]/80 backdrop-blur-xl rounded-[24px] p-6 border border-white/10 relative overflow-hidden group hover:border-orange-500/40 transition-colors">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-[40px] pointer-events-none transition-all group-hover:bg-orange-500/20"></div>
-                                    <div className="flex items-center gap-4 mb-4 relative z-10">
-                                        <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-400">
-                                            <Target size={24} />
-                                        </div>
-                                        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Conversion</h3>
-                                    </div>
-                                    <div className="relative z-10">
-                                        <span className="text-4xl font-black text-white">{conversionRate.toFixed(1)}%</span>
-                                        <div className="flex items-center gap-1 text-emerald-400 text-sm font-bold mt-2">
-                                            <TrendingUp size={16} />
-                                            <span>Real-time tracking</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-
-                            {/* Performance Chart & Games Row */}
+                            {/* Shopify-Style Dashboard (1 Month View) */}
                             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                                {/* Fake Bar Chart */}
                                 <motion.div
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 0.2 }}
-                                    className="lg:col-span-2 bg-[#0b1622]/80 backdrop-blur-xl rounded-[32px] p-8 border border-white/10 relative overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+                                    transition={{ delay: 0.1 }}
+                                    className="lg:col-span-2 bg-[#0b1622]/90 backdrop-blur-xl rounded-[24px] p-6 sm:p-8 border border-white/10 relative overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)]"
                                 >
-                                    <div className="flex justify-between items-center mb-10">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4 relative z-10">
                                         <div>
-                                            <h2 className="text-xl font-black text-white tracking-tight">Revenue & Growth Overview</h2>
-                                            <p className="text-sm text-slate-400">Monthly breakdown of your earnings vs active players generated.</p>
+                                            <h2 className="text-slate-400 font-medium mb-1 text-sm">Total Revenue</h2>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-4xl sm:text-5xl font-black text-white">$105K</span>
+                                                <span className="flex items-center text-emerald-400 font-bold text-sm bg-emerald-500/10 px-2 py-1 rounded-lg">
+                                                    <TrendingUp size={16} className="mr-1" /> 84%
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div className="flex gap-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-3 h-3 rounded-full bg-[#00b9f0]"></div>
-                                                <span className="text-xs font-bold text-slate-300">Revenue</span>
+                                        <button className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2.5 rounded-xl text-white font-bold transition-colors">
+                                            <Presentation size={16} /> Report
+                                        </button>
+                                    </div>
+
+                                    {/* SVG Line Chart (1 Month) */}
+                                    <div className="w-full h-48 sm:h-64 relative mb-12 z-10">
+                                        {/* Y-axis Labels */}
+                                        <div className="absolute left-0 top-0 bottom-6 flex flex-col justify-between text-xs text-slate-500 font-medium">
+                                            <span>$5K</span>
+                                            <span>$2.5K</span>
+                                            <span>$0</span>
+                                        </div>
+
+                                        {/* Chart Container */}
+                                        <div className="absolute left-12 right-0 top-2 bottom-6">
+                                            {/* Horizontal Grid Lines */}
+                                            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                                                <div className="w-full h-px bg-white/5"></div>
+                                                <div className="w-full h-px bg-white/5"></div>
+                                                <div className="w-full h-px bg-white/5"></div>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                                                <span className="text-xs font-bold text-slate-300">Players</span>
-                                            </div>
+
+                                            <svg className="w-full h-full overflow-visible relative z-10" preserveAspectRatio="none" viewBox="0 0 1000 100">
+                                                {/* Dotted Line (Previous Month) */}
+                                                <path 
+                                                    d="M 0 95 C 50 95, 80 80, 120 85 C 160 90, 200 40, 250 30 C 300 20, 350 95, 400 80 C 450 65, 500 50, 550 40 C 600 30, 650 60, 700 55 C 750 50, 800 80, 850 70 C 900 60, 950 85, 1000 80" 
+                                                    fill="none" 
+                                                    stroke="rgba(255,255,255,0.2)" 
+                                                    strokeWidth="2" 
+                                                    strokeDasharray="8,8" 
+                                                />
+                                                
+                                                {/* Solid Line (Current Month) */}
+                                                <path 
+                                                    d="M 0 95 C 100 95, 150 70, 180 50 C 210 30, 250 20, 280 40 C 310 60, 330 10, 360 20 C 390 30, 420 80, 450 70 C 480 60, 500 40, 550 35 C 600 30, 620 60, 650 70 C 680 80, 700 30, 750 45 C 800 60, 820 40, 850 45 C 880 50, 920 90, 950 80 C 980 70, 990 95, 1000 95" 
+                                                    fill="none" 
+                                                    stroke="#00b9f0" 
+                                                    strokeWidth="3.5" 
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    className="drop-shadow-[0_0_12px_rgba(0,185,240,0.6)]"
+                                                />
+                                            </svg>
+                                        </div>
+
+                                        {/* X-axis Labels */}
+                                        <div className="absolute left-12 right-0 bottom-0 flex justify-between text-[10px] sm:text-xs text-slate-500 font-medium">
+                                            <span>Apr 1</span>
+                                            <span>Apr 10</span>
+                                            <span>Apr 20</span>
+                                            <span>Apr 30</span>
                                         </div>
                                     </div>
 
-                                    <div className="h-64 flex items-end justify-between gap-4 mt-8">
-                                        {monthlyStats.map((stat, idx) => (
-                                            <div key={stat.label} className="flex-1 flex flex-col items-center gap-4 h-full">
-                                                <div className="relative flex-1 w-full flex items-end justify-center group">
-                                                    {/* Back Bar (Revenue) */}
-                                                    <div
-                                                        className="absolute bottom-0 w-full sm:w-12 bg-[#00b9f0] rounded-lg transition-all duration-1000 ease-out origin-bottom hover:brightness-125"
-                                                        style={{ height: `${stat.revenue}%` }}
-                                                    >
-                                                        <div className="w-full h-full bg-white opacity-0 hover:opacity-10 transition-opacity rounded-lg"></div>
-                                                    </div>
-                                                    {/* Front Bar (Players) */}
-                                                    <div
-                                                        className="absolute bottom-0 w-full sm:w-12 bg-gradient-to-t from-purple-600 to-purple-400 rounded-lg translate-y-2 translate-x-1 opacity-90 transition-all duration-1000 ease-out origin-bottom hover:brightness-125 hover:translate-y-1"
-                                                        style={{ height: `${stat.players}%` }}
-                                                    >
-                                                    </div>
-                                                </div>
-                                                <span className="text-xs font-bold text-slate-400 uppercase">{stat.label}</span>
+                                    {/* Bottom KPI Cards */}
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 relative z-10">
+                                        <div className="bg-white/[0.02] hover:bg-white/[0.04] transition-colors rounded-xl p-4 border border-white/5">
+                                            <h4 className="text-slate-400 text-xs sm:text-sm font-medium mb-1 truncate">Total Plays</h4>
+                                            <div className="text-lg sm:text-xl font-black text-white mb-1">142.5K</div>
+                                            <div className="text-emerald-400 text-[10px] sm:text-xs font-bold flex items-center"><TrendingUp size={12} className="mr-1"/> 37%</div>
+                                        </div>
+                                        <div className="bg-[#00b9f0]/10 rounded-xl p-4 border border-[#00b9f0]/30 relative overflow-hidden">
+                                            <div className="relative z-10">
+                                                <h4 className="text-slate-300 text-xs sm:text-sm font-medium mb-1 truncate">Total Revenue</h4>
+                                                <div className="text-lg sm:text-xl font-black text-white mb-1">$105K</div>
+                                                <div className="text-emerald-400 text-[10px] sm:text-xs font-bold flex items-center"><TrendingUp size={12} className="mr-1"/> 84%</div>
                                             </div>
-                                        ))}
+                                        </div>
+                                        <div className="bg-white/[0.02] hover:bg-white/[0.04] transition-colors rounded-xl p-4 border border-white/5">
+                                            <h4 className="text-slate-400 text-xs sm:text-sm font-medium mb-1 truncate">Active Players</h4>
+                                            <div className="text-lg sm:text-xl font-black text-white mb-1">45.2K</div>
+                                            <div className="text-emerald-400 text-[10px] sm:text-xs font-bold flex items-center"><TrendingUp size={12} className="mr-1"/> 60%</div>
+                                        </div>
+                                        <div className="bg-white/[0.02] hover:bg-white/[0.04] transition-colors rounded-xl p-4 border border-white/5">
+                                            <h4 className="text-slate-400 text-xs sm:text-sm font-medium mb-1 truncate">Conversion</h4>
+                                            <div className="text-lg sm:text-xl font-black text-white mb-1">8.68%</div>
+                                            <div className="text-emerald-400 text-[10px] sm:text-xs font-bold flex items-center"><TrendingUp size={12} className="mr-1"/> 15%</div>
+                                        </div>
                                     </div>
                                 </motion.div>
 
@@ -533,6 +501,63 @@ export default function CreatorStudioPage() {
                                  </div>
                             </div>
                             
+                            {/* TikTok Flex - My Games Earnings */}
+                            <div className="bg-[#0b1622]/80 backdrop-blur-xl rounded-[32px] p-8 border border-white/10 relative overflow-hidden shadow-[0_0_50px_rgba(16,185,129,0.1)]">
+                                {/* Ambient glow for flashiness */}
+                                <div className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-emerald-500/20 rounded-full blur-[80px] pointer-events-none"></div>
+
+                                <div className="flex justify-between items-end mb-8 relative z-10">
+                                    <div>
+                                        <h2 className="text-2xl font-black text-white tracking-tight mb-2 flex items-center gap-3">
+                                            My Games Revenue
+                                            <div className="flex items-center gap-2 text-xs font-black text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.4)]">
+                                                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div> LIVE EARNINGS
+                                            </div>
+                                        </h2>
+                                        <p className="text-slate-400 text-sm font-medium">Lifetime revenue generated from games you've created.</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-[#0f212e]/90 rounded-3xl border border-white/10 overflow-hidden shadow-2xl overflow-x-auto scrollbar-hide relative z-10 backdrop-blur-md">
+                                    <div className="min-w-[500px]">
+                                        <div className="grid grid-cols-4 p-5 text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 bg-[#1a2c38]/80">
+                                            <div className="pl-4">Game Name</div>
+                                            <div>Status</div>
+                                            <div className="text-right">Total Plays</div>
+                                            <div className="text-right pr-4">Total Revenue</div>
+                                        </div>
+                                        <div className="divide-y divide-white/5">
+                                            {[
+                                                { game: "Hype Drop", status: "Active", plays: "142,450", payout: "$ 385.50", color: "#00b9f0", emoji: "🚀" },
+                                                { game: "Viral Slots", status: "Active", plays: "98,230", payout: "$ 290.00", color: "#a855f7", emoji: "🎰" },
+                                                { game: "Creator Clash", status: "Active", plays: "115,800", payout: "$ 400.00", color: "#f59e0b", emoji: "🥊" },
+                                                { game: "Mystery Box", status: "Active", plays: "89,120", payout: "$ 310.25", color: "#10b981", emoji: "📦" },
+                                                { game: "Influencer Run", status: "Trending", plays: "155,400", payout: "$ 395.00", color: "#ec4899", emoji: "🏃" },
+                                            ].map((win, i) => (
+                                                <div key={i} className="grid grid-cols-4 p-5 hover:bg-white/[0.04] text-sm items-center transition-all duration-300 group">
+                                                    <div className="font-black text-white flex items-center gap-4 pl-4">
+                                                        <div className="w-10 h-10 rounded-xl bg-[#1a2c38] flex items-center justify-center text-xl border border-white/10 group-hover:border-white/30 transition-all shrink-0 group-hover:scale-110" style={{ boxShadow: `0 0 20px ${win.color}30` }}>
+                                                            {win.emoji}
+                                                        </div>
+                                                        <span className="hidden sm:inline truncate max-w-[140px] text-base group-hover:text-[#00b9f0] transition-colors">{win.game}</span>
+                                                    </div>
+                                                    <div className="font-bold text-xs flex items-center gap-2">
+                                                        <div className={`w-2 h-2 rounded-full animate-pulse ${win.status === 'Trending' ? 'bg-pink-500 shadow-[0_0_10px_#ec4899]' : 'bg-emerald-500 shadow-[0_0_10px_#10b981]'}`}></div>
+                                                        <span className={win.status === 'Trending' ? 'text-pink-400' : 'text-emerald-400'}>{win.status}</span>
+                                                    </div>
+                                                    <div className="text-right font-bold text-slate-300 text-base">{win.plays}</div>
+                                                    <div className="text-right font-black pr-4 text-xl tracking-tight">
+                                                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-300 drop-shadow-[0_0_12px_rgba(52,211,153,0.6)]">
+                                                            {win.payout}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Table Breakdown */}
                             <div className="bg-[#0b1622]/80 backdrop-blur-xl rounded-[32px] p-8 border border-white/10">
                                  <h2 className="text-xl font-black text-white tracking-tight mb-6">Game Performance</h2>

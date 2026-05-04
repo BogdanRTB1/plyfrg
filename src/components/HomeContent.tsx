@@ -127,11 +127,11 @@ export default function HomeContent() {
     const activeOriginals = originals.slice(0, 12);
 
     const recentWins = [
-        { game: "Plinko", user: "Hidden_User", multiplier: "130.00", payout: "1,300 FC", icon: "/images/game-plinko.png" },
-        { game: "Crash", user: "SpeedDemon", multiplier: "14.50", payout: "450 FC", icon: "/images/game-crash.png" },
-        { game: "Slots", user: "LuckySpin", multiplier: "500.00", payout: "2,500 FC", icon: "/images/game-slots.png" },
-        { game: "Roulette", user: "RedBlack", multiplier: "36.00", payout: "360 FC", icon: "/images/game-roulette.png" },
-        { game: "Mines", user: "BombSquad", multiplier: "5.45", payout: "125 FC", icon: "/images/game-mines.png" },
+        { game: "Plinko", user: "AlexM99", multiplier: "130.00", payout: "1,300 FC", icon: "/images/game-plinko.png" },
+        { game: "Crash", user: "SarahGamer", multiplier: "14.50", payout: "450 FC", icon: "/images/game-crash.png" },
+        { game: "Slots", user: "JohnDoe22", multiplier: "500.00", payout: "2,500 FC", icon: "/images/game-slots.png" },
+        { game: "Roulette", user: "CryptoKing_88", multiplier: "36.00", payout: "360 FC", icon: "/images/game-roulette.png" },
+        { game: "Mines", user: "Mike_S", multiplier: "5.45", payout: "125 FC", icon: "/images/game-mines.png" },
     ];
 
     const pickRandomGame = () => {
