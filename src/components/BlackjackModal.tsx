@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Spade, Club, Heart, Diamond } from "lucide-react";
+import { X, Trophy, Spade, Club, Heart, Diamond, Minus, Plus, MoreHorizontal, Zap } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
+import MobileGameHudBar from "./MobileGameHudBar";
 import confetti from "canvas-confetti";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
@@ -43,6 +44,7 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
     // Session tracking
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
+    const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'DEALER_TURN' | 'WON' | 'LOST' | 'PUSH'>('IDLE');
 
@@ -222,6 +224,7 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
 
     useEffect(() => {
         if (!isOpen) {
+            setMobileMoreOpen(false);
             clearDealerTimeout();
             roundIdRef.current += 1;
             // Save session to history if any bets were made
@@ -257,6 +260,8 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
+
+    const bettingLocked = gameState === "PLAYING" || gameState === "DEALER_TURN";
 
     const placeholderCard: Card = { suit: 'Spades', value: 'A', numValue: 11, hidden: true };
     const dealerCardsToRender = dealerHand.length > 0 ? dealerHand : [placeholderCard];
@@ -302,15 +307,56 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
     }
 
     return createPortal(
-        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black md:bg-black/80 backdrop-blur-none md:backdrop-blur-sm">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 className={`${BLACKJACK_CONFIG.theme.background} rounded-none md:rounded-2xl w-full max-w-5xl border border-white/10 shadow-2xl overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[700px] md:max-h-[90vh] min-h-0`}
             >
+                <MobileGameHudBar
+                    className={BLACKJACK_CONFIG.theme.panelBg}
+                    left={
+                        <>
+                            <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
+                            <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
+                            <div className="flex min-w-0 max-w-[6rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
+                                <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
+                                <span className="min-w-0 truncate px-0.5 text-center text-xs font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
+                                <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
+                            </div>
+                        </>
+                    }
+                    center={
+                        gameState === "PLAYING" ? (
+                            <button type="button" onClick={hit} className="flex h-[68px] w-[68px] items-center justify-center rounded-full bg-zinc-700 text-sm font-black uppercase text-white shadow-lg active:scale-95" aria-label="Hit">
+                                HIT
+                            </button>
+                        ) : gameState === "DEALER_TURN" ? (
+                            <button type="button" disabled className="flex h-[68px] w-[68px] cursor-wait items-center justify-center rounded-full border border-white/10 bg-[#1a2c38] text-[10px] font-black uppercase text-slate-500 opacity-70" aria-label="Dealer turn">
+                                …
+                            </button>
+                        ) : (
+                            <button type="button" onClick={startGame} disabled={balance < betAmount || betAmount <= 0} className={`flex h-[68px] w-[68px] items-center justify-center rounded-full ${BLACKJACK_CONFIG.theme.buttonAccent} text-white shadow-[0_0_22px_rgba(16,185,129,0.35)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45`} aria-label="Deal">
+                                <Zap className="h-7 w-7" strokeWidth={2.2} />
+                            </button>
+                        )
+                    }
+                    right={
+                        <>
+                            {gameState === "PLAYING" ? (
+                                <button type="button" onClick={() => stand()} className="shrink-0 rounded-lg border border-emerald-500/40 bg-emerald-600 px-2.5 py-3 text-[10px] font-black uppercase leading-tight text-white shadow-md active:scale-95">Stand</button>
+                            ) : (
+                                <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(balance)} className="shrink-0 rounded-lg border border-[#00b9f0]/30 bg-[#1a2c38] px-3 py-3 text-xs font-black text-[#00b9f0] active:scale-95 disabled:opacity-40">MAX</button>
+                            )}
+                            <button type="button" disabled={bettingLocked} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
+                        </>
+                    }
+                />
+
                 {/* ADVANCED BETTING MENU */}
-                <div className={`w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain ${BLACKJACK_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
+                <div className={`z-20 hidden md:flex md:w-80 md:max-h-none md:shrink-0 md:overflow-y-auto md:overscroll-contain ${BLACKJACK_CONFIG.theme.panelBg} flex-col gap-2 border-r border-white/5 p-3 md:p-6 md:gap-4`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{BLACKJACK_CONFIG.names.title}</h2>
@@ -391,7 +437,10 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
                 </div>
 
                 {/* GAME AREA - Table */}
-                <div className={`flex-1 relative ${BLACKJACK_CONFIG.theme.tableBg} p-6 sm:p-10 flex flex-col justify-between overflow-hidden shadow-inner`}>
+                <div className={`relative flex flex-1 flex-col justify-between overflow-hidden ${BLACKJACK_CONFIG.theme.tableBg} p-6 shadow-inner sm:p-10`}>
+                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-[60] flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-slate-200 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
+                        <X className="h-5 w-5" />
+                    </button>
 
                     {/* Background decor */}
                     <div className="absolute inset-0 z-0 bg-black/10"></div>
@@ -444,6 +493,32 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
                     </div>
                 </div>
             </motion.div>
+
+            <AnimatePresence>
+                {mobileMoreOpen && (
+                    <motion.div key="bj-mobile-more" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110] flex flex-col justify-end md:hidden">
+                        <button type="button" className="min-h-0 flex-1 bg-black/55" aria-label="Close menu" onClick={() => setMobileMoreOpen(false)} />
+                        <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 320 }} className={`max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain rounded-t-2xl border border-white/10 border-b-0 bg-[#121c22] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl`} onClick={(e) => e.stopPropagation()}>
+                            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
+                            <div className="mb-4 flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{BLACKJACK_CONFIG.names.title}</span>
+                                <FavoriteToggle gameName={BLACKJACK_CONFIG.names.title} />
+                            </div>
+                            {gameState === "PLAYING" && (
+                                <div className="mb-4 grid grid-cols-2 gap-2">
+                                    <button type="button" onClick={hit} className="rounded-xl border border-white/10 bg-zinc-800 py-3 text-sm font-black uppercase text-white active:bg-zinc-700">Hit</button>
+                                    <button type="button" onClick={() => stand()} className="rounded-xl border border-emerald-500/40 bg-emerald-600 py-3 text-sm font-black uppercase text-white active:brightness-110">Stand</button>
+                                </div>
+                            )}
+                            <div className="mb-4 flex items-center justify-between rounded-xl border border-green-500/20 bg-[#0a1114]/50 p-3">
+                                <span className="text-[10px] font-bold uppercase text-slate-400">Last win</span>
+                                {lastWin ? <span className="flex items-center gap-1 text-sm font-black text-green-400">+{lastWin.amount.toFixed(2)} {lastWin.currency === "GC" ? <DiamondIcon className="h-3 w-3" /> : <ForgesCoinIcon className="h-3 w-3" />}</span> : <span className="font-mono text-xs text-slate-600">—</span>}
+                            </div>
+                            <button type="button" onClick={() => setMobileMoreOpen(false)} className="w-full rounded-xl border border-white/10 bg-[#1a2c38] py-3 text-sm font-bold text-white active:bg-white/10">Done</button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>,
         document.body
     );

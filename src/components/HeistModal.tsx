@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Lock, Unlock, Zap, Trophy, Goal, Crosshair } from "lucide-react";
+import { X, Lock, Unlock, Zap, Trophy, Goal, Crosshair, Minus, Plus, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
+import MobileGameHudBar from "./MobileGameHudBar";
 import confetti from "canvas-confetti";
 
 const HEIST_CONFIG = {
@@ -28,6 +29,7 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
     const [cashOutValue, setCashOutValue] = useState(0);
     const crashPointRef = useRef(1.00);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
     const startGame = () => {
         if (balance < betAmount) return;
@@ -91,6 +93,7 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
 
     useEffect(() => {
         if (!isOpen) {
+            setMobileMoreOpen(false);
             // Save session to history if any bets were made
             if (sessionWagered > 0) {
                 window.dispatchEvent(new CustomEvent('game_session_complete', {
@@ -117,15 +120,49 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
     if (typeof document === "undefined") return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black md:bg-black/80 backdrop-blur-none md:backdrop-blur-sm">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 className="bg-[#0f212e] rounded-none md:rounded-2xl w-full max-w-4xl border border-yellow-500/20 shadow-[0_0_50px_rgba(234,179,8,0.1)] overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[600px] md:max-h-[90vh] min-h-0"
             >
+                <MobileGameHudBar
+                    className="bg-[#121c22]"
+                    left={
+                        <>
+                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
+                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
+                            <div className="flex min-w-0 max-w-[6rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
+                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
+                                <span className="min-w-0 truncate px-0.5 text-center text-xs font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
+                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
+                            </div>
+                        </>
+                    }
+                    center={
+                        gameState === "PLAYING" ? (
+                            <button type="button" onClick={cashOut} className="flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full bg-green-500 text-[10px] font-black uppercase leading-tight text-[#0f212e] shadow-[0_0_20px_rgba(34,197,94,0.45)] active:scale-95">
+                                <Trophy className="mb-0.5 h-5 w-5" />
+                                <span className="text-[10px]">{(betAmount * multiplier).toFixed(0)}</span>
+                            </button>
+                        ) : (
+                            <button type="button" onClick={startGame} disabled={balance < betAmount || betAmount <= 0} className="flex h-[68px] w-[68px] items-center justify-center rounded-full bg-gradient-to-br from-yellow-600 to-amber-500 text-black shadow-[0_0_22px_rgba(234,179,8,0.35)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45" aria-label="Start heist">
+                                <Lock className="h-7 w-7" strokeWidth={2.2} />
+                            </button>
+                        )
+                    }
+                    right={
+                        <>
+                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(balance)} className="shrink-0 rounded-lg border border-yellow-500/30 bg-[#1a2c38] px-3 py-3 text-xs font-black text-yellow-400 active:scale-95 disabled:opacity-40">MAX</button>
+                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
+                        </>
+                    }
+                />
+
                 {/* ADVANCED BETTING MENU */}
-                <div className="w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain bg-[#121c22] p-6 flex flex-col gap-4 border-r border-white/5 z-20">
+                <div className="hidden md:flex md:w-80 md:max-h-none md:shrink-0 md:overflow-y-auto md:overscroll-contain bg-[#121c22] flex-col gap-2 border-r border-white/5 p-3 md:p-6 md:gap-4 z-20">
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
                             <Crosshair className={HEIST_CONFIG.theme.accent} />
@@ -197,7 +234,10 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
                 </div>
 
                 {/* GAME AREA */}
-                <div className="flex-1 relative bg-[#06090c] p-4 flex flex-col items-center justify-center overflow-hidden">
+                <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-[#06090c] p-4">
+                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-slate-300 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
+                        <X className="h-5 w-5" />
+                    </button>
                     <div className="absolute inset-0 opacity-10 bg-[url('/images/game-heist-v2.png')] bg-cover bg-center mix-blend-screen"></div>
 
                     {gameState === 'CRASHED' && (
@@ -269,6 +309,26 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
                     </div>
                 </div>
             </motion.div>
+
+            <AnimatePresence>
+                {mobileMoreOpen && (
+                    <motion.div key="heist-mobile-more" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110] flex flex-col justify-end md:hidden">
+                        <button type="button" className="min-h-0 flex-1 bg-black/55" aria-label="Close menu" onClick={() => setMobileMoreOpen(false)} />
+                        <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 320 }} className="max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain rounded-t-2xl border border-white/10 border-b-0 bg-[#121c22] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
+                            <div className="mb-4 flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{HEIST_CONFIG.names.title}</span>
+                                <FavoriteToggle gameName={HEIST_CONFIG.names.title} />
+                            </div>
+                            <div className="mb-4 flex items-center justify-between rounded-xl border border-green-500/20 bg-[#0a1114]/50 p-3">
+                                <span className="text-[10px] font-bold uppercase text-slate-400">Last win</span>
+                                {lastWin ? <span className="flex items-center gap-1 text-sm font-black text-green-400">+{lastWin.amount.toFixed(2)} {lastWin.currency === "GC" ? <DiamondIcon className="h-3 w-3" /> : <ForgesCoinIcon className="h-3 w-3" />}</span> : <span className="font-mono text-xs text-slate-600">—</span>}
+                            </div>
+                            <button type="button" onClick={() => setMobileMoreOpen(false)} className="w-full rounded-xl border border-white/10 bg-[#1a2c38] py-3 text-sm font-bold text-white active:bg-white/10">Done</button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>,
         document.body
     );

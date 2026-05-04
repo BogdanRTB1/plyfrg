@@ -271,7 +271,7 @@ export default function Header() {
 
                 </div>
 
-                <div className="flex items-center gap-1 sm:gap-2 md:gap-4 shrink-0 min-w-0">
+                <div className="flex items-center gap-1 sm:gap-2 md:gap-4 shrink-0 min-w-0 ml-2.5 sm:ml-3 md:ml-0 pl-px md:pl-0">
 
                     <div className={`bg-[#0f212e] border border-white/5 rounded-full p-1 pl-2 sm:pl-3 md:pl-4 items-center gap-1.5 sm:gap-2 md:gap-3 ${!user ? 'hidden md:flex' : 'hidden sm:flex'}`}>
                         {/* Diamonds (GC) */}

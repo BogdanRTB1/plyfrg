@@ -338,7 +338,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
     const accentColor = gameData.themeColor || '#a855f7';
 
     return createPortal(
-        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black/85 backdrop-blur-md">
+        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black md:bg-black/85 backdrop-blur-none md:backdrop-blur-md">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -347,7 +347,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                 style={{ borderColor: `${accentColor}40` }}
             >
                 {/* BETTING PANEL (LEFT) */}
-                <div className="w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain bg-[#121c22] p-6 flex flex-col gap-4 border-r border-white/5 z-20">
+                <div className="w-full md:w-80 max-h-[min(30vh,240px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain bg-[#121c22] p-3 flex flex-col gap-2 md:p-6 md:gap-4 border-r border-white/5 z-20">
                     {/* Header */}
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">

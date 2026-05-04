@@ -2,8 +2,9 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Loader2, RotateCcw, Minus, Plus } from 'lucide-react';
+import { X, Loader2, RotateCcw, Minus, Plus, MoreHorizontal, Zap } from 'lucide-react';
 import { DiamondIcon, ForgesCoinIcon } from './CurrencyIcons';
+import MobileGameHudBar from './MobileGameHudBar';
 
 interface CustomScratchModalProps {
     isOpen: boolean;
@@ -26,6 +27,7 @@ export default function CustomScratchModal({
     const [currency, setCurrency] = useState<'diamonds' | 'forgesCoins'>('diamonds');
     const [lastWin, setLastWin] = useState<number | null>(null);
     const [totalProfit, setTotalProfit] = useState(0);
+    const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
     const balance = currency === 'diamonds' ? diamonds : forgesCoins;
 
@@ -41,6 +43,7 @@ export default function CustomScratchModal({
 
     useEffect(() => {
         if (!isOpen) {
+            setMobileMoreOpen(false);
             setEngineReady(false);
             setIsPlaying(false);
             setLastWin(null);
@@ -116,7 +119,7 @@ export default function CustomScratchModal({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden"
+                className="fixed inset-0 bg-black md:bg-black/80 backdrop-blur-none md:backdrop-blur-sm z-[9999] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden"
                 onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
             >
                 <motion.div
@@ -168,8 +171,46 @@ export default function CustomScratchModal({
                         )}
                     </div>
 
-                    {/* Controls */}
-                    <div className="p-4 sm:p-5 border-t border-white/10 space-y-4 shrink-0 overflow-y-auto max-h-[45vh] md:max-h-none overscroll-contain">
+                    <MobileGameHudBar
+                        style={{ backgroundColor: "#0b1622" }}
+                        className="border-white/10 md:hidden"
+                        left={
+                            <>
+                                <button type="button" disabled={isPlaying} onClick={() => setBet(Math.max(1, Math.floor(bet / 2)))} className="shrink-0 rounded-lg border border-white/10 bg-[#0a111a] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
+                                <button type="button" disabled={isPlaying} onClick={() => setBet(Math.min(Math.floor(balance), bet * 2))} className="shrink-0 rounded-lg border border-white/10 bg-[#0a111a] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
+                                <div className="flex min-w-0 max-w-[6rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a111a]">
+                                    <button type="button" disabled={isPlaying} onClick={() => setBet(Math.max(1, bet - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
+                                    <span className="min-w-0 truncate px-0.5 text-center text-xs font-mono font-bold text-white">{bet}</span>
+                                    <button type="button" disabled={isPlaying} onClick={() => setBet(Math.min(Math.floor(balance), bet + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
+                                </div>
+                            </>
+                        }
+                        center={
+                            <button
+                                type="button"
+                                onClick={handlePlay}
+                                disabled={isPlaying || !engineReady || balance < bet}
+                                className="flex h-[68px] w-[68px] items-center justify-center rounded-full text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+                                style={{
+                                    background: `linear-gradient(135deg, ${accent}, ${accent}cc)`,
+                                    boxShadow: `0 0 22px ${accent}55`,
+                                }}
+                                aria-label="New card"
+                            >
+                                {isPlaying ? <Loader2 className="h-7 w-7 animate-spin" /> : <Zap className="h-7 w-7" strokeWidth={2.2} />}
+                            </button>
+                        }
+                        right={
+                            <>
+                                <button type="button" disabled={isPlaying} onClick={() => setBet(Math.max(1, Math.floor(balance)))} className="shrink-0 rounded-lg border px-3 py-3 text-xs font-black active:scale-95 disabled:opacity-40" style={{ color: accent, borderColor: `${accent}50`, background: "#0a111a" }}>MAX</button>
+                                <button type="button" disabled={isPlaying} onClick={() => setCurrency(currency === "diamonds" ? "forgesCoins" : "diamonds")} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase ${currency === "diamonds" ? "bg-cyan-500/30 text-cyan-200" : "bg-amber-500/30 text-amber-200"} active:scale-95 disabled:opacity-40`}>{currency === "diamonds" ? "GC" : "FC"}</button>
+                                <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#0a111a] p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
+                            </>
+                        }
+                    />
+
+                    {/* Controls — desktop */}
+                    <div className="hidden border-t border-white/10 p-3 sm:p-5 md:block md:space-y-4 md:pb-5">
                         {/* Bet & Currency */}
                         <div className="flex items-center gap-4">
                             <div className="flex-1">
@@ -247,6 +288,34 @@ export default function CustomScratchModal({
                         </div>
                     </div>
                 </motion.div>
+
+                <AnimatePresence>
+                    {mobileMoreOpen && (
+                        <motion.div key="scratch-mobile-more" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[10002] flex flex-col justify-end md:hidden" onClick={(e) => e.stopPropagation()}>
+                            <button type="button" className="min-h-0 flex-1 bg-black/55" aria-label="Close menu" onClick={() => setMobileMoreOpen(false)} />
+                            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 320 }} className="max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain rounded-t-2xl border border-white/10 border-b-0 bg-[#0b1622] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                                <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
+                                <p className="mb-3 text-center text-sm font-bold text-white">{gameData?.name || "Scratch"}</p>
+                                <div className="mb-4 flex flex-wrap gap-2">
+                                    <button type="button" onClick={handleReset} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#1a2c38] py-3 text-sm font-bold text-slate-200 active:bg-white/10">
+                                        <RotateCcw size={16} /> Reset
+                                    </button>
+                                </div>
+                                {lastWin !== null && (
+                                    <div className="mb-4 rounded-xl border border-white/10 bg-[#0a111a] p-3 text-center">
+                                        <span className="text-[10px] font-bold uppercase text-slate-500">Last result</span>
+                                        <div className={`mt-1 text-lg font-black ${lastWin > 0 ? "text-green-400" : "text-red-400"}`}>{lastWin > 0 ? `+${lastWin}` : `−${bet}`}</div>
+                                    </div>
+                                )}
+                                <div className="mb-4 flex items-center justify-center gap-2 text-xs">
+                                    <span className="font-bold text-slate-500">Session:</span>
+                                    <span className={`font-black ${totalProfit >= 0 ? "text-green-400" : "text-red-400"}`}>{totalProfit >= 0 ? "+" : ""}{totalProfit}</span>
+                                </div>
+                                <button type="button" onClick={() => setMobileMoreOpen(false)} className="w-full rounded-xl border border-white/10 bg-[#1a2c38] py-3 text-sm font-bold text-white active:bg-white/10">Done</button>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </motion.div>
         </AnimatePresence>
     );

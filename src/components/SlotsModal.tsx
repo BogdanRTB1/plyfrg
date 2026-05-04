@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Coins, Repeat } from "lucide-react";
+import { X, Trophy, Coins, Repeat, Minus, Plus, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
 import FavoriteToggle from "./FavoriteToggle";
+import MobileGameHudBar from "./MobileGameHudBar";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
 export const SLOTS_CONFIG = {
@@ -40,6 +41,7 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
     // Session tracking
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
+    const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
     const [gameState, setGameState] = useState<'IDLE' | 'SPINNING' | 'WON' | 'LOST'>('IDLE');
     const [reels, setReels] = useState<number[]>([1, 1, 1]);
@@ -115,6 +117,7 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
 
     useEffect(() => {
         if (!isOpen) {
+            setMobileMoreOpen(false);
             // Save session to history if any bets were made
             if (sessionWagered > 0) {
                 // Record session for consolidated history
@@ -141,15 +144,48 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
     if (typeof document === "undefined") return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black md:bg-black/80 backdrop-blur-none md:backdrop-blur-sm">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 className={`${SLOTS_CONFIG.theme.background} rounded-none md:rounded-2xl w-full max-w-4xl border border-white/10 shadow-2xl overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[600px] md:max-h-[90vh] min-h-0`}
             >
+                <MobileGameHudBar
+                    className={SLOTS_CONFIG.theme.panelBg}
+                    left={
+                        <>
+                            <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
+                            <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
+                            <div className="flex min-w-0 max-w-[5.5rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
+                                <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-4 w-4" /></button>
+                                <span className="min-w-0 truncate px-0.5 text-center text-[11px] font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
+                                <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-4 w-4" /></button>
+                            </div>
+                        </>
+                    }
+                    center={
+                        <button
+                            type="button"
+                            onClick={spinReels}
+                            disabled={balance < betAmount || betAmount <= 0 || gameState === 'SPINNING'}
+                            className={`flex h-[68px] w-[68px] items-center justify-center rounded-full bg-gradient-to-br from-[#00b9f0] to-[#38bdf8] text-[#0f212e] shadow-[0_0_22px_rgba(0,185,240,0.35)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45`}
+                            aria-label="Spin reels"
+                        >
+                            <Repeat className={`h-6 w-6 ${gameState === 'SPINNING' ? 'animate-spin' : ''}`} />
+                        </button>
+                    }
+                    right={
+                        <>
+                            <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(balance)} className={`shrink-0 rounded-lg border border-[#00b9f0]/30 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black ${SLOTS_CONFIG.theme.accent} active:scale-95 disabled:opacity-40`}>MAX</button>
+                            <button type="button" disabled={gameState === 'SPINNING'} onClick={() => setCurrencyType((c) => (c === 'GC' ? 'FC' : 'GC'))} className={`shrink-0 rounded-lg border border-white/10 px-2.5 py-2.5 text-[11px] font-black uppercase ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e]' : 'bg-amber-500 text-black'} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] p-2 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-4 w-4" /></button>
+                        </>
+                    }
+                />
+
                 {/* ADVANCED BETTING MENU */}
-                <div className={`w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain ${SLOTS_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
+                <div className={`hidden md:flex md:w-80 md:max-h-none md:shrink-0 md:overflow-y-auto md:overscroll-contain ${SLOTS_CONFIG.theme.panelBg} flex-col gap-2 border-r border-white/5 p-3 md:p-6 md:gap-4 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
                             <Coins className={SLOTS_CONFIG.theme.accent} />
@@ -226,6 +262,9 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
 
                 {/* GAME AREA */}
                 <div className={`flex-1 relative ${SLOTS_CONFIG.theme.slotBg} p-4 flex flex-col items-center justify-center overflow-hidden`}>
+                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-slate-300 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
+                        <X className="h-5 w-5" />
+                    </button>
 
                     {gameState === 'WON' && (
                         <div className="absolute inset-x-0 top-0 p-6 flex justify-center z-20">
@@ -304,6 +343,51 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
                     </div>
                 </div>
             </motion.div>
+
+            <AnimatePresence>
+                {mobileMoreOpen && (
+                    <motion.div key="slots-mobile-more" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110] flex flex-col justify-end md:hidden">
+                        <button type="button" className="min-h-0 flex-1 bg-black/55" aria-label="Close menu" onClick={() => setMobileMoreOpen(false)} />
+                        <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 320 }} className="max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain rounded-t-2xl border border-white/10 border-b-0 bg-[#121c22] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
+                            <div className="mb-4 flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{SLOTS_CONFIG.names.title}</span>
+                                <FavoriteToggle gameName={SLOTS_CONFIG.names.title} />
+                            </div>
+                            <div className="mb-4 bg-[#0f171c] p-1 rounded-xl flex border border-white/5">
+                                <button type="button" onClick={() => setCurrencyType('GC')} disabled={gameState === 'SPINNING'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'} disabled:opacity-40`}><DiamondIcon className="w-4 h-4" /> Diamonds</button>
+                                <button type="button" onClick={() => setCurrencyType('FC')} disabled={gameState === 'SPINNING'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'} disabled:opacity-40`}><ForgesCoinIcon className="w-4 h-4" /> Coins</button>
+                            </div>
+                            <p className="mb-2 text-[10px] font-bold uppercase text-slate-500">Bet amount</p>
+                            <div className="relative mb-2">
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                    {currencyType === 'GC' ? <DiamondIcon className="w-5 h-5 opacity-70" /> : <ForgesCoinIcon className="w-5 h-5 opacity-70" />}
+                                </div>
+                                <input type="number" value={betAmount} onChange={(e) => handleBetChange(Number(e.target.value))} disabled={gameState === 'SPINNING'} className="w-full bg-[#0a1114] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white font-mono text-lg font-bold outline-none disabled:opacity-40" />
+                            </div>
+                            <div className="mb-4 grid grid-cols-3 gap-2">
+                                <button type="button" onClick={() => handleBetChange(betAmount / 2)} disabled={gameState === 'SPINNING'} className="rounded-lg border border-white/5 bg-[#1a2c38] py-2 text-xs font-bold text-slate-300 disabled:opacity-40">1/2</button>
+                                <button type="button" onClick={() => handleBetChange(betAmount * 2)} disabled={gameState === 'SPINNING'} className="rounded-lg border border-white/5 bg-[#1a2c38] py-2 text-xs font-bold text-slate-300 disabled:opacity-40">2×</button>
+                                <button type="button" onClick={() => handleBetChange(balance)} disabled={gameState === 'SPINNING'} className={`rounded-lg border border-[#00b9f0]/30 bg-[#1a2c38] py-2 text-xs font-black ${SLOTS_CONFIG.theme.accent} disabled:opacity-40`}>MAX</button>
+                            </div>
+                            <p className="mb-2 text-[10px] font-bold uppercase text-slate-500">Payouts</p>
+                            <div className="mb-4 grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+                                {SLOTS_CONFIG.symbols.map(sym => (
+                                    <div key={sym.id} className="flex justify-between items-center bg-[#121c22] rounded px-2 py-2 border border-white/5">
+                                        <span className="text-xl leading-none">{sym.icon}</span>
+                                        <span className="text-[#00b9f0] font-mono text-xs font-bold">{sym.multiplier}x</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mb-4 flex items-center justify-between rounded-xl border border-green-500/20 bg-[#0a1114]/50 p-3">
+                                <span className="text-[10px] font-bold uppercase text-slate-400">Last win</span>
+                                {lastWin ? <span className="flex items-center gap-1 text-sm font-black text-green-400">+{lastWin.amount.toFixed(2)} {lastWin.currency === 'GC' ? <DiamondIcon className="h-3 w-3" /> : <ForgesCoinIcon className="h-3 w-3" />}</span> : <span className="font-mono text-xs text-slate-600">—</span>}
+                            </div>
+                            <button type="button" onClick={() => setMobileMoreOpen(false)} className="w-full rounded-xl border border-white/10 bg-[#1a2c38] py-3 text-sm font-bold text-white active:bg-white/10">Done</button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>,
         document.body
     );

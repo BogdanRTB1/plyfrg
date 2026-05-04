@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Volume2, VolumeX, ArrowUp, ArrowDown, Target } from 'lucide-react';
+import { X, Volume2, VolumeX, ArrowUp, ArrowDown, Target, Minus, Plus, MoreHorizontal, Zap, Trophy } from 'lucide-react';
 import { HiLoConfig, DEFAULT_HILO_CONFIG } from '@/types/hiloConfig';
 import confetti from 'canvas-confetti';
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import FavoriteToggle from "./FavoriteToggle";
+import MobileGameHudBar from "./MobileGameHudBar";
 import { createPortal } from "react-dom";
 
 interface CustomHiloModalProps {
@@ -77,6 +78,7 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
+    const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
     // Initialize Audio Context
     useEffect(() => {
@@ -312,6 +314,7 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
 
     useEffect(() => {
         if (!isOpen) {
+            setMobileMoreOpen(false);
             if (sessionWagered > 0) {
                 window.dispatchEvent(new CustomEvent('game_session_complete', {
                     detail: { 
@@ -337,6 +340,9 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
+
+    const bgColor = config.backgroundColor || "#06090c";
+    const accentColor = config.accentColor || "#22c55e";
 
     const renderCard = (card: Card, faceUp: boolean, isSmall: boolean = false) => {
         const rankStr = getRankStr(card.rank);
@@ -386,21 +392,66 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
     };
 
     return createPortal(
-        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black md:bg-black/80 backdrop-blur-none md:backdrop-blur-sm">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 className="rounded-none md:rounded-2xl w-full max-w-5xl border shadow-2xl overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[650px] md:max-h-[90vh] min-h-0"
                 style={{
-                    backgroundColor: config.backgroundColor || '#06090c',
-                    borderColor: config.accentColor + '30',
-                    boxShadow: `0 0 50px ${config.accentColor}15`,
+                    backgroundColor: bgColor,
+                    borderColor: accentColor + '30',
+                    boxShadow: `0 0 50px ${accentColor}15`,
                 }}
             >
+                <MobileGameHudBar
+                    style={{ backgroundColor: bgColor + "F0" }}
+                    className="border-white/10 backdrop-blur-md"
+                    left={
+                        <>
+                            <button type="button" disabled={isPlaying} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-black/30 px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
+                            <button type="button" disabled={isPlaying} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-black/30 px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
+                            <div className="flex min-w-0 max-w-[6rem] items-center overflow-hidden rounded-lg border border-white/10 bg-black/40">
+                                <button type="button" disabled={isPlaying} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
+                                <span className="min-w-0 truncate px-0.5 text-center text-xs font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
+                                <button type="button" disabled={isPlaying} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
+                            </div>
+                        </>
+                    }
+                    center={
+                        isPlaying && !gameOver ? (
+                            <button type="button" onClick={handleCashout} className="flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full bg-green-500 text-[10px] font-black uppercase leading-tight text-black shadow-[0_0_20px_rgba(34,197,94,0.45)] active:scale-95">
+                                <Trophy className="mb-0.5 h-5 w-5" />
+                                <span className="text-[10px]">{(betAmount * multiplier).toFixed(0)}</span>
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={startGame}
+                                disabled={balance < betAmount || betAmount <= 0}
+                                className="flex h-[68px] w-[68px] items-center justify-center rounded-full text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+                                style={{
+                                    background: `linear-gradient(135deg, ${accentColor}, ${accentColor}CC)`,
+                                    boxShadow: `0 0 22px ${accentColor}55`,
+                                }}
+                                aria-label={gameOver ? "Play again" : "Start game"}
+                            >
+                                <Zap className="h-7 w-7" strokeWidth={2.2} />
+                            </button>
+                        )
+                    }
+                    right={
+                        <>
+                            <button type="button" disabled={isPlaying} onClick={() => handleBetChange(balance)} className="shrink-0 rounded-lg border bg-black/30 px-3 py-3 text-xs font-black active:scale-95 disabled:opacity-40" style={{ color: accentColor, borderColor: accentColor + "50" }}>MAX</button>
+                            <button type="button" disabled={isPlaying} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-black/30 p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
+                        </>
+                    }
+                />
+
                 {/* ADVANCED BETTING MENU */}
-                <div className="w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain p-6 flex flex-col gap-4 border-r border-white/5 z-20"
-                     style={{ backgroundColor: (config.backgroundColor || '#06090c') + 'F0' }}>
+                <div className="z-20 hidden md:flex md:w-80 md:max-h-none md:shrink-0 md:overflow-y-auto md:overscroll-contain flex-col gap-2 border-r border-white/5 p-3 md:p-6 md:gap-4"
+                     style={{ backgroundColor: bgColor + 'F0' }}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex flex-col gap-1 text-white">
                             <h2 className="text-xl font-black uppercase tracking-widest leading-none truncate w-[200px]">
@@ -480,7 +531,7 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
                 </div>
 
                 {/* GAME AREA */}
-                <div className="flex-1 relative flex flex-col items-center overflow-hidden" style={{ backgroundColor: config.backgroundColor || '#06090c' }}>
+                <div className="relative flex flex-1 flex-col items-center overflow-hidden" style={{ backgroundColor: bgColor }}>
                     
                     {/* Controls overlay */}
                     <div className="absolute top-6 right-6 flex items-center gap-3 z-50">
@@ -571,6 +622,36 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
                     </div>
                 </div>
             </motion.div>
+
+            <AnimatePresence>
+                {mobileMoreOpen && (
+                    <motion.div key="custom-hilo-mobile-more" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110] flex flex-col justify-end md:hidden">
+                        <button type="button" className="min-h-0 flex-1 bg-black/55" aria-label="Close menu" onClick={() => setMobileMoreOpen(false)} />
+                        <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 320 }} className="max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain rounded-t-2xl border border-white/10 border-b-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl" style={{ backgroundColor: bgColor + "F0" }} onClick={(e) => e.stopPropagation()}>
+                            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
+                            <div className="mb-4 flex items-center justify-between gap-2">
+                                <span className="truncate text-xs font-bold uppercase tracking-wider text-slate-500">{config.theme.gameName}</span>
+                                <FavoriteToggle gameName={gameName || "Hi-Lo"} />
+                            </div>
+                            {isPlaying && !gameOver && (
+                                <div className="mb-4 grid grid-cols-2 gap-2">
+                                    <button type="button" onClick={() => { handleGuess("higher"); setMobileMoreOpen(false); }} className="flex flex-col items-center gap-1 rounded-xl border border-green-600/40 bg-[#1a2332] py-3 text-sm font-black uppercase text-white active:bg-white/10">
+                                        <ArrowUp className="text-green-500" size={22} /> Higher
+                                    </button>
+                                    <button type="button" onClick={() => { handleGuess("lower"); setMobileMoreOpen(false); }} className="flex flex-col items-center gap-1 rounded-xl border border-rose-600/40 bg-[#1a2332] py-3 text-sm font-black uppercase text-white active:bg-white/10">
+                                        <ArrowDown className="text-rose-500" size={22} /> Lower
+                                    </button>
+                                </div>
+                            )}
+                            <div className="mb-4 flex items-center justify-between rounded-xl border border-white/10 bg-black/30 p-3">
+                                <span className="text-[10px] font-bold uppercase text-slate-400">Last win</span>
+                                {lastWin ? <span className="flex items-center gap-1 text-sm font-black text-green-400">+{lastWin.amount.toFixed(2)} {lastWin.currency === "GC" ? <DiamondIcon className="h-3 w-3" /> : <ForgesCoinIcon className="h-3 w-3" />}</span> : <span className="font-mono text-xs text-slate-600">—</span>}
+                            </div>
+                            <button type="button" onClick={() => setMobileMoreOpen(false)} className="w-full rounded-xl border border-white/10 bg-black/30 py-3 text-sm font-bold text-white active:bg-white/10">Done</button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>,
         document.body
     );

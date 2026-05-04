@@ -37,11 +37,11 @@ export default function GameCard({ name, image, rtp = "99.0%", provider = "PlayF
                     RTP {rtp}
                 </div>
 
-                {/* Touch: always show Play; desktop: reveal on hover */}
-                <div className="absolute inset-x-0 -bottom-1 p-3 pb-4 sm:p-4 sm:pb-5 bg-gradient-to-t from-[#0f212e] via-[#0f212e]/90 to-transparent flex flex-col justify-end h-3/4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none">
+                {/* Desktop: reveal Play on hover. Mobile: whole card is clickable (parent handles tap) — no overlay button */}
+                <div className="pointer-events-none absolute inset-x-0 -bottom-1 z-20 hidden h-3/4 flex-col justify-end bg-gradient-to-t from-[#0f212e] via-[#0f212e]/90 to-transparent p-3 pb-4 opacity-0 transition-opacity duration-300 md:flex md:opacity-0 md:group-hover:opacity-100 sm:p-4 sm:pb-5">
                     <button
                         type="button"
-                        className="w-full py-2.5 sm:py-2 bg-[#00b9f0] text-[#0f212e] text-xs font-bold rounded-lg shadow-lg translate-y-0 md:translate-y-4 md:group-hover:translate-y-0 transition-transform duration-300 hover:bg-[#38bdf8] active:scale-[0.98] pointer-events-auto touch-manipulation min-h-[44px] sm:min-h-0"
+                        className="pointer-events-auto min-h-0 w-full touch-manipulation rounded-lg bg-[#00b9f0] py-2 text-xs font-bold text-[#0f212e] shadow-lg translate-y-4 transition-transform duration-300 hover:bg-[#38bdf8] active:scale-[0.98] sm:py-2 md:group-hover:translate-y-0"
                     >
                         Play Now
                     </button>

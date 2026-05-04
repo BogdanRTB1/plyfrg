@@ -105,7 +105,7 @@ export default function FootballModal({ isOpen, onClose, diamonds, setDiamonds, 
     if (typeof document === "undefined") return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black md:bg-black/80 backdrop-blur-none md:backdrop-blur-sm">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -113,7 +113,7 @@ export default function FootballModal({ isOpen, onClose, diamonds, setDiamonds, 
                 className={`${FOOTBALL_CONFIG.theme.background} rounded-none md:rounded-2xl w-full max-w-5xl border border-white/10 shadow-2xl overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[700px] md:max-h-[90vh] min-h-0`}
             >
                 {/* ADVANCED BETTING MENU */}
-                <div className={`w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain ${FOOTBALL_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-black/50 z-20`}>
+                <div className={`w-full md:w-80 max-h-[min(30vh,240px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain ${FOOTBALL_CONFIG.theme.panelBg} p-3 flex flex-col gap-2 md:p-6 md:gap-4 border-r border-black/50 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
                             <Activity className={FOOTBALL_CONFIG.theme.accent} />

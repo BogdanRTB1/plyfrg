@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { X, TrendingUp, Zap, Trophy, Goal } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, TrendingUp, Zap, Trophy, Goal, Minus, Plus, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
+import MobileGameHudBar from "./MobileGameHudBar";
 import confetti from "canvas-confetti";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
@@ -38,6 +39,7 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
     // Session tracking
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
+    const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'CRASHED'>('IDLE');
     const [cashedOutAt, setCashedOutAt] = useState<number | null>(null);
@@ -236,6 +238,7 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
 
     useEffect(() => {
         if (!isOpen) {
+            setMobileMoreOpen(false);
             // Record session for consolidated history
             if (sessionWagered > 0) {
                 window.dispatchEvent(new CustomEvent('game_session_complete', {
@@ -273,15 +276,119 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
     if (typeof document === "undefined") return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black md:bg-black/80 backdrop-blur-none md:backdrop-blur-sm">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 className={`${CRASH_CONFIG.theme.background} rounded-none md:rounded-2xl w-full max-w-5xl border border-white/10 shadow-2xl overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[700px] md:max-h-[90vh] min-h-0`}
             >
-                {/* ADVANCED BETTING MENU */}
-                <div className={`w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain ${CRASH_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-black/50 z-20`}>
+                {/* Mobile: thin HUD — side actions + center play */}
+                <MobileGameHudBar
+                    className={CRASH_CONFIG.theme.panelBg}
+                    left={
+                        <>
+                            <button
+                                type="button"
+                                disabled={gameState === "PLAYING"}
+                                onClick={() => handleBetChange(betAmount / 2)}
+                                className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40"
+                            >
+                                ½
+                            </button>
+                            <button
+                                type="button"
+                                disabled={gameState === "PLAYING"}
+                                onClick={() => handleBetChange(betAmount * 2)}
+                                className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40"
+                            >
+                                2×
+                            </button>
+                            <div className="flex min-w-0 max-w-[5.5rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
+                                <button
+                                    type="button"
+                                    disabled={gameState === "PLAYING"}
+                                    onClick={() => handleBetChange(Math.max(0, betAmount - 5))}
+                                    className="shrink-0 p-2 text-slate-400 active:bg-white/10 disabled:opacity-40"
+                                    aria-label="Decrease bet"
+                                >
+                                    <Minus className="h-4 w-4" />
+                                </button>
+                                <span className="min-w-0 truncate px-0.5 text-center text-[11px] font-mono font-bold text-white">
+                                    {Number(betAmount).toFixed(0)}
+                                </span>
+                                <button
+                                    type="button"
+                                    disabled={gameState === "PLAYING"}
+                                    onClick={() => handleBetChange(Math.min(balance, betAmount + 5))}
+                                    className="shrink-0 p-2 text-slate-400 active:bg-white/10 disabled:opacity-40"
+                                    aria-label="Increase bet"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                </button>
+                            </div>
+                        </>
+                    }
+                    center={
+                        gameState === "PLAYING" && cashedOutAt === null ? (
+                            <button
+                                type="button"
+                                onClick={() => cashOut()}
+                                className="flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full bg-green-500 text-[10px] font-black uppercase leading-tight text-[#0f212e] shadow-[0_0_20px_rgba(34,197,94,0.45)] active:scale-95"
+                            >
+                                <span className="text-[9px]">Out</span>
+                                <span className="text-xs font-black">{(betAmount * multiplier).toFixed(0)}</span>
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={startGame}
+                                disabled={
+                                    balance < betAmount ||
+                                    betAmount <= 0 ||
+                                    (gameState === "PLAYING" && cashedOutAt !== null)
+                                }
+                                className={`flex h-[68px] w-[68px] items-center justify-center rounded-full ${CRASH_CONFIG.theme.buttonAccent} text-[#0f212e] shadow-[0_0_22px_rgba(0,185,240,0.35)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45`}
+                                aria-label={gameState === "PLAYING" && cashedOutAt !== null ? "Round finished" : "Place bet"}
+                            >
+                                <Zap className="h-6 w-6" strokeWidth={2.5} />
+                            </button>
+                        )
+                    }
+                    right={
+                        <>
+                            <button
+                                type="button"
+                                disabled={gameState === "PLAYING"}
+                                onClick={() => handleBetChange(balance)}
+                                className={`shrink-0 rounded-lg border border-[#00b9f0]/30 bg-[#1a2c38] px-2 py-2 text-[10px] font-black ${CRASH_CONFIG.theme.accent} active:scale-95 disabled:opacity-40`}
+                            >
+                                MAX
+                            </button>
+                            <button
+                                type="button"
+                                disabled={gameState === "PLAYING"}
+                                onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))}
+                                className={`shrink-0 rounded-lg border border-white/10 px-2 py-2 text-[10px] font-black uppercase ${
+                                    currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"
+                                } active:scale-95 disabled:opacity-40`}
+                            >
+                                {currencyType}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMobileMoreOpen(true)}
+                                className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] p-2 text-slate-300 active:bg-white/10"
+                                aria-label="More options"
+                            >
+                                <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                        </>
+                    }
+                />
+
+                {/* ADVANCED BETTING MENU — desktop */}
+                <div className={`hidden md:flex md:w-80 md:max-h-none md:shrink-0 md:overflow-y-auto md:overscroll-contain ${CRASH_CONFIG.theme.panelBg} flex-col gap-2 border-r border-black/50 p-3 md:p-6 md:gap-4 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
                             <TrendingUp className={CRASH_CONFIG.theme.accent} />
@@ -377,7 +484,15 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
                 </div>
 
                 {/* GAME AREA */}
-                <div className={`flex-1 relative ${CRASH_CONFIG.theme.graphBg} p-2 sm:p-6 flex flex-col justify-center overflow-hidden shadow-inner`}>
+                <div className={`flex-1 relative min-h-[48vh] md:min-h-0 ${CRASH_CONFIG.theme.graphBg} p-1 sm:p-6 flex flex-col justify-center overflow-hidden shadow-inner`}>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-slate-300 backdrop-blur-sm md:hidden active:bg-white/10"
+                        aria-label="Close game"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
 
                     <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none"></div>
 
@@ -416,6 +531,77 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
                     />
                 </div>
             </motion.div>
+
+            <AnimatePresence>
+                {mobileMoreOpen && (
+                    <motion.div
+                        key="crash-mobile-more"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[110] flex flex-col justify-end md:hidden"
+                    >
+                        <button
+                            type="button"
+                            className="min-h-0 flex-1 bg-black/55"
+                            aria-label="Close menu"
+                            onClick={() => setMobileMoreOpen(false)}
+                        />
+                        <motion.div
+                            initial={{ y: "100%" }}
+                            animate={{ y: 0 }}
+                            exit={{ y: "100%" }}
+                            transition={{ type: "spring", damping: 28, stiffness: 320 }}
+                            className="max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain rounded-t-2xl border border-white/10 border-b-0 bg-[#121c22] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
+                            <div className="mb-4 flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Crash</span>
+                                <FavoriteToggle gameName={CRASH_CONFIG.names.title} />
+                            </div>
+                            <div className="mb-4 space-y-2">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Auto cashout</label>
+                                <div className="relative">
+                                    <Goal className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="1.01"
+                                        value={autoCashout}
+                                        onChange={(e) => setAutoCashout(e.target.value)}
+                                        disabled={gameState === "PLAYING"}
+                                        placeholder="Off"
+                                        className="w-full rounded-xl border border-white/10 bg-[#0a1114] py-3 pl-10 pr-8 font-mono text-base font-bold text-white outline-none focus:border-[#00b9f0] disabled:opacity-50"
+                                    />
+                                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-bold text-slate-500">×</span>
+                                </div>
+                            </div>
+                            <div className="mb-4 flex items-center justify-between rounded-xl border border-green-500/20 bg-[#0a1114]/50 p-3">
+                                <div className="flex items-center gap-2">
+                                    <Trophy className="h-4 w-4 text-green-500" />
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Last win</span>
+                                </div>
+                                {lastWin ? (
+                                    <span className="flex items-center gap-1 text-sm font-black text-green-400">
+                                        +{lastWin.amount.toFixed(2)}{" "}
+                                        {lastWin.currency === "GC" ? <DiamondIcon className="h-3 w-3" /> : <ForgesCoinIcon className="h-3 w-3" />}
+                                    </span>
+                                ) : (
+                                    <span className="font-mono text-xs text-slate-600">—</span>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setMobileMoreOpen(false)}
+                                className="w-full rounded-xl border border-white/10 bg-[#1a2c38] py-3 text-sm font-bold text-white active:bg-white/10"
+                            >
+                                Done
+                            </button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>,
         document.body
     );

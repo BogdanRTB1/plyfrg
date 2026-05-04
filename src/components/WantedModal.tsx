@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Skull, Zap, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Trophy, Skull, Zap, ChevronLeft, ChevronRight, Minus, Plus, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
+import MobileGameHudBar from "./MobileGameHudBar";
 import confetti from "canvas-confetti";
 
 export const WANTED_CONFIG = {
@@ -46,6 +47,7 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
+    const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
     const [gameState, setGameState] = useState<GameState>("IDLE");
     const [countdown, setCountdown] = useState(3);
@@ -262,6 +264,7 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
     useEffect(() => {
         if (!isOpen) {
+            setMobileMoreOpen(false);
             // Save session to history if any bets were made
             if (sessionWagered > 0) {
                 window.dispatchEvent(new CustomEvent('game_session_complete', {
@@ -328,14 +331,48 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
     const survivalSeconds = (elapsedMs / 1000).toFixed(1);
 
     return createPortal(
-        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black md:bg-black/80 backdrop-blur-none md:backdrop-blur-sm">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 className={`${WANTED_CONFIG.theme.background} rounded-none md:rounded-2xl w-full max-w-5xl border border-blue-500/20 shadow-[0_0_50px_rgba(59,130,246,0.15)] overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[700px] md:max-h-[90vh] min-h-0`}
             >
-                <div className={`w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain ${WANTED_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
+                <MobileGameHudBar
+                    className={WANTED_CONFIG.theme.panelBg}
+                    left={
+                        <>
+                            <button type="button" disabled={gameState === "PLAYING" || gameState === "COUNTDOWN"} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-blue-500/20 bg-[#1a1f2e] px-3 py-3 text-xs font-black text-blue-200 active:scale-95 disabled:opacity-40">½</button>
+                            <button type="button" disabled={gameState === "PLAYING" || gameState === "COUNTDOWN"} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-blue-500/20 bg-[#1a1f2e] px-3 py-3 text-xs font-black text-blue-200 active:scale-95 disabled:opacity-40">2×</button>
+                            <div className="flex min-w-0 max-w-[6rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#050505]">
+                                <button type="button" disabled={gameState === "PLAYING" || gameState === "COUNTDOWN"} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
+                                <span className="min-w-0 truncate px-0.5 text-center text-xs font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
+                                <button type="button" disabled={gameState === "PLAYING" || gameState === "COUNTDOWN"} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
+                            </div>
+                        </>
+                    }
+                    center={
+                        gameState === "PLAYING" ? (
+                            <button type="button" onClick={cashOut} className="flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full bg-green-500 text-[10px] font-black uppercase leading-tight text-black shadow-[0_0_20px_rgba(34,197,94,0.45)] active:scale-95">
+                                <Trophy className="mb-0.5 h-5 w-5" />
+                                <span className="text-[10px]">{cashoutPreview.toFixed(0)}</span>
+                            </button>
+                        ) : (
+                            <button type="button" onClick={startGame} disabled={!canStart || gameState === "COUNTDOWN"} className={`flex h-[68px] w-[68px] items-center justify-center rounded-full ${WANTED_CONFIG.theme.buttonAccent} text-white shadow-[0_0_22px_rgba(59,130,246,0.35)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45`} aria-label="Start run">
+                                <Zap className="h-7 w-7" strokeWidth={2.2} />
+                            </button>
+                        )
+                    }
+                    right={
+                        <>
+                            <button type="button" disabled={gameState === "PLAYING" || gameState === "COUNTDOWN"} onClick={() => handleBetChange(balance)} className={`shrink-0 rounded-lg border border-blue-500/30 bg-[#1a1f2e] px-3 py-3 text-xs font-black ${WANTED_CONFIG.theme.accent} active:scale-95 disabled:opacity-40`}>MAX</button>
+                            <button type="button" disabled={gameState === "PLAYING" || gameState === "COUNTDOWN"} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a1f2e] p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
+                        </>
+                    }
+                />
+
+                <div className={`z-20 hidden md:flex md:w-80 md:max-h-none md:shrink-0 md:overflow-y-auto md:overscroll-contain ${WANTED_CONFIG.theme.panelBg} flex-col gap-2 border-r border-white/5 p-3 md:p-6 md:gap-4`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
                             <Skull className={WANTED_CONFIG.theme.accent} />
@@ -409,7 +446,10 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
                     </div>
                 </div>
 
-                <div className={`flex-1 relative ${WANTED_CONFIG.theme.gameBg} overflow-hidden shadow-inner flex flex-col`}>
+                <div className={`relative flex flex-1 flex-col overflow-hidden ${WANTED_CONFIG.theme.gameBg} shadow-inner`}>
+                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-[70] flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-slate-200 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
+                        <X className="h-5 w-5" />
+                    </button>
                     <div className="absolute inset-0 bg-gradient-to-b from-[#0b1325] via-[#060b16] to-[#030406]" />
                     <div className={`absolute inset-0 transition-opacity duration-200 ${nearMissFlash ? "opacity-100 bg-yellow-200/5" : "opacity-0"}`} />
 
@@ -533,6 +573,27 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
                     </AnimatePresence>
                 </div>
             </motion.div>
+
+            <AnimatePresence>
+                {mobileMoreOpen && (
+                    <motion.div key="wanted-mobile-more" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110] flex flex-col justify-end md:hidden">
+                        <button type="button" className="min-h-0 flex-1 bg-black/55" aria-label="Close menu" onClick={() => setMobileMoreOpen(false)} />
+                        <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 320 }} className={`max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain rounded-t-2xl border border-white/10 border-b-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl ${WANTED_CONFIG.theme.panelBg}`} onClick={(e) => e.stopPropagation()}>
+                            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
+                            <div className="mb-4 flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{WANTED_CONFIG.names.title}</span>
+                                <FavoriteToggle gameName={WANTED_CONFIG.names.title} />
+                            </div>
+                            <p className="mb-3 text-[11px] leading-relaxed text-slate-500">Controls: A/D sau săgeți stânga/dreapta, S centru, Space cashout.</p>
+                            <div className="mb-4 flex items-center justify-between rounded-xl border border-green-500/20 bg-[#050505]/50 p-3">
+                                <span className="text-[10px] font-bold uppercase text-slate-400">Last win</span>
+                                {lastWin ? <span className="flex items-center gap-1 text-sm font-black text-green-400">+{lastWin.amount.toFixed(2)} {lastWin.currency === "GC" ? <DiamondIcon className="h-3 w-3" /> : <ForgesCoinIcon className="h-3 w-3" />}</span> : <span className="font-mono text-xs text-slate-600">—</span>}
+                            </div>
+                            <button type="button" onClick={() => setMobileMoreOpen(false)} className="w-full rounded-xl border border-white/10 bg-[#1a1f2e] py-3 text-sm font-bold text-white active:bg-white/10">Done</button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>,
         document.body
     );

@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Footprints, Skull } from "lucide-react";
+import { X, Trophy, Footprints, Skull, Minus, Plus, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
+import MobileGameHudBar from "./MobileGameHudBar";
 import confetti from "canvas-confetti";
 
 export const BRIDGE_CONFIG = {
@@ -35,6 +36,7 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'CRACKED'>('IDLE');
     const [currentStep, setCurrentStep] = useState(0);
     const [path, setPath] = useState<('left' | 'right')[]>([]);
+    const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
     const startGame = () => {
         if (balance < betAmount || betAmount <= 0) return;
@@ -113,19 +115,61 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
         setBetAmount(Number(newAmount.toFixed(2)));
     };
 
+    useEffect(() => {
+        if (!isOpen) setMobileMoreOpen(false);
+    }, [isOpen]);
+
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black md:bg-black/80 backdrop-blur-none md:backdrop-blur-sm">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 className={`${BRIDGE_CONFIG.theme.background} rounded-none md:rounded-2xl w-full max-w-5xl border border-cyan-500/20 shadow-2xl overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[700px] md:max-h-[90vh] min-h-0`}
             >
+                <MobileGameHudBar
+                    className={BRIDGE_CONFIG.theme.panelBg}
+                    left={
+                        <>
+                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-cyan-500/20 bg-[#100033] px-3 py-3 text-xs font-black text-cyan-200 active:scale-95 disabled:opacity-40">½</button>
+                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-cyan-500/20 bg-[#100033] px-3 py-3 text-xs font-black text-cyan-200 active:scale-95 disabled:opacity-40">2×</button>
+                            <div className="flex min-w-0 max-w-[6rem] items-center overflow-hidden rounded-lg border border-cyan-500/20 bg-[#050014]/80">
+                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2.5 text-cyan-300/80 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
+                                <span className="min-w-0 truncate px-0.5 text-center text-xs font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
+                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2.5 text-cyan-300/80 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
+                            </div>
+                        </>
+                    }
+                    center={
+                        gameState === "PLAYING" && currentStep > 0 ? (
+                            <button type="button" onClick={() => cashOut()} className="flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full bg-green-500 text-[10px] font-black uppercase leading-tight text-[#050014] shadow-[0_0_20px_rgba(34,197,94,0.45)] active:scale-95">
+                                <Trophy className="mb-0.5 h-5 w-5" />
+                                <span className="text-[10px]">{(betAmount * BRIDGE_CONFIG.multipliers[currentStep - 1]).toFixed(0)}</span>
+                            </button>
+                        ) : gameState === "IDLE" ? (
+                            <button type="button" onClick={startGame} disabled={balance < betAmount || betAmount <= 0} className="flex h-[68px] w-[68px] items-center justify-center rounded-full bg-cyan-600 text-[#050014] shadow-[0_0_22px_rgba(34,211,238,0.35)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45" aria-label="Bet">
+                                <Footprints className="h-7 w-7" strokeWidth={2.2} />
+                            </button>
+                        ) : (
+                            <button type="button" disabled className="flex h-[68px] w-[68px] cursor-not-allowed items-center justify-center rounded-full border border-cyan-500/30 bg-[#100033] text-cyan-500/50 opacity-50" aria-label="Choose glass">
+                                <Footprints className="h-7 w-7" strokeWidth={2.2} />
+                            </button>
+                        )
+                    }
+                    right={
+                        <>
+                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(balance)} className={`shrink-0 rounded-lg border border-cyan-500/30 bg-[#100033] px-3 py-3 text-xs font-black ${BRIDGE_CONFIG.theme.accent} active:scale-95 disabled:opacity-40`}>MAX</button>
+                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-cyan-500/20 px-3 py-3 text-xs font-black uppercase ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-cyan-500/20 bg-[#100033] p-2.5 text-cyan-200 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
+                        </>
+                    }
+                />
+
                 {/* ADVANCED BETTING MENU */}
-                <div className={`w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain ${BRIDGE_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-cyan-500/10 z-20`}>
+                <div className={`hidden md:flex md:w-80 md:max-h-none md:shrink-0 md:overflow-y-auto md:overscroll-contain ${BRIDGE_CONFIG.theme.panelBg} flex-col gap-2 border-r border-cyan-500/10 p-3 md:p-6 md:gap-4 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
                             <Footprints className={BRIDGE_CONFIG.theme.accent} />
@@ -197,9 +241,12 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
                 </div>
 
                 {/* GAME AREA */}
-                <div className={`flex-1 relative ${BRIDGE_CONFIG.theme.gameBg} bg-cover bg-center p-2 sm:p-6 flex flex-col justify-end items-center overflow-hidden shadow-inner perspective-[1000px]`}>
+                <div className={`relative flex flex-1 flex-col items-center justify-end overflow-hidden ${BRIDGE_CONFIG.theme.gameBg} bg-cover bg-center p-2 shadow-inner perspective-[1000px] sm:p-6`}>
+                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-[45] flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-500/20 bg-black/50 text-cyan-100 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
+                        <X className="h-5 w-5" />
+                    </button>
 
-                    <div className="absolute inset-0 bg-black/60 z-0 backdrop-blur-[1px]"></div>
+                    <div className="absolute inset-0 z-0 bg-black/60 backdrop-blur-[1px]"></div>
 
                     {/* Result overlay */}
                     <AnimatePresence>
@@ -301,6 +348,26 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
 
                 </div>
             </motion.div>
+
+            <AnimatePresence>
+                {mobileMoreOpen && (
+                    <motion.div key="bridge-mobile-more" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110] flex flex-col justify-end md:hidden">
+                        <button type="button" className="min-h-0 flex-1 bg-black/55" aria-label="Close menu" onClick={() => setMobileMoreOpen(false)} />
+                        <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 320 }} className={`max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain rounded-t-2xl border border-cyan-500/20 border-b-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl ${BRIDGE_CONFIG.theme.panelBg}`} onClick={(e) => e.stopPropagation()}>
+                            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
+                            <div className="mb-4 flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{BRIDGE_CONFIG.names.title}</span>
+                                <FavoriteToggle gameName={BRIDGE_CONFIG.names.title} />
+                            </div>
+                            <div className="mb-4 flex items-center justify-between rounded-xl border border-green-500/20 bg-[#050014]/80 p-3">
+                                <span className="text-[10px] font-bold uppercase text-slate-400">Last win</span>
+                                {lastWin ? <span className="flex items-center gap-1 text-sm font-black text-green-400">+{lastWin.amount.toFixed(2)} {lastWin.currency === "GC" ? <DiamondIcon className="h-3 w-3" /> : <ForgesCoinIcon className="h-3 w-3" />}</span> : <span className="font-mono text-xs text-slate-600">—</span>}
+                            </div>
+                            <button type="button" onClick={() => setMobileMoreOpen(false)} className="w-full rounded-xl border border-cyan-500/20 bg-[#100033] py-3 text-sm font-bold text-white active:bg-white/10">Done</button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>,
         document.body
     );
