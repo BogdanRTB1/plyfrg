@@ -347,7 +347,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                 style={{ borderColor: `${accentColor}40` }}
             >
                 {/* BETTING PANEL (LEFT) */}
-                <div className="w-full md:w-80 max-h-[min(42vh,360px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain bg-[#121c22] p-6 flex flex-col gap-4 border-r border-white/5 z-20">
+                <div className="w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain bg-[#121c22] p-6 flex flex-col gap-4 border-r border-white/5 z-20">
                     {/* Header */}
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">

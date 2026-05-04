@@ -281,7 +281,7 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
                 className={`${CRASH_CONFIG.theme.background} rounded-none md:rounded-2xl w-full max-w-5xl border border-white/10 shadow-2xl overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[700px] md:max-h-[90vh] min-h-0`}
             >
                 {/* ADVANCED BETTING MENU */}
-                <div className={`w-full md:w-80 max-h-[min(42vh,360px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain ${CRASH_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-black/50 z-20`}>
+                <div className={`w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain ${CRASH_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-black/50 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
                             <TrendingUp className={CRASH_CONFIG.theme.accent} />

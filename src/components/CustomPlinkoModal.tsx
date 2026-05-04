@@ -189,7 +189,7 @@ export default function CustomPlinkoModal({ isOpen, onClose, gameData, diamonds,
                 className={`bg-[#0f212e] rounded-none md:rounded-2xl w-full max-w-5xl border border-blue-500/30 shadow-[0_0_50px_rgba(59,130,246,0.15)] overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[700px] md:max-h-[90vh] min-h-0`}
             >
                 {/* ADVANCED BETTING MENU */}
-                <div className={`w-full md:w-80 max-h-[min(42vh,360px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain bg-[#121c22] p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
+                <div className={`w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain bg-[#121c22] p-6 flex flex-col gap-4 border-r border-white/5 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
                             <Play className="text-purple-500" />

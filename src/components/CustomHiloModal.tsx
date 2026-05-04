@@ -399,7 +399,7 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
                 }}
             >
                 {/* ADVANCED BETTING MENU */}
-                <div className="w-full md:w-80 max-h-[min(42vh,360px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain p-6 flex flex-col gap-4 border-r border-white/5 z-20"
+                <div className="w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain p-6 flex flex-col gap-4 border-r border-white/5 z-20"
                      style={{ backgroundColor: (config.backgroundColor || '#06090c') + 'F0' }}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex flex-col gap-1 text-white">

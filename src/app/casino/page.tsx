@@ -1,9 +1,9 @@
 "use client";
 
-import { Dices, Search, Filter, Sparkles, TrendingUp } from "lucide-react";
+import { Dices, Search, Filter, Sparkles } from "lucide-react";
 import GameCard from "@/components/GameCard";
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 export default function CasinoPage() {
     const allGames = [
@@ -25,10 +25,12 @@ export default function CasinoPage() {
         { name: "Heist", image: null, rtp: "98.1%", provider: "InfluenBet" },
     ];
 
-    const categories = ["All Games", "Trending", "New Releases", "Table Games", "Instant Win"];
+    const categories = ["All Games", "Trending", "New Releases", "Table Games", "Instant Win"] as const;
+    type Category = (typeof categories)[number];
 
     // AI / Custom game states
     const [customGames, setCustomGames] = useState<any[]>([]);
+    const [activeCategory, setActiveCategory] = useState<Category>("All Games");
 
     // Balance & User state for potential other uses (if any left, though mostly removed)
     const [diamonds, setDiamonds] = useState(0);
@@ -71,8 +73,26 @@ export default function CasinoPage() {
         window.dispatchEvent(new CustomEvent('open_game', { detail: game }));
     };
 
+    const filteredGames = useMemo(() => {
+        const g = allGames;
+        if (activeCategory === "All Games") return g;
+        if (activeCategory === "Trending") {
+            const hot = g.filter((x: { badge?: string }) => x.badge === "Hot");
+            return hot.length ? hot : g.slice(0, 6);
+        }
+        if (activeCategory === "New Releases") {
+            const neu = g.filter((x: { badge?: string }) => x.badge === "New");
+            return neu.length ? neu : g.filter((x: { badge?: string }) => x.badge).slice(-4);
+        }
+        if (activeCategory === "Table Games") return g.filter((x: { name: string }) => ["Blackjack", "Roulette"].includes(x.name));
+        if (activeCategory === "Instant Win") {
+            return g.filter((x: { name: string }) => !["Blackjack", "Roulette"].includes(x.name));
+        }
+        return g;
+    }, [activeCategory]);
+
     return (
-        <div className="flex-1 h-full overflow-y-auto bg-[#050505] relative custom-scrollbar p-6 md:p-10 pb-32 z-0">
+        <div className="flex-1 h-full overflow-y-auto bg-[#050505] relative custom-scrollbar p-4 sm:p-6 md:p-10 pb-32 z-0">
             {/* Ambient Background Glow */}
             <div className="absolute top-[10%] left-[20%] w-[40%] h-[300px] bg-sky-600/10 blur-[120px] rounded-full pointer-events-none z-[-1]" />
             <div className="absolute top-[30%] right-[10%] w-[30%] h-[200px] bg-[#00b9f0]/10 blur-[100px] rounded-full pointer-events-none z-[-1]" />
@@ -134,24 +154,40 @@ export default function CasinoPage() {
                 </motion.div>
             </div>
 
-            {/* Categories */}
+            {/* Categories: dropdown on mobile (easy thumb use), chips on md+ */}
             <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="flex items-center gap-2 overflow-x-auto pb-4 mb-8 custom-scrollbar scroll-smooth"
+                className="mb-8"
             >
-                {categories.map((category, idx) => (
-                    <button
-                        key={idx}
-                        className={`whitespace-nowrap px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${idx === 0
-                            ? "bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.3)]"
-                            : "bg-[#0f212e] border border-white/5 hover:bg-white/10 text-slate-300"
+                <label className="md:hidden block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Category</label>
+                <select
+                    value={activeCategory}
+                    onChange={(e) => setActiveCategory(e.target.value as Category)}
+                    className="md:hidden w-full bg-[#0f212e] border border-white/10 rounded-xl py-3.5 px-4 text-sm font-bold text-white focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] mb-3 min-h-[48px] touch-manipulation"
+                    aria-label="Game category"
+                >
+                    {categories.map((category) => (
+                        <option key={category} value={category}>{category}</option>
+                    ))}
+                </select>
+                <div className="hidden md:flex flex-wrap items-center gap-2">
+                    {categories.map((category) => (
+                        <button
+                            key={category}
+                            type="button"
+                            onClick={() => setActiveCategory(category)}
+                            className={`whitespace-nowrap px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                                activeCategory === category
+                                    ? "bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.3)]"
+                                    : "bg-[#0f212e] border border-white/5 hover:bg-white/10 text-slate-300"
                             }`}
-                    >
-                        {category}
-                    </button>
-                ))}
+                        >
+                            {category}
+                        </button>
+                    ))}
+                </div>
             </motion.div>
 
             {/* Games Grid */}
@@ -159,9 +195,9 @@ export default function CasinoPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5, duration: 0.5 }}
-                className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6"
+                className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6"
             >
-                {allGames.map((game, index) => (
+                {filteredGames.map((game, index) => (
                     <motion.div
                         key={index}
                         initial={{ opacity: 0, y: 20 }}

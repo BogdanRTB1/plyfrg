@@ -125,7 +125,7 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
                 className={`${BRIDGE_CONFIG.theme.background} rounded-none md:rounded-2xl w-full max-w-5xl border border-cyan-500/20 shadow-2xl overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[700px] md:max-h-[90vh] min-h-0`}
             >
                 {/* ADVANCED BETTING MENU */}
-                <div className={`w-full md:w-80 max-h-[min(42vh,360px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain ${BRIDGE_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-cyan-500/10 z-20`}>
+                <div className={`w-full md:w-80 max-h-[min(52vh,480px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain ${BRIDGE_CONFIG.theme.panelBg} p-6 flex flex-col gap-4 border-r border-cyan-500/10 z-20`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2 text-white">
                             <Footprints className={BRIDGE_CONFIG.theme.accent} />
