@@ -480,12 +480,12 @@ export default function CustomWheelModal({ isOpen, onClose, gameData, diamonds, 
     const pointerEmoji = getPointerEmoji();
 
     return createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black/80 backdrop-blur-sm">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="rounded-2xl w-full max-w-5xl border shadow-2xl overflow-hidden flex flex-col md:flex-row h-[600px] sm:h-[700px]"
+                className="rounded-none md:rounded-2xl w-full max-w-5xl border shadow-2xl overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[700px] md:max-h-[90vh] min-h-0"
                 style={{
                     backgroundColor: bgColor,
                     borderColor: accentColor + '30',
@@ -493,7 +493,7 @@ export default function CustomWheelModal({ isOpen, onClose, gameData, diamonds, 
                 }}
             >
                 {/* BETTING PANEL */}
-                <div className="w-full md:w-80 p-6 flex flex-col gap-4 border-r border-white/5 z-20"
+                <div className="w-full md:w-80 max-h-[min(42vh,360px)] md:max-h-none shrink-0 overflow-y-auto overscroll-contain p-6 flex flex-col gap-4 border-r border-white/5 z-20"
                      style={{ backgroundColor: bgColor + 'F0' }}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex flex-col gap-1 text-white">

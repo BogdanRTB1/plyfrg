@@ -116,18 +116,19 @@ export default function CustomScratchModal({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+                className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden"
                 onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
             >
                 <motion.div
                     initial={{ opacity: 0, scale: 0.9, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                    className="bg-[#0b1622] rounded-[28px] border border-white/10 w-full max-w-2xl overflow-hidden shadow-2xl relative"
+                    className="bg-[#0b1622] rounded-none md:rounded-[28px] border border-white/10 w-full max-w-2xl h-[100dvh] max-h-[100dvh] md:h-auto md:max-h-[90vh] overflow-hidden shadow-2xl relative flex flex-col min-h-0"
                     style={{ boxShadow: `0 0 60px ${accent}20` }}
+                    onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between p-5 border-b border-white/10">
+                    <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 shrink-0">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
                                 style={{ background: `${accent}20` }}>
@@ -149,7 +150,7 @@ export default function CustomScratchModal({
                     </div>
 
                     {/* Engine */}
-                    <div className="relative bg-[#060b11]" style={{ height: '420px' }}>
+                    <div className="relative bg-[#060b11] flex-1 min-h-0 md:h-[420px] md:flex-none md:shrink-0">
                         <iframe
                             ref={iframeRef}
                             src="/engines/scratch-engine.html"
@@ -168,7 +169,7 @@ export default function CustomScratchModal({
                     </div>
 
                     {/* Controls */}
-                    <div className="p-5 border-t border-white/10 space-y-4">
+                    <div className="p-4 sm:p-5 border-t border-white/10 space-y-4 shrink-0 overflow-y-auto max-h-[45vh] md:max-h-none overscroll-contain">
                         {/* Bet & Currency */}
                         <div className="flex items-center gap-4">
                             <div className="flex-1">

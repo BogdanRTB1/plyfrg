@@ -60,7 +60,7 @@ export default function BecomeCreatorContent() {
     };
 
     return (
-        <div className="flex-1 h-full overflow-y-auto bg-[#050505] relative custom-scrollbar z-0">
+        <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-[#050505] relative custom-scrollbar z-0">
             {/* Dynamic Background */}
             <div className="absolute inset-0 pointer-events-none z-[-1]">
                 <Particles
@@ -78,10 +78,10 @@ export default function BecomeCreatorContent() {
             <div className="absolute top-0 right-[-10%] w-[60%] h-[600px] bg-[#00b9f0]/10 blur-[120px] rounded-full pointer-events-none z-[-1]" />
             <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[500px] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none z-[-1]" />
 
-            <div className="max-w-[1400px] mx-auto px-6 py-20 lg:py-32 relative z-10 flex flex-col pt-32">
+            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-20 lg:py-32 relative z-10 flex flex-col pt-24 sm:pt-32">
 
                 {/* Hero Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-40">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center mb-24 sm:mb-40">
                     <motion.div
                         initial="hidden"
                         animate="visible"

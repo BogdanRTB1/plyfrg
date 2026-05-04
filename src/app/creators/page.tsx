@@ -136,7 +136,7 @@ export default function CreatorsPage() {
 
 
     return (
-        <div className="flex-1 h-full overflow-y-auto bg-[#050B14] relative custom-scrollbar z-0 p-6 lg:p-12 pb-32">
+        <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-[#050B14] relative custom-scrollbar z-0 p-4 sm:p-6 lg:p-12 pb-32">
 
             {/* Ambient Background */}
             <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[#00b9f0]/10 blur-[150px] rounded-full pointer-events-none -z-10" />
@@ -152,7 +152,7 @@ export default function CreatorsPage() {
                     <Star size={16} fill="currentColor" />
                     <span>Playforges Elite</span>
                 </div>
-                <h1 className="text-5xl md:text-6xl font-black mb-4 text-white tracking-tight">
+                <h1 className="text-4xl md:text-6xl font-black mb-4 text-white tracking-tight">
                     Platform <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00b9f0] to-[#8adffc]">Creators</span>
                 </h1>
                 <p className="text-slate-400 text-lg max-w-2xl leading-relaxed">
@@ -178,7 +178,7 @@ export default function CreatorsPage() {
                         <div className="absolute bottom-0 w-full h-full bg-gradient-to-t from-[#0b1622]/40 to-transparent"></div>
                     </div>
 
-                    <div className="flex flex-col md:flex-row gap-8 relative z-10 pt-24 px-8 pb-8">
+                    <div className="flex flex-col md:flex-row gap-8 relative z-10 pt-24 px-5 sm:px-8 pb-8">
                         {/* Avatar */}
                         <div className="flex-shrink-0 flex flex-col items-center">
                             <div className="relative w-32 h-32 rounded-full bg-[#152a3a] flex items-center justify-center text-4xl font-bold text-white border-4 border-[#0b1622] shadow-[0_0_30px_rgba(0,185,240,0.3)] overflow-hidden">
@@ -205,7 +205,7 @@ export default function CreatorsPage() {
 
                         {/* Details */}
                         <div className="flex-grow flex flex-col justify-end pt-4 md:pt-8">
-                            <div className="flex justify-between items-start mb-6">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
                                 <div>
                                     <div className="flex items-center gap-3 mb-1">
                                         <h2 className="text-3xl font-black text-white tracking-tight">{featuredCreator.name}</h2>
@@ -215,7 +215,7 @@ export default function CreatorsPage() {
                                     </div>
                                     <p className="text-[#00b9f0] font-bold">{getFollowersCount(featuredCreator.name)} Followers</p>
                                 </div>
-                                <Link href={`/creators/${encodeURIComponent(featuredCreator.name)}`} className="flex items-center gap-2 px-6 py-3 bg-white text-[#0b1622] hover:bg-slate-200 rounded-xl font-bold shadow-[0_0_20px_rgba(255,255,255,0.2)] transition-all transform hover:scale-105">
+                                <Link href={`/creators/${encodeURIComponent(featuredCreator.name)}`} className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-white text-[#0b1622] hover:bg-slate-200 rounded-xl font-bold shadow-[0_0_20px_rgba(255,255,255,0.2)] transition-all transform hover:scale-105">
                                     <Play size={16} fill="currentColor" />
                                     <span>Visit Portfolio</span>
                                 </Link>
@@ -266,7 +266,7 @@ export default function CreatorsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="mb-8 flex items-center justify-between"
+                className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
             >
                 <div className="flex items-center gap-4">
                     <h2 className="text-2xl font-black text-white tracking-tight">Discover Creators</h2>
@@ -275,12 +275,12 @@ export default function CreatorsPage() {
                     </span>
                 </div>
 
-                <div className="relative">
+                <div className="relative w-full md:w-auto">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
                         type="text"
                         placeholder="Search creators..."
-                        className="bg-[#0b1622] border border-white/10 rounded-xl pl-10 pr-4 py-2 w-64 text-sm text-white focus:outline-none focus:border-[#00b9f0] transition-colors"
+                        className="bg-[#0b1622] border border-white/10 rounded-xl pl-10 pr-4 py-2 w-full md:w-64 text-sm text-white focus:outline-none focus:border-[#00b9f0] transition-colors"
                     />
                 </div>
             </motion.div>

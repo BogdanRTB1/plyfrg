@@ -234,7 +234,7 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="min-h-[calc(100vh-80px)] bg-[#071d2a] pb-16">
+        <div className="min-h-[calc(100vh-80px)] bg-[#071d2a] pb-16 overflow-x-hidden">
 
             {/* Banner Header */}
             <div className="h-64 sm:h-80 w-full bg-gradient-to-b from-[#00b9f0]/20 to-[#071d2a] border-b border-white/5 relative">
@@ -242,8 +242,8 @@ export default function ProfilePage() {
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
             </div>
 
-            <div className="max-w-5xl mx-auto px-4 sm:px-8 -mt-24 sm:-mt-32 relative z-10">
-                <div className="bg-[#0f212e]/90 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl p-6 sm:p-10">
+            <div className="max-w-5xl mx-auto px-3 sm:px-8 -mt-24 sm:-mt-32 relative z-10">
+                <div className="bg-[#0f212e]/90 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl p-4 sm:p-10">
 
                     {/* User Info Section */}
                     <div className="flex flex-col sm:flex-row gap-6 sm:gap-10 items-center sm:items-end mb-10">
@@ -276,7 +276,7 @@ export default function ProfilePage() {
                                 {isCreator && creatorData && (
                                     <button 
                                         onClick={() => window.location.href = `/creators/${encodeURIComponent(creatorData.display_name || creatorData.name || username)}`}
-                                        className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2"
+                                    className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2"
                                     >
                                         <Star size={16} />
                                         Visit Creator Page

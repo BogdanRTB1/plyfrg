@@ -159,7 +159,7 @@ export default function HomeContent() {
 
 
     return (
-        <motion.div initial="hidden" animate="show" variants={container} className="flex-1 h-full overflow-y-auto custom-scrollbar p-4 md:p-8 pb-32 relative">
+        <motion.div initial="hidden" animate="show" variants={container} className="flex-1 h-full overflow-y-auto overflow-x-hidden custom-scrollbar p-4 md:p-8 pb-32 relative">
             <AnimatePresence>
                 {isRandomizing && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-zinc-900 flex flex-col items-center justify-center p-4">
@@ -175,7 +175,7 @@ export default function HomeContent() {
             </AnimatePresence>
 
             {/* Hero Section */}
-            <motion.section variants={item} className="relative min-h-[400px] h-auto md:h-[400px] rounded-3xl overflow-hidden flex items-center p-6 sm:p-8 md:p-12 mb-12 shadow-2xl border border-white/5 group">
+            <motion.section variants={item} className="relative min-h-[400px] h-auto md:h-[400px] rounded-3xl overflow-hidden flex items-center p-4 sm:p-8 md:p-12 mb-10 md:mb-12 shadow-2xl border border-white/5 group">
                 <div className="absolute inset-0 bg-[#0f172a]">
                     <Image src="/images/hero-banner.png" alt="Hero Background" fill className="object-cover object-center opacity-100 transition-transform duration-700 group-hover:scale-105" priority />
                     <div className="absolute inset-0 bg-gradient-to-r from-[#0f172a] via-[#0f172a]/60 to-transparent"></div>
@@ -197,12 +197,12 @@ export default function HomeContent() {
             </motion.section>
 
             {/* Originals Section */}
-            <motion.div variants={item} className="flex justify-between items-end mb-6">
+            <motion.div variants={item} className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3 mb-6">
                 <h2 className="text-2xl font-bold text-white flex items-center gap-3 before:content-[''] before:w-1 before:h-6 before:bg-[#00b9f0] before:rounded-full">PlayForges Originals</h2>
             </motion.div>
 
             <motion.div variants={item} className="mb-12">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
                     {activeOriginals.map((game, index) => (
                         <div key={index} className="cursor-pointer h-full" onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: game.name }))}>
                             <GameCard name={game.name} image={game.image} rtp={game.rtp} />
@@ -212,12 +212,12 @@ export default function HomeContent() {
             </motion.div>
 
             {/* Top Creators */}
-            <div className="flex justify-between items-end mb-6 mt-16">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3 mb-6 mt-14 md:mt-16">
                 <h2 className="text-2xl font-bold text-white flex items-center gap-3 before:content-[''] before:w-1 before:h-6 before:bg-[#00b9f0] before:rounded-full">Top Creators</h2>
                 <Link href="/creators" className="text-sm font-bold text-[#00b9f0] hover:text-[#38bdf8] transition">View All</Link>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-16">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6 mb-14 md:mb-16">
                 {topCreatorsRender.map((creator, index) => (
                     <Link href={`/creators/${encodeURIComponent(creator.name)}`} key={index} className="bg-[#0f212e] rounded-xl overflow-hidden group border border-white/5 hover:border-[#00b9f0]/50 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-[#00b9f0]/10 flex flex-col h-full relative">
                         <div className="relative w-full aspect-square bg-[#1a2c38] overflow-hidden shrink-0">
@@ -234,7 +234,7 @@ export default function HomeContent() {
 
 
             {/* Promotions Section */}
-            <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
+            <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-14 md:mb-16">
                 <div className="bg-gradient-to-br from-[#1a2c38] to-[#0f212e] rounded-2xl p-8 relative overflow-hidden group border border-white/5 hover:border-[#00b9f0]/30 transition-all shadow-lg hover:shadow-[#00b9f0]/10">
                     <div className="relative z-10">
                         <span className="bg-[#00b9f0] text-[#0f212e] text-xs font-bold px-3 py-1 rounded-full mb-4 inline-block shadow-[0_0_10px_rgba(0,185,240,0.3)]">Daily Event</span>
@@ -262,9 +262,9 @@ export default function HomeContent() {
 
             {/* Live Wins Table */}
             <motion.div variants={item} className="mb-16">
-                <div className="flex justify-between items-end mb-6">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3 mb-6">
                     <h2 className="text-2xl font-bold text-white flex items-center gap-3 before:content-[''] before:w-1 before:h-6 before:bg-green-500 before:rounded-full">Live Wins</h2>
-                    <div className="flex items-center gap-2 text-xs font-bold text-green-500 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
+                    <div className="w-fit flex items-center gap-2 text-xs font-bold text-green-500 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> LIVE FEED
                     </div>
                 </div>

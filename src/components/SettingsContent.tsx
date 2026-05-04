@@ -402,7 +402,7 @@ export default function SettingsContent() {
                 <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[100px] mix-blend-screen"></div>
             </div>
 
-            <div className="max-w-6xl mx-auto p-6 md:p-12 relative z-10">
+            <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-12 relative z-10">
 
                 {/* Page Header */}
                 <div className="mb-12">
@@ -427,7 +427,7 @@ export default function SettingsContent() {
 
                     {/* Navigation Sidebar */}
                     <div className="lg:col-span-3">
-                        <nav className="space-y-2 sticky top-6">
+                        <nav className="space-y-2 lg:sticky lg:top-6">
                             {tabs.map((tab, idx) => {
                                 const isActive = activeTab === tab.id;
                                 return (
@@ -437,7 +437,7 @@ export default function SettingsContent() {
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: idx * 0.05 + 0.2 }}
                                         onClick={() => setActiveTab(tab.id as any)}
-                                        className={`w-full text-left p-4 rounded-xl flex items-center justify-between group transition-all duration-300 border relative overflow-hidden ${isActive
+                                        className={`w-full text-left p-3 sm:p-4 rounded-xl flex items-center justify-between group transition-all duration-300 border relative overflow-hidden ${isActive
                                             ? 'bg-[#00b9f0]/10 border-[#00b9f0]/20 text-white shadow-[0_0_15px_rgba(0,185,240,0.1)]'
                                             : 'bg-[#0f212e] border-white/5 text-slate-400 hover:bg-[#1a2c38] hover:text-white'
                                             }`}

@@ -140,7 +140,7 @@ export default function HistoryContent() {
                 <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[100px] mix-blend-screen"></div>
             </div>
 
-            <div className="max-w-7xl mx-auto p-6 md:p-12 pb-32 min-h-[100dvh] md:min-h-0 relative z-10">
+            <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-12 pb-32 min-h-[100dvh] md:min-h-0 relative z-10">
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -154,8 +154,8 @@ export default function HistoryContent() {
                         <p className="text-slate-400">View and analyze your past gameplay sessions.</p>
                     </div>
 
-                    <div className="flex gap-4">
-                        <div className="bg-[#0f212e] border border-white/5 rounded-xl p-4 flex items-center gap-4 min-w-[180px]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 w-full md:w-auto">
+                        <div className="bg-[#0f212e] border border-white/5 rounded-xl p-4 flex items-center gap-4 min-w-0">
                             <div className="p-3 bg-green-500/10 rounded-lg text-green-500">
                                 <TrendingUp size={24} />
                             </div>
@@ -169,7 +169,7 @@ export default function HistoryContent() {
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-[#0f212e] border border-white/5 rounded-xl p-4 flex items-center gap-4 min-w-[180px]">
+                        <div className="bg-[#0f212e] border border-white/5 rounded-xl p-4 flex items-center gap-4 min-w-0">
                             <div className="p-3 bg-blue-500/10 rounded-lg text-blue-500">
                                 <TrendingUp size={24} />
                             </div>
@@ -186,8 +186,8 @@ export default function HistoryContent() {
                     </div>
                 </motion.div>
 
-                <div className="bg-[#0f212e] border border-white/5 rounded-2xl p-4 mb-8 flex justify-between items-center">
-                    <div className="flex gap-2">
+                <div className="bg-[#0f212e] border border-white/5 rounded-2xl p-3 sm:p-4 mb-8 flex justify-between items-center">
+                    <div className="flex gap-2 overflow-x-auto custom-scrollbar w-full">
                         {['all', 'wins', 'losses', 'high-rollers'].map((f) => (
                             <button
                                 key={f}

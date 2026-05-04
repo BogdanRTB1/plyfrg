@@ -41,10 +41,10 @@ export default function RootLayout({
           <Sidebar />
 
           {/* Main Content Area (Right Side) */}
-          <main className="flex-1 flex flex-col h-full md:ml-[260px] ml-0 w-full md:w-auto relative bg-[#050505] transition-all duration-300">
+          <main className="flex-1 flex flex-col h-full md:ml-[260px] ml-0 w-full md:w-auto min-w-0 relative bg-[#050505] transition-all duration-300">
             <Header />
             {/* Page Content - flex-1 allows it to fill remaining height, overflow-hidden forces page to handle scroll */}
-            <div className="flex-1 overflow-hidden relative flex flex-col">
+            <div className="flex-1 overflow-hidden relative flex flex-col min-w-0">
               {children}
             </div>
           </main>

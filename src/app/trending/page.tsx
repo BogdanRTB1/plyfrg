@@ -126,7 +126,7 @@ export default function TrendingPage() {
     ];
 
     return (
-        <div className="flex-1 h-full overflow-y-auto bg-[#050505] relative custom-scrollbar p-6 md:px-16 lg:px-24 md:py-10 pb-32 z-0">
+        <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-[#050505] relative custom-scrollbar p-4 sm:p-6 md:px-12 lg:px-20 md:py-10 pb-32 z-0">
             <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -141,7 +141,7 @@ export default function TrendingPage() {
                         <p className="text-slate-400 font-medium">Discover what's hot. Real-time player counts from the last 24 hours.</p>
                     </div>
 
-                    <div className="flex gap-3 pr-2">
+                    <div className="hidden sm:flex gap-3 pr-2">
                         <button 
                             onClick={() => scroll('left')}
                             className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-all border border-white/10 active:scale-90 shadow-2xl backdrop-blur-md group"
@@ -210,12 +210,12 @@ export default function TrendingPage() {
             </AnimatePresence>
 
 
-            <div className="mb-8 flex items-center justify-between">
+            <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                  <div className="flex items-center gap-3">
                     <TrendingUp className="text-[#00b9f0]" size={24} />
                     <h2 className="text-xl font-bold text-white uppercase tracking-tight italic">Ecosystem Stats</h2>
                 </div>
-                <div className="flex gap-4 text-[10px] items-center text-slate-500 uppercase font-black tracking-widest">
+                <div className="flex flex-wrap gap-3 text-[10px] items-center text-slate-500 uppercase font-black tracking-widest">
                     <span className="flex items-center gap-1"><Clock size={12} /> Live Tracking</span>
                     <span className="flex items-center gap-1"><Calendar size={12} /> Averages</span>
                 </div>

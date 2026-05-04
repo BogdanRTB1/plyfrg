@@ -169,8 +169,8 @@ export default function CreatorProfilePage() {
                 <div className="absolute inset-0 bg-[url('/noise.png')] opacity-30 mix-blend-overlay"></div>
             </div>
 
-            <div className="max-w-[1400px] mx-auto px-4 sm:px-8 -mt-48 relative z-20">
-                <div className="bg-[#0b1622]/60 backdrop-blur-3xl rounded-[40px] border border-white/5 shadow-[0_0_80px_rgba(0,0,0,0.8)] p-8 sm:p-12">
+            <div className="max-w-[1400px] mx-auto px-3 sm:px-8 -mt-48 relative z-20">
+                <div className="bg-[#0b1622]/60 backdrop-blur-3xl rounded-[28px] sm:rounded-[40px] border border-white/5 shadow-[0_0_80px_rgba(0,0,0,0.8)] p-4 sm:p-12">
                     
                     {/* Header Section */}
                     <div className="flex flex-col md:flex-row gap-10 items-start md:items-end mb-12 relative">
@@ -197,7 +197,7 @@ export default function CreatorProfilePage() {
                                     <span className="text-[#00b9f0] bg-[#00b9f0]/10 px-3 py-1 rounded-full border border-[#00b9f0]/20 font-black uppercase tracking-widest text-xs">Elite Creator</span>
                                     {isFollowing && <span className="text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 font-bold text-xs flex items-center gap-1"><Star size={12} className="fill-emerald-400"/> Following</span>}
                                 </div>
-                                <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter mb-4 drop-shadow-xl">
+                                <h1 className="text-3xl sm:text-5xl md:text-7xl font-black text-white tracking-tighter mb-4 drop-shadow-xl break-words">
                                     {creatorData.display_name}
                                 </h1>
                                 <div className="flex flex-wrap items-center gap-6 text-sm font-bold text-slate-300">
@@ -301,7 +301,7 @@ export default function CreatorProfilePage() {
                     </div>
 
                     {/* Content Grid */}
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-12 mt-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 lg:gap-12 mt-4">
                         {/* Left Col: Info */}
                         <div className="lg:col-span-1 space-y-8">
                             <div>
@@ -370,7 +370,7 @@ export default function CreatorProfilePage() {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="bg-[#0f212e] rounded-3xl p-16 border border-white/5 flex flex-col items-center justify-center text-center backdrop-blur-sm relative overflow-hidden">
+                                <div className="bg-[#0f212e] rounded-3xl p-8 sm:p-16 border border-white/5 flex flex-col items-center justify-center text-center backdrop-blur-sm relative overflow-hidden">
                                     <div className="absolute inset-0 bg-[url('/noise.png')] mix-blend-overlay opacity-20"></div>
                                     <GamepadIcon size={64} className="text-[#00b9f0]/30 mb-6 relative z-10" />
                                     <p className="text-2xl font-black text-white mb-3 relative z-10 tracking-tight">No games yet</p>

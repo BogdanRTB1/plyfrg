@@ -219,7 +219,7 @@ export default function CreatorStudioPage() {
     }
 
     return (
-        <div className="flex-1 h-full overflow-y-auto bg-[#050B14] relative custom-scrollbar z-0 p-6 lg:p-12 pb-32">
+        <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-[#050B14] relative custom-scrollbar z-0 p-4 sm:p-6 lg:p-12 pb-32">
 
             {/* Ambient Backgrounds */}
             <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-[#00b9f0]/10 blur-[150px] rounded-full pointer-events-none -z-10" />
@@ -230,7 +230,7 @@ export default function CreatorStudioPage() {
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col md:flex-row gap-6 md:items-center justify-between"
+                    className="flex flex-col md:flex-row gap-4 md:gap-6 md:items-center justify-between"
                 >
                     <div className="flex items-center gap-6">
                         <div className="relative w-24 h-24 rounded-2xl bg-[#152a3a] flex items-center justify-center text-4xl font-bold text-white border-2 border-white/10 shadow-[0_0_30px_rgba(0,185,240,0.2)] overflow-hidden">
@@ -259,11 +259,24 @@ export default function CreatorStudioPage() {
                     </button>
                 </motion.div>
 
-                {/* Navigation Tabs */}
-                <div className="flex border-b border-white/10 mb-8 pb-px">
+                {/* Navigation: mobile dropdown + desktop tabs */}
+                <div className="md:hidden mb-6 space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Workspace</label>
+                    <select
+                        value={activeTab}
+                        onChange={(e) => setActiveTab(e.target.value as typeof activeTab)}
+                        className="w-full bg-[#0b1622] border border-white/10 rounded-xl px-4 py-3.5 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-[#00b9f0]/40 appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%222%22%3E%3Cpath d=%22m6 9 6 6 6-6%22/%3E%3C/svg%3E')] bg-[length:1.25rem] bg-[right_0.75rem_center] bg-no-repeat pr-10"
+                    >
+                        <option value="dashboard">Dashboard</option>
+                        <option value="studio">Game Studio</option>
+                        <option value="games">My Games{publishedGames.length > 0 ? ` (${publishedGames.length})` : ''}</option>
+                        <option value="finances">Finances</option>
+                    </select>
+                </div>
+                <div className="hidden md:flex overflow-x-auto border-b border-white/10 mb-8 pb-px custom-scrollbar">
                     <button
                         onClick={() => setActiveTab('dashboard')}
-                        className={`px-8 py-4 font-bold text-sm tracking-widest uppercase transition-colors relative ${activeTab === 'dashboard' ? 'text-[#00b9f0]' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-5 sm:px-8 py-4 font-bold text-sm tracking-widest uppercase transition-colors relative whitespace-nowrap ${activeTab === 'dashboard' ? 'text-[#00b9f0]' : 'text-slate-400 hover:text-white'}`}
                     >
                         Dashboard
                         {activeTab === 'dashboard' && (
@@ -272,7 +285,7 @@ export default function CreatorStudioPage() {
                     </button>
                     <button
                         onClick={() => setActiveTab('studio')}
-                        className={`px-8 py-4 font-bold text-sm tracking-widest uppercase transition-colors relative flex items-center gap-2 ${activeTab === 'studio' ? 'text-purple-400' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-5 sm:px-8 py-4 font-bold text-sm tracking-widest uppercase transition-colors relative flex items-center gap-2 whitespace-nowrap ${activeTab === 'studio' ? 'text-purple-400' : 'text-slate-400 hover:text-white'}`}
                     >
                         <Gamepad2 size={16} /> Game Studio
                         {activeTab === 'studio' && (
@@ -281,7 +294,7 @@ export default function CreatorStudioPage() {
                     </button>
                     <button
                         onClick={() => setActiveTab('games')}
-                        className={`px-8 py-4 font-bold text-sm tracking-widest uppercase transition-colors relative flex items-center gap-2 ${activeTab === 'games' ? 'text-[#00b9f0]' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-5 sm:px-8 py-4 font-bold text-sm tracking-widest uppercase transition-colors relative flex items-center gap-2 whitespace-nowrap ${activeTab === 'games' ? 'text-[#00b9f0]' : 'text-slate-400 hover:text-white'}`}
                     >
                         <Layers size={16} /> My Games
                         {publishedGames.length > 0 && (
@@ -293,7 +306,7 @@ export default function CreatorStudioPage() {
                     </button>
                     <button
                         onClick={() => setActiveTab('finances')}
-                        className={`px-8 py-4 font-bold text-sm tracking-widest uppercase transition-colors relative flex items-center gap-2 ${activeTab === 'finances' ? 'text-emerald-400' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-5 sm:px-8 py-4 font-bold text-sm tracking-widest uppercase transition-colors relative flex items-center gap-2 whitespace-nowrap ${activeTab === 'finances' ? 'text-emerald-400' : 'text-slate-400 hover:text-white'}`}
                     >
                         <DollarSign size={16} /> Finances
                         {activeTab === 'finances' && (

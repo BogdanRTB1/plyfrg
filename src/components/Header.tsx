@@ -252,7 +252,7 @@ export default function Header() {
 
     return (
         <>
-            <header className="h-20 px-4 md:px-8 flex items-center justify-between gap-2 md:gap-4 bg-[#071d2a]/95 backdrop-blur-xl sticky top-0 z-40 border-b border-white/5 animate-in fade-in slide-in-from-top-8 duration-1000 ease-out fill-mode-both delay-[1500ms]">
+            <header className="h-20 px-3 sm:px-4 md:px-8 flex items-center justify-between gap-2 md:gap-4 bg-[#071d2a]/95 backdrop-blur-xl sticky top-0 z-40 border-b border-white/5 animate-in fade-in slide-in-from-top-8 duration-1000 ease-out fill-mode-both delay-[1500ms]">
                 {/* Mobile Expanded Search Overlay */}
                 <div className={`absolute inset-0 px-4 flex items-center gap-3 bg-[#071d2a] md:hidden z-50 transition-all duration-300 ${isMobileSearchOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-2 pointer-events-none'}`}>
                     <div className="relative group w-full flex-1">
@@ -273,7 +273,7 @@ export default function Header() {
                     </button>
                 </div>
 
-                <div className="flex items-center gap-3 flex-1 md:flex-none md:w-[400px]">
+                <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 md:flex-none md:w-[400px]">
                     <button className="md:hidden text-slate-400 hover:text-white shrink-0" onClick={toggle}>
                         <Menu size={24} />
                     </button>
@@ -291,7 +291,7 @@ export default function Header() {
 
                 </div>
 
-                <div className="flex items-center gap-2 md:gap-4 shrink-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 md:gap-4 shrink-0 min-w-0">
                     {/* Mobile Search Icon */}
                     <button
                         className={`md:hidden p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-full transition-colors shrink-0 ${!user ? 'hidden' : ''}`}
@@ -300,7 +300,7 @@ export default function Header() {
                         <Search size={22} />
                     </button>
 
-                    <div className={`bg-[#0f212e] border border-white/5 rounded-full p-1 pl-3 md:pl-4 items-center gap-2 md:gap-3 ${!user ? 'hidden md:flex' : 'flex'}`}>
+                    <div className={`bg-[#0f212e] border border-white/5 rounded-full p-1 pl-2 sm:pl-3 md:pl-4 items-center gap-1.5 sm:gap-2 md:gap-3 ${!user ? 'hidden md:flex' : 'hidden sm:flex'}`}>
                         {/* Diamonds (GC) */}
                         <div className="flex items-center gap-1.5">
                             <div className="w-5 h-5 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
@@ -325,8 +325,17 @@ export default function Header() {
                             <Wallet size={14} className="sm:hidden" />
                         </button>
                     </div>
+                    {user && (
+                        <button
+                            className="sm:hidden p-2 bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] rounded-full transition-colors shadow-[0_0_12px_rgba(0,185,240,0.25)]"
+                            onClick={() => setIsWalletOpen(true)}
+                            aria-label="Open wallet"
+                        >
+                            <Wallet size={16} />
+                        </button>
+                    )}
 
-                    <div className="relative" ref={dropdownRef}>
+                    <div className="relative shrink-0" ref={dropdownRef}>
                         <button
                             className={`p-2.5 hover:text-white hover:bg-white/5 rounded-full transition-colors relative ${activeDropdown === 'notifications' ? 'bg-white/5 text-white' : 'text-slate-400'}`}
                             onClick={() => setActiveDropdown(activeDropdown === 'notifications' ? null : 'notifications')}
@@ -358,7 +367,7 @@ export default function Header() {
                     </div>
 
                     {user ? (
-                        <div className="relative" ref={userDropdownRef}>
+                        <div className="relative shrink-0" ref={userDropdownRef}>
                             <button
                                 className="flex items-center gap-3 pl-2 pr-1 py-1 rounded-full hover:bg-white/5 transition-colors border border-transparent hover:border-white/5"
                                 onClick={() => setActiveDropdown(activeDropdown === 'user' ? null : 'user')}

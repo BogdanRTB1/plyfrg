@@ -307,14 +307,14 @@ export default function SupportContent() {
     const [openFaq, setOpenFaq] = useState<number | null>(null);
 
     return (
-        <div className="flex-1 h-full overflow-y-auto bg-[#050505] relative custom-scrollbar">
+        <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-[#050505] relative custom-scrollbar">
             {/* Dynamic Background */}
             <div className="absolute inset-0 pointer-events-none fixed">
                 <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-[#00b9f0]/10 rounded-full blur-[150px] mix-blend-screen opacity-50"></div>
                 <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[150px] mix-blend-screen opacity-50"></div>
             </div>
 
-            <div className="max-w-5xl mx-auto p-6 md:p-12 relative z-10 min-h-screen flex flex-col">
+            <div className="max-w-5xl mx-auto p-4 sm:p-6 md:p-12 relative z-10 min-h-screen flex flex-col">
 
                 <AnimatePresence mode="wait">
                     {/* HOME VIEW: DASHBOARD GRID */}
@@ -341,7 +341,7 @@ export default function SupportContent() {
                                     initial={{ y: 20, opacity: 0 }}
                                     animate={{ y: 0, opacity: 1 }}
                                     transition={{ delay: 0.2 }}
-                                    className="text-5xl md:text-6xl font-black text-white tracking-tight mb-4"
+                                    className="text-4xl md:text-6xl font-black text-white tracking-tight mb-4"
                                 >
                                     How can we <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00b9f0] to-blue-500">help you?</span>
                                 </motion.h1>
@@ -488,7 +488,7 @@ export default function SupportContent() {
                                             className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                                         >
                                             <div
-                                                className={`max-w-[70%] p-4 rounded-2xl text-base leading-relaxed shadow-lg ${msg.sender === 'user'
+                                            className={`max-w-[85%] sm:max-w-[70%] p-4 rounded-2xl text-base leading-relaxed shadow-lg ${msg.sender === 'user'
                                                     ? 'bg-[#00b9f0] text-[#050505] font-bold'
                                                     : 'bg-[#252525] text-slate-200 border border-white/5'
                                                     }`}
