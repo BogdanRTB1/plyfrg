@@ -35,6 +35,7 @@ import {
   HiLoConfig, DEFAULT_HILO_CONFIG, HILO_DEAL_SOUNDS, HILO_LOSS_SOUNDS
 } from '@/types/hiloConfig';
 import CustomHiloModal from './CustomHiloModal';
+import StudioTemplateStylePicker from './StudioTemplateStylePicker';
 import { createClient } from '@/utils/supabase/client';
 import { deletePublishedGameById, loadPublishedGames, savePublishedGame } from '@/utils/publishedGamesStorage';
 import { playSlotReelTickSound, playSlotSpinSound } from '@/utils/slotSpinSound';
@@ -1297,18 +1298,16 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                         {/* ─── Section Navigation (mobile: picker / desktop: tabs) ───────── */}
                         {gameType === 'slots' && (
                         <>
-                            <div className="md:hidden space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Studio section</label>
-                                <select
-                                    value={activeSection}
-                                    onChange={(e) => setActiveSection(e.target.value as typeof activeSection)}
-                                    className="w-full bg-[#0a111a] border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40"
-                                >
-                                    {sections.map((s) => (
-                                        <option key={s.id} value={s.id}>{s.label}</option>
-                                    ))}
-                                </select>
-                            </div>
+                            <StudioTemplateStylePicker
+                                fieldLabel="Studio section"
+                                value={activeSection}
+                                onChange={(id) => setActiveSection(id as typeof activeSection)}
+                                options={sections.map((s) => ({
+                                    id: s.id,
+                                    label: s.label,
+                                    icon: s.icon,
+                                }))}
+                            />
                             <div className="hidden md:flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
                             {sections.map((s) => (
                                 <button
@@ -1329,18 +1328,16 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
                         {gameType === 'crash' && (
                         <>
-                            <div className="md:hidden space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Studio section</label>
-                                <select
-                                    value={crashActiveSection}
-                                    onChange={(e) => setCrashActiveSection(e.target.value as typeof crashActiveSection)}
-                                    className="w-full bg-[#0a111a] border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                                >
-                                    <option value="design">Design & Assets</option>
-                                    <option value="engine">Engine Params</option>
-                                    <option value="preview">Preview & Publish</option>
-                                </select>
-                            </div>
+                            <StudioTemplateStylePicker
+                                fieldLabel="Studio section"
+                                value={crashActiveSection}
+                                onChange={(id) => setCrashActiveSection(id as typeof crashActiveSection)}
+                                options={[
+                                    { id: 'design', label: 'Design & Assets', icon: <Palette size={16} /> },
+                                    { id: 'engine', label: 'Engine Params', icon: <Gauge size={16} /> },
+                                    { id: 'preview', label: 'Preview & Publish', icon: <Eye size={16} /> },
+                                ]}
+                            />
                             <div className="hidden md:flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
                             {[
                                 { id: 'design', icon: <Palette size={16} />, label: 'Design & Assets' },
@@ -1365,18 +1362,16 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
                         {gameType === 'scratch' && (
                         <>
-                            <div className="md:hidden space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Studio section</label>
-                                <select
-                                    value={scratchActiveSection}
-                                    onChange={(e) => setScratchActiveSection(e.target.value as typeof scratchActiveSection)}
-                                    className="w-full bg-[#0a111a] border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-amber-500/40"
-                                >
-                                    <option value="design">Design & Symbols</option>
-                                    <option value="paytable">Paytable & Odds</option>
-                                    <option value="preview">Preview & Publish</option>
-                                </select>
-                            </div>
+                            <StudioTemplateStylePicker
+                                fieldLabel="Studio section"
+                                value={scratchActiveSection}
+                                onChange={(id) => setScratchActiveSection(id as typeof scratchActiveSection)}
+                                options={[
+                                    { id: 'design', label: 'Design & Symbols', icon: <Palette size={16} /> },
+                                    { id: 'paytable', label: 'Paytable & Odds', icon: <Zap size={16} /> },
+                                    { id: 'preview', label: 'Preview & Publish', icon: <Eye size={16} /> },
+                                ]}
+                            />
                             <div className="hidden md:flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
                             {[
                                 { id: 'design', icon: <Palette size={16} />, label: 'Design & Symbols' },
@@ -1401,18 +1396,16 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
                         {gameType === 'wheel' && (
                         <>
-                            <div className="md:hidden space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Studio section</label>
-                                <select
-                                    value={wheelActiveSection}
-                                    onChange={(e) => setWheelActiveSection(e.target.value as typeof wheelActiveSection)}
-                                    className="w-full bg-[#0a111a] border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-rose-500/40"
-                                >
-                                    <option value="design">Design & Assets</option>
-                                    <option value="segments">Segments & Mechanics</option>
-                                    <option value="preview">Preview & Publish</option>
-                                </select>
-                            </div>
+                            <StudioTemplateStylePicker
+                                fieldLabel="Studio section"
+                                value={wheelActiveSection}
+                                onChange={(id) => setWheelActiveSection(id as typeof wheelActiveSection)}
+                                options={[
+                                    { id: 'design', label: 'Design & Assets', icon: <Palette size={16} /> },
+                                    { id: 'segments', label: 'Segments & Mechanics', icon: <Settings2 size={16} /> },
+                                    { id: 'preview', label: 'Preview & Publish', icon: <Eye size={16} /> },
+                                ]}
+                            />
                             <div className="hidden md:flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
                             {[
                                 { id: 'design', icon: <Palette size={16} />, label: 'Design & Assets' },
@@ -1437,18 +1430,16 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
                         {gameType === 'mines' && (
                         <>
-                            <div className="md:hidden space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Studio section</label>
-                                <select
-                                    value={minesActiveSection}
-                                    onChange={(e) => setMinesActiveSection(e.target.value as typeof minesActiveSection)}
-                                    className="w-full bg-[#0a111a] border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-orange-500/40"
-                                >
-                                    <option value="design">Design & Assets</option>
-                                    <option value="mechanics">Grid & Mechanics</option>
-                                    <option value="preview">Preview & Publish</option>
-                                </select>
-                            </div>
+                            <StudioTemplateStylePicker
+                                fieldLabel="Studio section"
+                                value={minesActiveSection}
+                                onChange={(id) => setMinesActiveSection(id as typeof minesActiveSection)}
+                                options={[
+                                    { id: 'design', label: 'Design & Assets', icon: <Palette size={16} /> },
+                                    { id: 'mechanics', label: 'Grid & Mechanics', icon: <Settings2 size={16} /> },
+                                    { id: 'preview', label: 'Preview & Publish', icon: <Eye size={16} /> },
+                                ]}
+                            />
                             <div className="hidden md:flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
                             {[
                                 { id: 'design', icon: <Palette size={16} />, label: 'Design & Assets' },
@@ -1473,18 +1464,16 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
                         {gameType === 'case' && (
                         <>
-                            <div className="md:hidden space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Studio section</label>
-                                <select
-                                    value={caseActiveSection}
-                                    onChange={(e) => setCaseActiveSection(e.target.value as typeof caseActiveSection)}
-                                    className="w-full bg-[#0a111a] border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                                >
-                                    <option value="design">Design & Audio</option>
-                                    <option value="items">Items & Rarities</option>
-                                    <option value="preview">Preview & Publish</option>
-                                </select>
-                            </div>
+                            <StudioTemplateStylePicker
+                                fieldLabel="Studio section"
+                                value={caseActiveSection}
+                                onChange={(id) => setCaseActiveSection(id as typeof caseActiveSection)}
+                                options={[
+                                    { id: 'design', label: 'Design & Audio', icon: <Palette size={16} /> },
+                                    { id: 'items', label: 'Items & Rarities', icon: <Settings2 size={16} /> },
+                                    { id: 'preview', label: 'Preview & Publish', icon: <Eye size={16} /> },
+                                ]}
+                            />
                             <div className="hidden md:flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
                             {[
                                 { id: 'design', icon: <Palette size={16} />, label: 'Design & Audio' },
@@ -1509,18 +1498,16 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
                         {gameType === 'hilo' && (
                         <>
-                            <div className="md:hidden space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Studio section</label>
-                                <select
-                                    value={hiloActiveSection}
-                                    onChange={(e) => setHiloActiveSection(e.target.value as typeof hiloActiveSection)}
-                                    className="w-full bg-[#0a111a] border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-sky-500/40"
-                                >
-                                    <option value="design">Design & Assets</option>
-                                    <option value="audio">Audio Setup</option>
-                                    <option value="preview">Preview & Publish</option>
-                                </select>
-                            </div>
+                            <StudioTemplateStylePicker
+                                fieldLabel="Studio section"
+                                value={hiloActiveSection}
+                                onChange={(id) => setHiloActiveSection(id as typeof hiloActiveSection)}
+                                options={[
+                                    { id: 'design', label: 'Design & Assets', icon: <Palette size={16} /> },
+                                    { id: 'audio', label: 'Audio Setup', icon: <Volume2 size={16} /> },
+                                    { id: 'preview', label: 'Preview & Publish', icon: <Eye size={16} /> },
+                                ]}
+                            />
                             <div className="hidden md:flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
                             {[
                                 { id: 'design', icon: <Palette size={16} />, label: 'Design & Assets' },
@@ -1616,23 +1603,23 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                 </div>
 
                                 {/* Victory Celebration */}
-                                <div className="bg-gradient-to-br from-[#0a111a] to-[#160b1e] border border-purple-500/20 rounded-2xl p-5 mt-4">
-                                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+                                <div className="mt-4 rounded-2xl border border-purple-500/20 bg-gradient-to-br from-[#0a111a] to-[#160b1e] p-4 sm:p-5">
+                                    <div className="mb-4 flex flex-col gap-3 border-b border-white/5 pb-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                                         <div className="flex items-center gap-2">
-                                            <Sparkles size={16} className="text-amber-400" />
-                                            <span className="text-xs font-black text-white uppercase tracking-widest">Victory Celebration</span>
+                                            <Sparkles size={16} className="text-amber-400 shrink-0" />
+                                            <span className="text-xs font-black uppercase tracking-widest text-white">Victory Celebration</span>
                                         </div>
-                                        <label className={`text-[10px] font-bold px-3 py-2 rounded-xl cursor-pointer transition-all border ${winSound ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-purple-500/10 text-purple-400 border-purple-500/30 hover:bg-purple-500/20'}`}>
-                                            <span className="flex items-center gap-1.5"><Volume2 size={12} />{winSound ? 'Audio Ready' : 'Add Sound'}</span>
+                                        <label className={`shrink-0 cursor-pointer rounded-xl border px-2.5 py-2 text-[10px] font-bold transition-all sm:self-auto sm:px-3 ${winSound ? 'border-green-500/30 bg-green-500/20 text-green-400' : 'border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20'}`}>
+                                            <span className="flex items-center gap-1.5 whitespace-nowrap"><Volume2 size={12} className="shrink-0" />{winSound ? 'Audio Ready' : 'Add Sound'}</span>
                                             <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleAudioUpload(e, setWinSound)} />
                                         </label>
                                     </div>
-                                    <div className="grid grid-cols-5 gap-2">
+                                    <div className="-mx-1 flex gap-2 overflow-x-auto overscroll-x-contain px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-5 md:overflow-visible md:p-0 [&::-webkit-scrollbar]:hidden">
                                         {WIN_EFFECTS.map(effect => (
-                                            <button key={effect.id} onClick={() => setWinEffect(effect.id)}
-                                                className={`flex flex-col items-center justify-center py-3 rounded-xl border transition-all ${winEffect === effect.id ? 'bg-gradient-to-b from-purple-500/20 to-purple-600/10 border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'bg-black/30 border-white/5 hover:bg-white/5'}`}>
-                                                <span className={`text-xl mb-1 ${winEffect === effect.id ? 'scale-110' : 'opacity-60'}`}>{effect.icon}</span>
-                                                <span className={`text-[9px] font-bold uppercase ${winEffect === effect.id ? 'text-white' : 'text-slate-500'}`}>{effect.name}</span>
+                                            <button key={effect.id} type="button" onClick={() => setWinEffect(effect.id)}
+                                                className={`flex min-w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-xl border py-2.5 transition-all sm:min-w-[5rem] md:min-w-0 ${winEffect === effect.id ? 'border-purple-400 bg-gradient-to-b from-purple-500/20 to-purple-600/10 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'border-white/5 bg-black/30 hover:bg-white/5'}`}>
+                                                <span className={`mb-0.5 text-lg sm:text-xl ${winEffect === effect.id ? 'scale-110' : 'opacity-60'}`}>{effect.icon}</span>
+                                                <span className={`text-[8px] font-bold uppercase sm:text-[9px] ${winEffect === effect.id ? 'text-white' : 'text-slate-500'}`}>{effect.name}</span>
                                             </button>
                                         ))}
                                     </div>

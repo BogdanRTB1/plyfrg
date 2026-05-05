@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, Users, Target, DollarSign, Activity, Gamepad2, Edit, Layers, Play, Sparkles, Clock, Trash2, Eye } from 'lucide-react';
 import EditCreatorModal from '@/components/EditCreatorModal';
 import CreatorGameStudio from '@/components/CreatorGameStudio';
+import StudioTemplateStylePicker from '@/components/StudioTemplateStylePicker';
 import { createClient } from '@/utils/supabase/client';
 import { deletePublishedGameById, loadPublishedGames, migratePublishedGamesAssetsToSupabase } from '@/utils/publishedGamesStorage';
 import { toast } from 'sonner';
@@ -356,20 +357,23 @@ export default function CreatorStudioPage() {
                     </button>
                 </motion.div>
 
-                {/* Navigation: mobile dropdown + desktop tabs */}
-                <div className="md:hidden mb-6 space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Workspace</label>
-                    <select
-                        value={activeTab}
-                        onChange={(e) => setActiveTab(e.target.value as typeof activeTab)}
-                        className="w-full bg-[#0b1622] border border-white/10 rounded-xl px-4 py-3.5 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-[#00b9f0]/40 appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%222%22%3E%3Cpath d=%22m6 9 6 6 6-6%22/%3E%3C/svg%3E')] bg-[length:1.25rem] bg-[right_0.75rem_center] bg-no-repeat pr-10"
-                    >
-                        <option value="dashboard">Dashboard</option>
-                        <option value="studio">Game Studio</option>
-                        <option value="games">My Games{publishedGames.length > 0 ? ` (${publishedGames.length})` : ''}</option>
-                        <option value="finances">Finances</option>
-                    </select>
-                </div>
+                {/* Navigation: mobile template-style picker + desktop tabs */}
+                <StudioTemplateStylePicker
+                    className="mb-6"
+                    fieldLabel="Workspace"
+                    value={activeTab}
+                    onChange={(id) => setActiveTab(id as typeof activeTab)}
+                    options={[
+                        { id: 'dashboard', label: 'Dashboard', icon: <TrendingUp size={16} /> },
+                        { id: 'studio', label: 'Game Studio', icon: <Gamepad2 size={16} /> },
+                        {
+                            id: 'games',
+                            label: publishedGames.length > 0 ? `My Games (${publishedGames.length})` : 'My Games',
+                            icon: <Layers size={16} />,
+                        },
+                        { id: 'finances', label: 'Finances', icon: <DollarSign size={16} /> },
+                    ]}
+                />
                 <div className="hidden md:flex overflow-x-auto border-b border-white/10 mb-8 pb-px custom-scrollbar">
                     <button
                         onClick={() => setActiveTab('dashboard')}
@@ -552,11 +556,22 @@ export default function CreatorStudioPage() {
                                                     </div>
                                                 )}
 
-                                                {/* X-axis Labels */}
-                                                <div className="absolute left-0 right-0 bottom-0 flex justify-around text-[10px] sm:text-xs text-slate-500 font-medium px-2">
-                                                    {hourlyStats.map((stat, i) => (
-                                                        <span key={i} className="flex-1 text-center">{stat.label}</span>
-                                                    ))}
+                                                {/* X-axis Labels — stagger on tiny screens so hours do not overlap */}
+                                                <div className="absolute bottom-0 left-0 right-0 flex px-1 sm:px-2">
+                                                    {hourlyStats.map((stat, i) => {
+                                                        const bc = hourlyStats.length || 1;
+                                                        const tickStep = bc <= 6 ? 1 : bc <= 12 ? 3 : 4;
+                                                        const showOnMobile = i % tickStep === 0 || i === bc - 1;
+                                                        return (
+                                                            <span key={i} className="flex min-w-0 flex-1 justify-center">
+                                                                <span
+                                                                    className={`text-center text-[9px] font-medium text-slate-500 sm:text-xs ${showOnMobile ? "" : "max-sm:invisible"}`}
+                                                                >
+                                                                    {stat.label}
+                                                                </span>
+                                                            </span>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         );

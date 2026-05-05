@@ -32,8 +32,8 @@ export function MobileHudBetRow({
     disabled,
     clampMin = 0,
     integerOnly = false,
-    quickBtnClassName = "shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2 py-2 text-[11px] font-black text-slate-200 shadow-sm active:scale-95 disabled:opacity-40 min-h-[40px] min-w-[34px]",
-    inputClassName = "min-h-[40px] w-full min-w-0 rounded-lg border border-white/10 bg-[#0a1114] px-1 py-1 text-center text-[12px] font-mono font-bold text-white outline-none focus:border-[#00b9f0]/55 disabled:opacity-40",
+    quickBtnClassName = "shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-1.5 py-1.5 text-[10px] font-black text-slate-200 shadow-sm active:scale-95 disabled:opacity-40 min-h-[34px] min-w-[30px]",
+    inputClassName = "min-h-[32px] w-full min-w-0 rounded-md border border-white/10 bg-[#0a1114] px-0.5 py-0.5 text-center text-[11px] font-mono font-bold text-white outline-none focus:border-[#00b9f0]/55 disabled:opacity-40",
 }: {
     betAmount: number;
     balance: number;
@@ -102,8 +102,8 @@ export function MobileHudBetRow({
             <button type="button" disabled={disabled} onClick={dbl} className={quickBtnClassName}>
                 2×
             </button>
-            <div className="flex max-w-[6.75rem] min-w-0 flex-1 flex-col gap-0.5">
-                <span className="px-0.5 text-[9px] font-black uppercase tracking-wide text-slate-500">
+            <div className="flex max-w-[4.75rem] min-w-0 flex-1 flex-col gap-0.5 sm:max-w-[5.25rem]">
+                <span className="px-0.5 text-[8px] font-black uppercase tracking-wide text-slate-500">
                     Bet
                 </span>
                 <input
