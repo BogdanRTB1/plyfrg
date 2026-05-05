@@ -6,6 +6,7 @@ import { X, User, Trophy, Play, Target, Star } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import confetti from "canvas-confetti";
 
 export const TOMATOES_CONFIG = {
@@ -41,6 +42,8 @@ export default function TomatoesModal({ isOpen, onClose, diamonds, setDiamonds, 
 
     const [gameState, setGameState] = useState<'IDLE' | 'THROWING' | 'FINISHED'>('IDLE');
     const [resultTarget, setResultTarget] = useState<number | null>(null);
+
+    useBodyScrollLock(isOpen);
 
     const throwTomato = () => {
         if (balance < betAmount || betAmount <= 0) return;
@@ -119,7 +122,7 @@ export default function TomatoesModal({ isOpen, onClose, diamonds, setDiamonds, 
     if (typeof document === "undefined") return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center p-0 md:p-4 overflow-hidden bg-black md:bg-black/80 backdrop-blur-none md:backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex max-h-[100dvh] min-h-[100dvh] w-full max-w-[100vw] items-stretch overscroll-none md:items-center justify-center bg-black p-0 backdrop-blur-none md:bg-black/80 md:backdrop-blur-sm md:p-4 overflow-hidden">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}

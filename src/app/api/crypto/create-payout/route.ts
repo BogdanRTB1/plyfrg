@@ -9,8 +9,8 @@ const getSupabaseAdmin = () => createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// ForgesCoins to USD conversion rate (1 FC = $1 USD)
-const FC_TO_USD_RATE = 1.0;
+// ForgesCoins to USD conversion rate for redeem (1 FC = $0.80 USD)
+const FC_TO_USD_RATE = 0.8;
 const MIN_WITHDRAWAL = 10; // Minimum 10 FC to withdraw
 
 export async function POST(req: NextRequest) {
@@ -28,11 +28,16 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { amount, address, currency = "btc" } = body;
+        const { amount, address, email, currency = "btc" } = body;
 
         // Validations
-        if (!amount || !address) {
-            return NextResponse.json({ error: "Amount and address are required" }, { status: 400 });
+        if (!amount || !address || !email) {
+            return NextResponse.json({ error: "Amount, address and email are required" }, { status: 400 });
+        }
+        const normalizedEmail = String(email).trim().toLowerCase();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(normalizedEmail)) {
+            return NextResponse.json({ error: "A valid email address is required" }, { status: 400 });
         }
 
         const fcAmount = Number(amount);
@@ -43,9 +48,19 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Check user balance (from user metadata)
-        const currentMeta = user.user_metadata || {};
-        const currentForgesCoins = Number(currentMeta.forges_coins || 0);
+        // Check user balance from user_balances table (source of truth)
+        const { data: balanceRow, error: balanceError } = await getSupabaseAdmin()
+            .from("user_balances")
+            .select("forges_coins")
+            .eq("id", user.id)
+            .single();
+
+        if (balanceError || !balanceRow) {
+            console.error("Balance fetch error:", balanceError);
+            return NextResponse.json({ error: "Failed to verify your balance" }, { status: 500 });
+        }
+
+        const currentForgesCoins = Number(balanceRow.forges_coins || 0);
 
         if (fcAmount > currentForgesCoins) {
             return NextResponse.json({ error: "Insufficient Forges Coins balance" }, { status: 400 });
@@ -69,12 +84,18 @@ export async function POST(req: NextRequest) {
 
         // Deduct balance immediately (optimistic — will be restored if payout fails)
         const newForgesCoins = Number((currentForgesCoins - fcAmount).toFixed(2));
-        await getSupabaseAdmin().auth.admin.updateUserById(user.id, {
-            user_metadata: {
-                ...currentMeta,
+        const { error: deductError } = await getSupabaseAdmin()
+            .from("user_balances")
+            .update({
                 forges_coins: newForgesCoins,
-            }
-        });
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", user.id);
+
+        if (deductError) {
+            console.error("Balance deduct error:", deductError);
+            return NextResponse.json({ error: "Failed to reserve your balance for payout" }, { status: 500 });
+        }
 
         // Store payout request in database
         const { data: payoutRecord, error: dbError } = await getSupabaseAdmin()
@@ -87,68 +108,33 @@ export async function POST(req: NextRequest) {
                 pay_currency: currency,
                 pay_address: address,
                 pay_amount: estimatedCryptoAmount,
+                requester_email: normalizedEmail,
+                completed: "no",
             })
             .select()
             .single();
 
         if (dbError) {
             // Restore balance on failure
-            await getSupabaseAdmin().auth.admin.updateUserById(user.id, {
-                user_metadata: { ...currentMeta, forges_coins: currentForgesCoins }
-            });
+            await getSupabaseAdmin()
+                .from("user_balances")
+                .update({
+                    forges_coins: currentForgesCoins,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", user.id);
             console.error("DB error storing payout:", dbError);
             return NextResponse.json({ error: "Failed to create payout request" }, { status: 500 });
         }
 
-        // Attempt to create payout via NOWPayments
-        // NOTE: NOWPayments payouts require email-based 2FA verification. 
-        // In production, you may need to handle this async via admin dashboard
-        // or use their batch payout API with pre-approved settings.
-        try {
-            const payoutRes = await fetch(`${NOWPAYMENTS_BASE}/payout`, {
-                method: "POST",
-                headers: {
-                    "x-api-key": NOWPAYMENTS_API_KEY,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    withdrawals: [
-                        {
-                            address: address,
-                            currency: currency,
-                            amount: estimatedCryptoAmount,
-                            ipn_callback_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://playforges.com"}/api/crypto/payout-ipn`,
-                        },
-                    ],
-                }),
-            });
-
-            if (payoutRes.ok) {
-                const payoutData = await payoutRes.json();
-                await getSupabaseAdmin()
-                    .from("crypto_payouts")
-                    .update({
-                        nowpayments_id: payoutData.id,
-                        payout_status: "processing",
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq("id", payoutRecord.id);
-            } else {
-                // Payout API failed — keep as pending for manual review
-                const errText = await payoutRes.text();
-                console.error("NOWPayments payout API error:", errText);
-                // Status stays "pending" for admin to manually process
-            }
-        } catch (payoutApiErr) {
-            console.error("Payout API call failed:", payoutApiErr);
-            // Keep as pending for manual processing
-        }
+        // Keep payout as pending for manual admin verification.
+        // Admin can review email, wallet and amount, then set completed=yes when finalized.
 
         // Create notification
         await getSupabaseAdmin().from("notifications").insert({
             user_id: user.id,
-            title: "🏦 Withdrawal Request Submitted",
-            message: `Your withdrawal of ${fcAmount} Forges Coins ($${usdAmount.toFixed(2)}) to ${address.slice(0, 8)}...${address.slice(-6)} is being processed.`,
+            title: "Withdrawal Request Submitted",
+            message: `Your withdrawal request of ${fcAmount} Forges Coins ($${usdAmount.toFixed(2)}) was received and will be verified soon.`,
         });
 
         return NextResponse.json({

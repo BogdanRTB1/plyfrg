@@ -5,6 +5,8 @@ import { createClient } from "@/utils/supabase/client";
 const STORAGE_KEY = "custom_published_games";
 const PRIMARY_BUCKET = "game-assets";
 const FALLBACK_BUCKET = "avatars";
+const CREATOR_GAMES_TABLE = "creator_games";
+const MAX_PUBLISHED_GAMES = 50;
 
 const getFileExtensionForDataUrl = (dataUrl: string) => {
     const mime = dataUrl.match(/^data:(.*?);base64,/)?.[1] || "";
@@ -113,4 +115,106 @@ export const migratePublishedGamesAssetsToSupabase = async () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
     window.dispatchEvent(new Event("storage"));
     return migrated;
+};
+
+const setLocalGames = (games: any[], emitEvent = true) => {
+    const trimmed = games.slice(0, MAX_PUBLISHED_GAMES);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+    if (emitEvent) {
+        window.dispatchEvent(new Event("storage"));
+    }
+    return trimmed;
+};
+
+const getLocalGames = () => {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+};
+
+export const loadPublishedGames = async (): Promise<any[]> => {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+
+    // DB is source of truth only for authenticated users.
+    if (!session?.user) return getLocalGames();
+
+    const { data, error } = await supabase
+        .from(CREATOR_GAMES_TABLE)
+        .select("game_data")
+        .order("published_at", { ascending: false });
+
+    if (error || !data) {
+        return getLocalGames();
+    }
+
+    const dbGames = data
+        .map((row: any) => row.game_data)
+        .filter((game: any) => !!game);
+
+    // Do not emit "storage" here; callers often listen to it and would recurse.
+    setLocalGames(dbGames, false);
+    return dbGames;
+};
+
+export const savePublishedGame = async (game: any): Promise<{ ok: boolean; reason?: string }> => {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+
+    const existing = await loadPublishedGames();
+    const duplicate = existing.some((g: any) => (g?.name || "").toLowerCase() === (game?.name || "").toLowerCase() && g?.id !== game?.id);
+    if (duplicate) return { ok: false, reason: "duplicate_name" };
+
+    const merged = [game, ...existing.filter((g: any) => g?.id !== game?.id)];
+    setLocalGames(merged);
+
+    if (!session?.user) return { ok: true };
+
+    const payload = {
+        id: game.id,
+        creator_id: session.user.id,
+        creator_name: game.creatorName || session.user.user_metadata?.full_name || session.user.email,
+        game_name: game.name,
+        game_type: game.type || "custom",
+        game_data: game,
+        published_at: game.publishedAt || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+        .from(CREATOR_GAMES_TABLE)
+        .upsert(payload, { onConflict: "id" });
+
+    if (error) {
+        console.error("Failed to save game in DB:", error);
+        return { ok: false, reason: "db_error" };
+    }
+
+    return { ok: true };
+};
+
+export const deletePublishedGameById = async (gameId: string): Promise<boolean> => {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+
+    const existing = getLocalGames();
+    setLocalGames(existing.filter((g: any) => g?.id !== gameId));
+
+    if (!session?.user) return true;
+
+    const { error } = await supabase
+        .from(CREATOR_GAMES_TABLE)
+        .delete()
+        .eq("id", gameId);
+
+    if (error) {
+        console.error("Failed to delete game from DB:", error);
+        return false;
+    }
+    return true;
 };

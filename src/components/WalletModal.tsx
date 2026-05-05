@@ -19,6 +19,7 @@ interface WalletModalProps {
 }
 
 type TabType = 'deposit' | 'redeem' | 'bonus' | 'history';
+const REDEEM_USD_RATE = 0.8;
 
 interface Transaction {
     id: string;
@@ -49,6 +50,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
     // Redeem state
     const [redeemAmount, setRedeemAmount] = useState("");
     const [redeemAddress, setRedeemAddress] = useState("");
+    const [redeemEmail, setRedeemEmail] = useState("");
 
     const bundles = [
         { id: 1, price: 35, diamonds: 35000, forgesCoins: 38 },
@@ -175,6 +177,9 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
         e.preventDefault();
         setLoading(true);
 
+        const emailValue = redeemEmail.trim().toLowerCase();
+        const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
+
         if (Number(redeemAmount) > forgesCoins) {
             toast.error("Insufficient Forges Coins");
             setLoading(false);
@@ -182,6 +187,11 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
         }
         if (Number(redeemAmount) < 10) {
             toast.error("Minimum withdrawal is 10 Forges Coins");
+            setLoading(false);
+            return;
+        }
+        if (!emailValid) {
+            toast.error("Please enter a valid email address");
             setLoading(false);
             return;
         }
@@ -203,6 +213,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                 body: JSON.stringify({
                     amount: Number(redeemAmount),
                     address: redeemAddress,
+                    email: emailValue,
                     currency: 'btc',
                 }),
             });
@@ -232,7 +243,8 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
             setRedeemAmount("");
             setRedeemAddress("");
-            toast.success(`Withdrawal of ${redeemAmount} Forges Coins submitted! Processing...`);
+            setRedeemEmail("");
+            toast.success("Redeem request submitted. Your request will be verified soon.");
         } catch (error) {
             console.error('Withdraw error:', error);
             toast.error('Failed to submit withdrawal. Please try again.');
@@ -336,11 +348,11 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
                 <div className="flex min-h-0 flex-1 flex-col md:flex-row md:h-[580px]">
                     {/* Tabs: horizontal chips on mobile, sidebar on desktop */}
-                    <div className="flex shrink-0 gap-2 overflow-x-auto overscroll-x-contain border-b border-white/5 bg-[#0a161f]/40 px-3 py-3 md:w-48 md:flex-col md:gap-2 md:border-b-0 md:border-r md:p-4 md:py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div className="flex shrink-0 gap-1 overflow-x-auto overscroll-x-contain border-b border-white/5 bg-[#0a161f]/40 px-3.5 py-2.5 md:w-48 md:flex-col md:gap-2 md:overflow-visible md:border-b-0 md:border-r md:p-4 md:py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                         <button
                             type="button"
                             onClick={() => setActiveTab('deposit')}
-                            className={`relative flex min-w-[108px] shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all sm:min-w-0 sm:justify-start sm:px-4 sm:py-3 sm:text-sm md:w-full ${activeTab === 'deposit'
+                            className={`relative flex min-w-0 flex-1 shrink items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-[10px] font-bold leading-tight transition-all sm:gap-1.5 sm:px-2 sm:text-[11px] md:w-full md:flex-none md:justify-start md:gap-2 md:rounded-xl md:px-4 md:py-3 md:text-sm ${activeTab === 'deposit'
                                 ? 'bg-[#00b9f0]/15 text-[#00b9f0] shadow-[0_0_12px_rgba(0,185,240,0.12)]'
                                 : 'bg-[#1a2c38]/80 text-slate-400 active:bg-white/5'
                                 }`}
@@ -348,45 +360,45 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                             {activeTab === 'deposit' && (
                                 <motion.div
                                     layoutId="activeWalletTab"
-                                    className="absolute inset-0 rounded-xl bg-[#00b9f0]/8 md:block"
+                                    className="absolute inset-0 rounded-lg bg-[#00b9f0]/8 md:rounded-xl md:block"
                                     initial={false}
                                     transition={{ type: "spring", stiffness: 500, damping: 32 }}
                                 />
                             )}
-                            <ArrowDownCircle size={17} className="relative z-10 shrink-0 sm:h-[18px] sm:w-[18px]" />
+                            <ArrowDownCircle className="relative z-10 h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 md:h-[18px] md:w-[18px]" />
                             <span className="relative z-10">Deposit</span>
                         </button>
                         <button
                             type="button"
                             onClick={() => setActiveTab('redeem')}
-                            className={`relative flex min-w-[108px] shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all sm:min-w-0 sm:justify-start sm:px-4 sm:py-3 sm:text-sm md:w-full ${activeTab === 'redeem'
+                            className={`relative flex min-w-0 flex-1 shrink items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-[10px] font-bold leading-tight transition-all sm:gap-1.5 sm:px-2 sm:text-[11px] md:w-full md:flex-none md:justify-start md:gap-2 md:rounded-xl md:px-4 md:py-3 md:text-sm ${activeTab === 'redeem'
                                 ? 'bg-[#00b9f0]/15 text-[#00b9f0] shadow-[0_0_12px_rgba(0,185,240,0.12)]'
                                 : 'bg-[#1a2c38]/80 text-slate-400 active:bg-white/5'
                                 }`}
                         >
-                            <ArrowUpCircle size={17} className="shrink-0 sm:h-[18px] sm:w-[18px]" />
+                            <ArrowUpCircle className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 md:h-[18px] md:w-[18px]" />
                             Redeem
                         </button>
                         <button
                             type="button"
                             onClick={() => setActiveTab('history')}
-                            className={`relative flex min-w-[108px] shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all sm:min-w-0 sm:justify-start sm:px-4 sm:py-3 sm:text-sm md:w-full ${activeTab === 'history'
+                            className={`relative flex min-w-0 flex-1 shrink items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-[10px] font-bold leading-tight transition-all sm:gap-1.5 sm:px-2 sm:text-[11px] md:w-full md:flex-none md:justify-start md:gap-2 md:rounded-xl md:px-4 md:py-3 md:text-sm ${activeTab === 'history'
                                 ? 'bg-[#00b9f0]/15 text-[#00b9f0] shadow-[0_0_12px_rgba(0,185,240,0.12)]'
                                 : 'bg-[#1a2c38]/80 text-slate-400 active:bg-white/5'
                                 }`}
                         >
-                            <Clock size={17} className="shrink-0 sm:h-[18px] sm:w-[18px]" />
+                            <Clock className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 md:h-[18px] md:w-[18px]" />
                             History
                         </button>
                         <button
                             type="button"
                             onClick={() => setActiveTab('bonus')}
-                            className={`relative flex min-w-[118px] shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all sm:min-w-0 sm:justify-start sm:px-4 sm:py-3 sm:text-sm md:w-full ${activeTab === 'bonus'
+                            className={`relative flex min-w-0 flex-1 shrink items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-[10px] font-bold leading-tight transition-all sm:gap-1.5 sm:px-2 sm:text-[11px] md:w-full md:flex-none md:justify-start md:gap-2 md:rounded-xl md:px-4 md:py-3 md:text-sm ${activeTab === 'bonus'
                                 ? 'bg-amber-500/15 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.12)]'
                                 : 'bg-[#1a2c38]/80 text-slate-400 active:bg-white/5'
                                 }`}
                         >
-                            <Gift size={17} className="shrink-0 sm:h-[18px] sm:w-[18px]" />
+                            <Gift className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 md:h-[18px] md:w-[18px]" />
                             Bonus
                         </button>
                     </div>
@@ -518,6 +530,20 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
                                             <div className="space-y-2">
                                                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                    Contact Email
+                                                </label>
+                                                <input
+                                                    type="email"
+                                                    value={redeemEmail}
+                                                    onChange={(e) => setRedeemEmail(e.target.value)}
+                                                    placeholder="Enter your email for redeem verification"
+                                                    className="w-full bg-[#0a161f] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 font-medium text-sm"
+                                                    required
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                                                     BTC Wallet Address
                                                 </label>
                                                 <input
@@ -534,7 +560,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                                 <div className="bg-[#0a161f] border border-white/5 rounded-xl p-3 text-center">
                                                     <p className="text-[10px] text-slate-500 font-bold uppercase">You will receive approximately</p>
                                                     <p className="text-lg font-black text-white mt-1">
-                                                        ~${Number(redeemAmount).toFixed(2)} USD
+                                                        ~${(Number(redeemAmount) * REDEEM_USD_RATE).toFixed(2)} USD
                                                         <span className="text-xs text-slate-400 font-medium ml-2">in BTC</span>
                                                     </p>
                                                 </div>
@@ -542,7 +568,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
                                             <button
                                                 type="submit"
-                                                disabled={loading || !redeemAmount || !redeemAddress || Number(redeemAmount) < 10}
+                                                disabled={loading || !redeemAmount || !redeemAddress || !redeemEmail || Number(redeemAmount) < 10}
                                                 className="w-full bg-white hover:bg-slate-200 text-[#0f212e] h-12 rounded-xl font-bold text-sm transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                             >
                                                 {loading ? <Loader2 className="animate-spin" size={20} /> : <ArrowUpCircle size={20} />}

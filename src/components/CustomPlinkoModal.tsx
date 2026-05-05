@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Play, RotateCw, Minus, Plus, MoreHorizontal } from "lucide-react";
+import { X, Play, RotateCw, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import confetti from "canvas-confetti";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import FavoriteToggle from "./FavoriteToggle";
-import MobileGameHudBar from "./MobileGameHudBar";
+import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { useBoardFitScale } from "@/hooks/useBoardFitScale";
 
 interface CustomPlinkoModalProps {
@@ -163,7 +163,9 @@ export default function CustomPlinkoModal({ isOpen, onClose, gameData, diamonds,
                         gameImage: gameData?.coverImage || "/images/game-placeholder.png", 
                         wagered: sessionWagered, 
                         payout: sessionPayout, 
-                        currency: currencyType 
+                        currency: currencyType,
+                        creatorId: gameData?.creatorId,
+                        gameId: gameData?.id,
                     }
                 }));
                 // Reset session
@@ -197,15 +199,14 @@ export default function CustomPlinkoModal({ isOpen, onClose, gameData, diamonds,
                 <MobileGameHudBar
                     className="bg-[#121c22]"
                     left={
-                        <>
-                            <button type="button" disabled={dropping} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
-                            <button type="button" disabled={dropping} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
-                            <div className="flex min-w-0 max-w-[5.5rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
-                                <button type="button" disabled={dropping} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-4 w-4" /></button>
-                                <span className="min-w-0 truncate px-0.5 text-center text-[11px] font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
-                                <button type="button" disabled={dropping} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-4 w-4" /></button>
-                            </div>
-                        </>
+                        <MobileHudBetRow
+                            betAmount={betAmount}
+                            balance={balance}
+                            onBetChange={handleBetChange}
+                            disabled={dropping}
+                            quickBtnClassName="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2 py-2 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40 min-h-[40px] min-w-[34px]"
+                            inputClassName="min-h-[40px] min-w-[3rem] flex-1 basis-0 max-w-[6.75rem] rounded-lg border border-white/10 bg-[#0a1114] px-1 py-1 text-center text-[11px] font-mono font-bold text-white outline-none focus:border-blue-400/45 disabled:opacity-40"
+                        />
                     }
                     center={
                         <button type="button" onClick={dropBall} disabled={dropping || balance < betAmount || betAmount <= 0} className="flex h-[68px] w-[68px] items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-[0_0_22px_rgba(59,130,246,0.35)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45" aria-label="Drop ball">
@@ -215,7 +216,12 @@ export default function CustomPlinkoModal({ isOpen, onClose, gameData, diamonds,
                     right={
                         <>
                             <button type="button" disabled={dropping} onClick={() => handleBetChange(balance)} className="shrink-0 rounded-lg border border-blue-500/30 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-blue-400 active:scale-95 disabled:opacity-40">MAX</button>
-                            <button type="button" disabled={dropping} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-2.5 py-2.5 text-[11px] font-black uppercase ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <MobileHudCurrencyToggle
+                                isGC={currencyType === "GC"}
+                                disabled={dropping}
+                                onToggle={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))}
+                                className="h-10 w-10 rounded-lg"
+                            />
                             <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] p-2 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-4 w-4" /></button>
                         </>
                     }
@@ -234,8 +240,8 @@ export default function CustomPlinkoModal({ isOpen, onClose, gameData, diamonds,
                     <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest truncate w-[200px]">By {gameData.creatorName}</p>
 
                     <div className="bg-[#0f171c] p-1 rounded-xl flex border border-white/5 mt-2">
-                        <button onClick={() => setCurrencyType('GC')} disabled={dropping} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> Diamonds</button>
-                        <button onClick={() => setCurrencyType('FC')} disabled={dropping} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> Coins</button>
+                        <button onClick={() => setCurrencyType('GC')} disabled={dropping} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> GC</button>
+                        <button onClick={() => setCurrencyType('FC')} disabled={dropping} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> FC</button>
                     </div>
 
                     <div className="space-y-2 mt-2">

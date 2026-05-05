@@ -13,6 +13,9 @@ export interface GameReport {
     wagered: number;
     payout: number;
     currency: 'GC' | 'FC';
+    // Creator game fields
+    creatorId?: string;
+    gameId?: string;
 }
 
 export const recordGameSession = async (report: GameReport) => {
@@ -49,6 +52,68 @@ export const recordGameSession = async (report: GameReport) => {
 
     // Always fire update event for UI
     window.dispatchEvent(new Event('history_updated'));
+
+    // ── Creator Analytics ──────────────────────────────────────────────
+    // Only record creator analytics for creator games (not built-in games)
+    if (report.creatorId && report.gameId) {
+        await recordCreatorAnalytics(report, user?.id || null);
+    }
+};
+
+/**
+ * Record creator analytics: earnings (only from player losses) and game plays.
+ * 
+ * Profit model: creator earns 30% of (wagered - payout) when player lost.
+ * The remaining 70% goes to the site. If the player came out profitable, creator earns nothing.
+ */
+const recordCreatorAnalytics = async (
+    report: GameReport,
+    playerId: string | null
+) => {
+    const supabase = createClient();
+    const now = new Date().toISOString();
+
+    try {
+        // Always record the game play session
+        const { error: playError } = await supabase.from('creator_game_plays').insert([{
+            creator_id: report.creatorId,
+            game_id: report.gameId,
+            game_name: report.gameName || '',
+            player_id: playerId,
+            wagered: report.wagered,
+            payout: report.payout,
+            currency: report.currency,
+            created_at: now,
+        }]);
+
+        if (playError) {
+            console.error('[Creator Analytics] Game play insert failed:', playError.message, playError.details);
+        }
+
+        // Only record earnings if the player LOST money (wagered > payout)
+        const playerLoss = report.wagered - report.payout;
+        if (playerLoss > 0) {
+            // Creator earns 30% of the player loss — 70% goes to the site
+            const creatorProfit = Number((playerLoss * 0.30).toFixed(2));
+            const { error: earnError } = await supabase.from('creator_earnings').insert([{
+                creator_id: report.creatorId,
+                game_id: report.gameId,
+                game_name: report.gameName || '',
+                player_id: playerId,
+                wagered: report.wagered,
+                payout: report.payout,
+                profit: creatorProfit,
+                currency: report.currency,
+                created_at: now,
+            }]);
+
+            if (earnError) {
+                console.error('[Creator Analytics] Earnings insert failed:', earnError.message, earnError.details);
+            }
+        }
+    } catch (e) {
+        console.error('[Creator Analytics] Exception:', e);
+    }
 };
 
 /**
@@ -73,9 +138,32 @@ export const recordGameActivity = async (gameName: string) => {
     }
 };
 
+/**
+ * Record a profile view for a creator.
+ */
+export const recordCreatorProfileView = async (creatorId: string) => {
+    try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        const { error } = await supabase.from('creator_profile_views').insert([{
+            creator_id: creatorId,
+            viewer_id: user?.id || null,
+            created_at: new Date().toISOString(),
+        }]);
+
+        if (error) {
+            console.error('[Creator Analytics] Profile view insert failed:', error.message, error.details);
+        }
+    } catch (e) {
+        console.error('[Creator Analytics] Profile view exception:', e);
+    }
+};
+
 const bridge = {
     recordGameSession,
-    recordGameActivity
+    recordGameActivity,
+    recordCreatorProfileView
 };
 
 export default bridge;

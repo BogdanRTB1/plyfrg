@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Loader2, RotateCcw, Minus, Plus, MoreHorizontal, Zap } from 'lucide-react';
 import { DiamondIcon, ForgesCoinIcon } from './CurrencyIcons';
-import MobileGameHudBar from './MobileGameHudBar';
+import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from './MobileGameHudBar';
 
 interface CustomScratchModalProps {
     isOpen: boolean;
@@ -30,6 +30,7 @@ export default function CustomScratchModal({
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
     const balance = currency === 'diamonds' ? diamonds : forgesCoins;
+    const intBalance = Math.max(1, Math.floor(balance));
 
     // Send config on engine ready
     const sendConfig = useCallback(() => {
@@ -175,15 +176,16 @@ export default function CustomScratchModal({
                         style={{ backgroundColor: "#0b1622" }}
                         className="border-white/10 md:hidden"
                         left={
-                            <>
-                                <button type="button" disabled={isPlaying} onClick={() => setBet(Math.max(1, Math.floor(bet / 2)))} className="shrink-0 rounded-lg border border-white/10 bg-[#0a111a] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
-                                <button type="button" disabled={isPlaying} onClick={() => setBet(Math.min(Math.floor(balance), bet * 2))} className="shrink-0 rounded-lg border border-white/10 bg-[#0a111a] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
-                                <div className="flex min-w-0 max-w-[6rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a111a]">
-                                    <button type="button" disabled={isPlaying} onClick={() => setBet(Math.max(1, bet - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
-                                    <span className="min-w-0 truncate px-0.5 text-center text-xs font-mono font-bold text-white">{bet}</span>
-                                    <button type="button" disabled={isPlaying} onClick={() => setBet(Math.min(Math.floor(balance), bet + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
-                                </div>
-                            </>
+                            <MobileHudBetRow
+                                betAmount={bet}
+                                balance={intBalance}
+                                onBetChange={(n) => setBet(Math.max(1, Math.min(intBalance, n)))}
+                                disabled={isPlaying}
+                                clampMin={1}
+                                integerOnly
+                                quickBtnClassName="shrink-0 rounded-lg border border-white/10 bg-[#0a111a] px-2 py-2 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40 min-h-[40px] min-w-[34px]"
+                                inputClassName="min-h-[40px] min-w-[3rem] flex-1 basis-0 max-w-[6.75rem] rounded-lg border border-white/10 bg-[#0a111a] px-1 py-1 text-center text-[11px] font-mono font-bold text-white outline-none focus:opacity-100 disabled:opacity-40"
+                            />
                         }
                         center={
                             <button
@@ -203,7 +205,11 @@ export default function CustomScratchModal({
                         right={
                             <>
                                 <button type="button" disabled={isPlaying} onClick={() => setBet(Math.max(1, Math.floor(balance)))} className="shrink-0 rounded-lg border px-3 py-3 text-xs font-black active:scale-95 disabled:opacity-40" style={{ color: accent, borderColor: `${accent}50`, background: "#0a111a" }}>MAX</button>
-                                <button type="button" disabled={isPlaying} onClick={() => setCurrency(currency === "diamonds" ? "forgesCoins" : "diamonds")} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase ${currency === "diamonds" ? "bg-cyan-500/30 text-cyan-200" : "bg-amber-500/30 text-amber-200"} active:scale-95 disabled:opacity-40`}>{currency === "diamonds" ? "GC" : "FC"}</button>
+                                <MobileHudCurrencyToggle
+                                    isGC={currency === "diamonds"}
+                                    disabled={isPlaying}
+                                    onToggle={() => setCurrency((c) => (c === "diamonds" ? "forgesCoins" : "diamonds"))}
+                                />
                                 <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#0a111a] p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
                             </>
                         }

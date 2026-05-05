@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { Heart } from "lucide-react";
 import { useState, useEffect } from "react";
+import { DEFAULT_ORIGINAL_CARD_RTP } from "@/constants/originalsRtp";
 
 interface GameCardProps {
     name: string;
@@ -10,7 +11,7 @@ interface GameCardProps {
     provider?: string;
 }
 
-export default function GameCard({ name, image, rtp = "99.0%", provider = "PlayForges" }: GameCardProps) {
+export default function GameCard({ name, image, rtp = DEFAULT_ORIGINAL_CARD_RTP, provider = "PlayForges" }: GameCardProps) {
     return (
         <div className="bg-[#0f212e] rounded-xl overflow-hidden group cursor-pointer border border-white/5 hover:border-[#00b9f0]/50 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-[#00b9f0]/10 flex flex-col h-full relative">
             <div className="relative w-full aspect-square bg-[#1a2c38] overflow-hidden">

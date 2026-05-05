@@ -34,6 +34,13 @@ interface SpinRequest {
   bet: number;
 }
 
+/** Extra haircut on credited line wins — pairs with CreatorGameStudio payout scaling (house-favored templates) */
+const VOLATILITY_SERVER_PROFILE: Record<'low' | 'medium' | 'high', { payoutScale: number; freeSpinScatterThreshold: number }> = {
+  low: { payoutScale: 0.67, freeSpinScatterThreshold: 5 },
+  medium: { payoutScale: 0.56, freeSpinScatterThreshold: 6 },
+  high: { payoutScale: 0.46, freeSpinScatterThreshold: 6 },
+};
+
 function cryptoRandom(): number {
   // Generate a cryptographically secure random number between 0 and 1
   const bytes = crypto.randomBytes(4);
@@ -230,7 +237,8 @@ export async function POST(req: Request) {
     
     const rows = config.rows || 3;
     const cols = config.cols || 5;
-    const volatility = config.volatility || 'medium';
+    const volatility = (config.volatility || 'medium') as 'low' | 'medium' | 'high';
+    const profile = VOLATILITY_SERVER_PROFILE[volatility] ?? VOLATILITY_SERVER_PROFILE.medium;
     
     // Generate the grid
     const grid = generateGrid(rows, cols, config.symbols, volatility);
@@ -247,15 +255,17 @@ export async function POST(req: Request) {
     let freeSpinsAwarded = 0;
     if (config.features?.scatterEnabled && config.features?.scatterSymbolId) {
       const scatterCount = countScatters(grid, config.symbols, config.features.scatterSymbolId);
-      if (scatterCount >= 3) {
+      if (scatterCount >= profile.freeSpinScatterThreshold) {
         freeSpinsAwarded = config.features.freeSpinsCount || 10;
       }
     }
+
+    const houseAdjustedMultiplier = Number((Math.max(0, totalMultiplier) * profile.payoutScale).toFixed(1));
     
     const result = {
       grid,
-      win: totalMultiplier > 0,
-      multiplier: totalMultiplier,
+      win: houseAdjustedMultiplier > 0,
+      multiplier: houseAdjustedMultiplier,
       winningCells,
       freeSpinsAwarded,
     };

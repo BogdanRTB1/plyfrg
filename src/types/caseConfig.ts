@@ -91,16 +91,17 @@ export interface CaseConfig {
 }
 
 // ─── Default Items ───────────────────────────────────────────────────────────
+/** Mass on low multipliers — raw RTP ~0.86; studio publish applies additional cap toward ~78% */
 export const DEFAULT_CASE_ITEMS: CaseItem[] = [
-  { id: 'item_1', name: '0.1x', multiplier: 0.1, rarity: 'common', probability: 35, image: null, color: '#374151' },
-  { id: 'item_2', name: '0.5x', multiplier: 0.5, rarity: 'common', probability: 25, image: null, color: '#4b5563' },
-  { id: 'item_3', name: '1x', multiplier: 1.0, rarity: 'rare', probability: 18, image: null, color: '#1e40af' },
-  { id: 'item_4', name: '2x', multiplier: 2.0, rarity: 'rare', probability: 10, image: null, color: '#1d4ed8' },
-  { id: 'item_5', name: '5x', multiplier: 5.0, rarity: 'epic', probability: 7, image: null, color: '#7e22ce' },
-  { id: 'item_6', name: '10x', multiplier: 10.0, rarity: 'epic', probability: 3.5, image: null, color: '#9333ea' },
-  { id: 'item_7', name: '25x', multiplier: 25.0, rarity: 'legendary', probability: 1, image: null, color: '#b45309' },
-  { id: 'item_8', name: '50x', multiplier: 50.0, rarity: 'legendary', probability: 0.45, image: null, color: '#d97706' },
-  { id: 'item_9', name: '100x', multiplier: 100.0, rarity: 'legendary', probability: 0.05, image: null, color: '#f59e0b' },
+  { id: 'item_1', name: '0.2x', multiplier: 0.2, rarity: 'common', probability: 34, image: null, color: '#374151' },
+  { id: 'item_2', name: '0.45x', multiplier: 0.45, rarity: 'common', probability: 26, image: null, color: '#4b5563' },
+  { id: 'item_3', name: '0.8x', multiplier: 0.8, rarity: 'common', probability: 18, image: null, color: '#525f6b' },
+  { id: 'item_4', name: '1.2x', multiplier: 1.2, rarity: 'rare', probability: 12, image: null, color: '#1e40af' },
+  { id: 'item_5', name: '2x', multiplier: 2.0, rarity: 'rare', probability: 6, image: null, color: '#1d4ed8' },
+  { id: 'item_6', name: '4x', multiplier: 4.0, rarity: 'epic', probability: 2.6, image: null, color: '#7e22ce' },
+  { id: 'item_7', name: '8x', multiplier: 8.0, rarity: 'epic', probability: 1, image: null, color: '#9333ea' },
+  { id: 'item_8', name: '15x', multiplier: 15.0, rarity: 'legendary', probability: 0.34, image: null, color: '#b45309' },
+  { id: 'item_9', name: '30x', multiplier: 30.0, rarity: 'legendary', probability: 0.06, image: null, color: '#f59e0b' },
 ];
 
 // ─── Default Config ──────────────────────────────────────────────────────────

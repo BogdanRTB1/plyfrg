@@ -11,6 +11,7 @@ import {
     Headphones,
     History,
     Settings,
+    ShieldCheck,
     X,
 } from "lucide-react";
 import Image from "next/image";
@@ -24,6 +25,7 @@ export default function Sidebar() {
     const pathname = usePathname();
     const [user, setUser] = useState<any>(null);
     const [isCreator, setIsCreator] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
     const supabase = createClient();
     const { isOpen, setIsOpen } = useMobileNav();
 
@@ -42,6 +44,7 @@ export default function Sidebar() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
                 setIsCreator(false);
+                setIsAdmin(false);
                 return;
             }
 
@@ -57,6 +60,18 @@ export default function Sidebar() {
             }
 
             setIsCreator(!!dbCreator);
+
+            const { data: adminProfile, error: adminError } = await supabase
+                .from("profiles")
+                .select("is_admin")
+                .eq("id", user.id)
+                .single();
+
+            if (adminError) {
+                setIsAdmin(!!user.app_metadata?.is_admin);
+            } else {
+                setIsAdmin(!!adminProfile?.is_admin || !!user.app_metadata?.is_admin);
+            }
         };
 
         checkCreatorStatus();
@@ -82,6 +97,7 @@ export default function Sidebar() {
         { icon: <Dices size={20} />, label: "Casino", href: "/casino" },
         { icon: <Star size={20} />, label: "Originals", href: "/originals" },
         { icon: <Headphones size={20} />, label: "Live Support", href: "/support" },
+        ...(isAdmin ? [{ icon: <ShieldCheck size={20} />, label: "Admin Redeems", href: "/admin/redeems" }] : []),
         { icon: <History size={20} />, label: "History", href: "/history" },
         ...(user ? [{ icon: <Settings size={20} />, label: "Settings", href: "/settings" }] : []),
     ];

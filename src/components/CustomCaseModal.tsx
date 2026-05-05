@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Package, Minus, Plus, MoreHorizontal, Zap } from "lucide-react";
+import { X, Trophy, Package, MoreHorizontal, Zap } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
 import FavoriteToggle from "./FavoriteToggle";
-import MobileGameHudBar from "./MobileGameHudBar";
+import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import type { CaseConfig, CaseItem, CaseRarity } from "@/types/caseConfig";
 import { DEFAULT_CASE_CONFIG, RARITY_CONFIG } from "@/types/caseConfig";
 
@@ -329,7 +329,9 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
                         gameImage: gameData?.coverImage || "/images/game-placeholder.png",
                         wagered: sessionWagered,
                         payout: sessionPayout,
-                        currency: currencyType
+                        currency: currencyType,
+                        creatorId: gameData?.creatorId,
+                        gameId: gameData?.id,
                     }
                 }));
                 setSessionWagered(0);
@@ -367,15 +369,14 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
                     style={{ backgroundColor: bgColor + "F0" }}
                     className="border-white/10 backdrop-blur-md"
                     left={
-                        <>
-                            <button type="button" disabled={gameState === "OPENING" || gameState === "REVEALING"} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-black/30 px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
-                            <button type="button" disabled={gameState === "OPENING" || gameState === "REVEALING"} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-black/30 px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
-                            <div className="flex min-w-0 max-w-[6rem] items-center overflow-hidden rounded-lg border border-white/10 bg-black/40">
-                                <button type="button" disabled={gameState === "OPENING" || gameState === "REVEALING"} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
-                                <span className="min-w-0 truncate px-0.5 text-center text-xs font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
-                                <button type="button" disabled={gameState === "OPENING" || gameState === "REVEALING"} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
-                            </div>
-                        </>
+                        <MobileHudBetRow
+                            betAmount={betAmount}
+                            balance={balance}
+                            onBetChange={handleBetChange}
+                            disabled={gameState === "OPENING" || gameState === "REVEALING"}
+                            quickBtnClassName="shrink-0 rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40 min-h-[40px] min-w-[34px]"
+                            inputClassName="min-h-[40px] min-w-[3rem] flex-1 basis-0 max-w-[6.75rem] rounded-lg border border-white/10 bg-black/40 px-1 py-1 text-center text-[11px] font-mono font-bold text-white outline-none focus:border-white/25 disabled:opacity-40"
+                        />
                     }
                     center={
                         gameState === "OPENING" || gameState === "REVEALING" ? (
@@ -401,7 +402,11 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
                     right={
                         <>
                             <button type="button" disabled={gameState === "OPENING" || gameState === "REVEALING"} onClick={() => handleBetChange(balance)} className="shrink-0 rounded-lg border bg-black/30 px-3 py-3 text-xs font-black active:scale-95 disabled:opacity-40" style={{ color: accentColor, borderColor: accentColor + "50" }}>MAX</button>
-                            <button type="button" disabled={gameState === "OPENING"} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <MobileHudCurrencyToggle
+                                isGC={currencyType === "GC"}
+                                disabled={gameState === "OPENING"}
+                                onToggle={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))}
+                            />
                             <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-black/30 p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
                         </>
                     }
@@ -432,11 +437,11 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
                     <div className="bg-black/30 p-1 rounded-xl flex border border-white/5">
                         <button onClick={() => setCurrencyType('GC')} disabled={gameState === 'OPENING'}
                             className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}>
-                            <DiamondIcon className="w-4 h-4" /> Diamonds
+                            <DiamondIcon className="w-4 h-4" /> GC
                         </button>
                         <button onClick={() => setCurrencyType('FC')} disabled={gameState === 'OPENING'}
                             className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}>
-                            <ForgesCoinIcon className="w-4 h-4" /> Coins
+                            <ForgesCoinIcon className="w-4 h-4" /> FC
                         </button>
                     </div>
 
@@ -477,7 +482,7 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
                                 <div key={item.id} className="flex items-center gap-2 text-xs p-1.5 rounded-lg bg-white/[0.02]">
                                     <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: rarityConf.color }} />
                                     <span className="text-white font-bold flex-1 truncate">{item.name}</span>
-                                    <span className="font-mono font-bold" style={{ color: rarityConf.color }}>{item.multiplier}x</span>
+                                    <span className="font-mono font-bold" style={{ color: rarityConf.color }}>{Number(item.multiplier).toFixed(1)}x</span>
                                     <span className="text-slate-500 font-mono text-[10px]">{item.probability}%</span>
                                 </div>
                             );
@@ -614,7 +619,7 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
                                                 {item.image ? (
                                                     <img src={item.image} alt={item.name} className="w-10 h-10 object-contain" />
                                                 ) : (
-                                                    <span className="text-2xl font-black text-white">{item.multiplier}x</span>
+                                                    <span className="text-2xl font-black text-white">{Number(item.multiplier).toFixed(1)}x</span>
                                                 )}
                                                 <span className="text-[10px] font-bold text-white/70 truncate max-w-[90px]">{item.name}</span>
                                                 <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" 
@@ -674,7 +679,7 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
                                             className="text-6xl font-black"
                                             style={{ color: RARITY_CONFIG[winnerItem.rarity].color }}
                                         >
-                                            {winnerItem.multiplier}x
+                                            {Number(winnerItem.multiplier).toFixed(1)}x
                                         </motion.span>
                                     )}
 
@@ -682,7 +687,7 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
 
                                     <div className="flex items-center gap-2">
                                         <span className="text-lg font-black font-mono text-green-400">
-                                            +{(betAmount * winnerItem.multiplier).toFixed(2)}
+                                            +{(betAmount * winnerItem.multiplier).toFixed(1)}
                                         </span>
                                         {currencyType === 'GC' ? <DiamondIcon className="w-5 h-5" /> : <ForgesCoinIcon className="w-5 h-5" />}
                                     </div>

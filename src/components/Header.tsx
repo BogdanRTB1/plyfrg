@@ -9,11 +9,14 @@ import { useState, useEffect, useRef } from "react";
 import { Search, Bell, LogOut, User as UserIcon, Settings, ChevronDown, Wallet, History, Menu } from "lucide-react";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AuthModal from "./AuthModal";
 import ConfirmModal from "./ConfirmModal";
 import WalletModal from "./WalletModal";
 import { createClient } from "@/utils/supabase/client";
 import { useMobileNav } from "@/components/MobileNavProvider";
+import { FEATURED_GAMES } from "@/constants/featuredGames";
+import { loadPublishedGames } from "@/utils/publishedGamesStorage";
 
 function NotificationItem({ n, markOneAsRead, formatDate }: { n: any, markOneAsRead: (id: string) => void, formatDate: (d: string) => string }) {
     const ref = useRef<HTMLDivElement>(null);
@@ -99,6 +102,11 @@ export default function Header() {
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [diamonds, setDiamonds] = useState(0);
     const [forgesCoins, setForgesCoins] = useState(0.00);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [creatorResults, setCreatorResults] = useState<any[]>([]);
+    const [customGameNames, setCustomGameNames] = useState<string[]>([]);
+    const [isSearchingCreators, setIsSearchingCreators] = useState(false);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
 
     // Sync balance with localStorage
     useEffect(() => {
@@ -172,11 +180,45 @@ export default function Header() {
     // Ref for detecting clicks outside dropdown
     const dropdownRef = useRef<HTMLDivElement>(null);
     const userDropdownRef = useRef<HTMLDivElement>(null);
+    const searchRef = useRef<HTMLDivElement>(null);
 
     const supabase = createClient();
     const { toggle } = useMobileNav();
+    const router = useRouter();
+
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const gameResults = (() => {
+        if (!normalizedQuery) return [];
+
+        const uniqueGameNames = Array.from(new Set([
+            ...FEATURED_GAMES.map((g) => g.name),
+            ...customGameNames,
+        ]));
+
+        return uniqueGameNames
+            .filter((name) => name.toLowerCase().includes(normalizedQuery))
+            .slice(0, 6);
+    })();
 
     useEffect(() => {
+        const loadCustomGames = () => {
+            void (async () => {
+                try {
+                    const parsed = await loadPublishedGames();
+                    const names = (Array.isArray(parsed) ? parsed : [])
+                        .map((g: any) => g?.name)
+                        .filter((name: any) => typeof name === "string");
+                    setCustomGameNames(names);
+                } catch {
+                    setCustomGameNames([]);
+                }
+            })();
+        };
+
+        loadCustomGames();
+        window.addEventListener("storage", loadCustomGames);
+        window.addEventListener("custom_games_updated", loadCustomGames);
+
         const getUser = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             setUser(user);
@@ -210,9 +252,13 @@ export default function Header() {
         const handleClickOutside = (event: MouseEvent) => {
             const isOutsideNotifications = !dropdownRef.current || !dropdownRef.current.contains(event.target as Node);
             const isOutsideUser = !userDropdownRef.current || !userDropdownRef.current.contains(event.target as Node);
+            const isOutsideSearch = !searchRef.current || !searchRef.current.contains(event.target as Node);
 
             if (isOutsideNotifications && isOutsideUser) {
                 setActiveDropdown(null);
+            }
+            if (isOutsideSearch) {
+                setIsSearchOpen(false);
             }
         };
 
@@ -222,8 +268,74 @@ export default function Header() {
             subscription.unsubscribe();
             window.removeEventListener('open_auth_modal', handleOpenAuth);
             document.removeEventListener("mousedown", handleClickOutside);
+            window.removeEventListener("storage", loadCustomGames);
+            window.removeEventListener("custom_games_updated", loadCustomGames);
         };
     }, []);
+
+    useEffect(() => {
+        if (!normalizedQuery || normalizedQuery.length < 2) {
+            setCreatorResults([]);
+            setIsSearchingCreators(false);
+            return;
+        }
+
+        const timeout = setTimeout(async () => {
+            setIsSearchingCreators(true);
+            const { data } = await supabase
+                .from("creators")
+                .select("display_name, profile_picture")
+                .ilike("display_name", `%${normalizedQuery}%`)
+                .order("followers_count", { ascending: false })
+                .limit(6);
+
+            setCreatorResults(data || []);
+            setIsSearchingCreators(false);
+        }, 180);
+
+        return () => clearTimeout(timeout);
+    }, [normalizedQuery]);
+
+    const openGameFromSearch = (gameName: string) => {
+        window.dispatchEvent(new CustomEvent("open_game", { detail: gameName }));
+        setSearchQuery("");
+        setIsSearchOpen(false);
+    };
+
+    const openCreatorFromSearch = (creatorName: string) => {
+        router.push(`/creators/${encodeURIComponent(creatorName)}`);
+        setSearchQuery("");
+        setIsSearchOpen(false);
+    };
+
+    const handleSearchSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!normalizedQuery) return;
+
+        const exactGame = gameResults.find((name) => name.toLowerCase() === normalizedQuery);
+        if (exactGame) {
+            openGameFromSearch(exactGame);
+            return;
+        }
+
+        const exactCreator = creatorResults.find((c: any) => c.display_name?.toLowerCase() === normalizedQuery);
+        if (exactCreator) {
+            openCreatorFromSearch(exactCreator.display_name);
+            return;
+        }
+
+        if (gameResults.length > 0) {
+            openGameFromSearch(gameResults[0]);
+            return;
+        }
+
+        if (creatorResults.length > 0) {
+            openCreatorFromSearch(creatorResults[0].display_name);
+            return;
+        }
+
+        toast.info("No game or creator found");
+    };
 
     const handleLogoutClick = () => {
         setActiveDropdown(null);
@@ -257,16 +369,67 @@ export default function Header() {
                         <Menu size={22} />
                     </button>
                     {/* Search: full width on mobile (logged in or out) — uses most of the bar */}
-                    <div className="relative group w-full flex-1 min-w-0">
+                    <div ref={searchRef} className="relative group w-full flex-1 min-w-0">
                         <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors pointer-events-none">
                             <Search size={16} className="sm:w-[18px] sm:h-[18px]" />
                         </div>
-                        <input
-                            type="search"
-                            enterKeyHint="search"
-                            placeholder="Games, creators…"
-                            className="w-full bg-[#0f212e] border border-white/10 rounded-full py-2 pl-9 pr-3 sm:py-2.5 sm:pl-12 sm:pr-5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all font-medium"
-                        />
+                        <form onSubmit={handleSearchSubmit}>
+                            <input
+                                type="search"
+                                enterKeyHint="search"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onFocus={() => setIsSearchOpen(true)}
+                                placeholder="Games, creators…"
+                                className="w-full bg-[#0f212e] border border-white/10 rounded-full py-2 pl-9 pr-3 sm:py-2.5 sm:pl-12 sm:pr-5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all font-medium"
+                            />
+                        </form>
+
+                        {isSearchOpen && normalizedQuery && (
+                            <div className="absolute left-0 right-0 top-[calc(100%+8px)] rounded-2xl border border-white/10 bg-[#0f212e] shadow-2xl overflow-hidden z-50">
+                                {gameResults.length === 0 && creatorResults.length === 0 && !isSearchingCreators ? (
+                                    <div className="px-4 py-3 text-xs text-slate-400">No results found.</div>
+                                ) : (
+                                    <>
+                                        {gameResults.length > 0 && (
+                                            <div className="py-1">
+                                                <div className="px-4 py-2 text-[10px] uppercase tracking-wider text-slate-500 font-bold">Games</div>
+                                                {gameResults.map((name) => (
+                                                    <button
+                                                        key={name}
+                                                        type="button"
+                                                        onClick={() => openGameFromSearch(name)}
+                                                        className="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-white/5 hover:text-white transition-colors"
+                                                    >
+                                                        {name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {creatorResults.length > 0 && (
+                                            <div className="py-1 border-t border-white/5">
+                                                <div className="px-4 py-2 text-[10px] uppercase tracking-wider text-slate-500 font-bold">Influencers</div>
+                                                {creatorResults.map((creator: any) => (
+                                                    <button
+                                                        key={creator.display_name}
+                                                        type="button"
+                                                        onClick={() => openCreatorFromSearch(creator.display_name)}
+                                                        className="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-white/5 hover:text-white transition-colors"
+                                                    >
+                                                        {creator.display_name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {isSearchingCreators && (
+                                            <div className="px-4 py-2 text-xs text-slate-500 border-t border-white/5">Searching influencers...</div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                 </div>

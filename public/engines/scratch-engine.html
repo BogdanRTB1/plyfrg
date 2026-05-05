@@ -290,7 +290,7 @@
     if (shouldWin && symbols.length > 0) {
       const winIdx = Math.floor(Math.random() * symbols.length);
       const winSym = symbols[winIdx];
-      isWin = true; winAmount = winSym.payout || 1; winningSymbolId = winSym.id;
+      isWin = true; winAmount = Math.max(1, Math.min(8, winSym.payout || 1)); winningSymbolId = winSym.id;
       const flat = new Array(rows * cols).fill(-1);
       const pos = [];
       while (pos.length < 3) {
@@ -333,6 +333,24 @@
     const w = canvas.width, h = canvas.height;
     if (w === 0 || h === 0) return;
     ctx.globalCompositeOperation = 'source-over';
+    const cover = config?.coverImage;
+    if (cover && (cover.startsWith('data:image') || cover.startsWith('http') || cover.startsWith('/'))) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+      };
+      img.onerror = () => {
+        const accent = config?.theme?.accentColor || '#f59e0b';
+        const grd = ctx.createLinearGradient(0, 0, w, h);
+        grd.addColorStop(0, accent); grd.addColorStop(1, '#1a2c38');
+        ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
+      };
+      img.src = cover;
+      return;
+    }
+
     const accent = config?.theme?.accentColor || '#f59e0b';
     const grd = ctx.createLinearGradient(0, 0, w, h);
     grd.addColorStop(0, accent); grd.addColorStop(1, '#1a2c38');
@@ -345,11 +363,35 @@
     ctx.fillText('SCRATCH HERE', w / 2, h / 2);
   }
 
+  function scratchStar(x, y, outerRadius, points = 5) {
+    const innerRadius = outerRadius * 0.45;
+    const step = Math.PI / points;
+    ctx.beginPath();
+    for (let i = 0; i < points * 2; i++) {
+      const r = i % 2 === 0 ? outerRadius : innerRadius;
+      const angle = i * step - Math.PI / 2;
+      const px = x + Math.cos(angle) * r;
+      const py = y + Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
   function scratch(x, y) {
     if (revealed) return;
     ctx.globalCompositeOperation = 'destination-out';
     const size = config?.brushSize || 40;
-    ctx.beginPath(); ctx.arc(x, y, size / 2, 0, Math.PI * 2); ctx.fill();
+    const shape = config?.brushShape || 'circle';
+    if (shape === 'square') {
+      ctx.fillRect(x - size / 2, y - size / 2, size, size);
+    } else if (shape === 'star') {
+      scratchStar(x, y, size / 2);
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.globalCompositeOperation = 'source-over';
     moveCount++;
     if (moveCount >= 5) { moveCount = 0; checkProgress(); }
@@ -382,7 +424,7 @@
     } else {
       overlay.classList.add('lose'); resultText.textContent = 'TRY AGAIN';
     }
-    parent.postMessage({ type: 'SCRATCH_RESULT', win: isWin, multiplier: isWin ? winAmount : 0, winningSymbol: winningSymbolId }, '*');
+    parent.postMessage({ type: 'SCRATCH_RESULT', win: isWin, multiplier: isWin ? Number(winAmount.toFixed(1)) : 0, winningSymbol: winningSymbolId }, '*');
   }
 
   function resetGame() {

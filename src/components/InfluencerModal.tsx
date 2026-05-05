@@ -2,22 +2,23 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Heart, MessageCircle, Share2, Flame, Trophy, Smartphone, Minus, Plus, MoreHorizontal } from "lucide-react";
+import { X, Heart, MessageCircle, Share2, Flame, Trophy, Smartphone, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
-import MobileGameHudBar from "./MobileGameHudBar";
+import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import confetti from "canvas-confetti";
 
 const EVENTS = [
-    { text: "Viral dance video!", mult: 1.5, type: 'good' },
-    { text: "Signed brand deal!", mult: 1.3, type: 'good' },
-    { text: "MrBeast commented!", mult: 2.0, type: 'good' },
-    { text: "Trending #1!", mult: 1.2, type: 'good' },
-    { text: "Exposed drama...", mult: 0.5, type: 'bad' },
-    { text: "Canceled on Twitter!", mult: 0.3, type: 'bad' },
-    { text: "Shadowbanned...", mult: 0.7, type: 'bad' },
-    { text: "Fake apology video...", mult: 0.1, type: 'bad' }
+    { text: "Viral dance video!", mult: 1.35, type: 'good' },
+    { text: "Signed brand deal!", mult: 1.22, type: 'good' },
+    { text: "MrBeast commented!", mult: 1.75, type: 'good' },
+    { text: "Trending #1!", mult: 1.15, type: 'good' },
+    { text: "Stadium collab announced!", mult: 4.2, type: 'good' },
+    { text: "Exposed drama...", mult: 0.55, type: 'bad' },
+    { text: "Canceled on Twitter!", mult: 0.35, type: 'bad' },
+    { text: "Shadowbanned...", mult: 0.72, type: 'bad' },
+    { text: "Fake apology video...", mult: 0.18, type: 'bad' }
 ];
 
 export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds, forgesCoins, setForgesCoins }: any) {
@@ -54,11 +55,15 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
         if (timerRef.current) clearInterval(timerRef.current);
 
         timerRef.current = setInterval(() => {
-            if (Math.random() > 0.4) {
-                const randomEvent = EVENTS[Math.floor(Math.random() * EVENTS.length)];
+            if (Math.random() > 0.48) {
+                const goods = EVENTS.filter((e) => e.type === 'good');
+                const bads = EVENTS.filter((e) => e.type === 'bad');
+                const pickBad = Math.random() < 0.68;
+                const pool = pickBad ? bads : goods;
+                const randomEvent = pool[Math.floor(Math.random() * pool.length)];
                 setEventText(randomEvent.text);
 
-                setMultiplier(prev => {
+                setMultiplier((prev) => {
                     const next = prev * randomEvent.mult;
                     if (next < 0.2) {
                         if (timerRef.current) clearInterval(timerRef.current);
@@ -69,7 +74,7 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
                     return next;
                 });
             } else {
-                setMultiplier(prev => prev + 0.1);
+                setMultiplier((prev) => prev + 0.07);
                 setEventText("Steady growth...");
             }
 
@@ -94,7 +99,7 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
         if (timerRef.current) clearInterval(timerRef.current);
 
         setGameState('WON');
-        const winAmount = betAmount * multiplier;
+        const winAmount = betAmount * multiplier * 0.9;
         setLastWin({ amount: winAmount, currency: currencyType });
 
         if (currencyType === 'GC') {
@@ -135,15 +140,12 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
                 <MobileGameHudBar
                     className="bg-[#121c22]"
                     left={
-                        <>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
-                            <div className="flex min-w-0 max-w-[6rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
-                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
-                                <span className="min-w-0 truncate px-0.5 text-center text-xs font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
-                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
-                            </div>
-                        </>
+                        <MobileHudBetRow
+                            betAmount={betAmount}
+                            balance={balance}
+                            onBetChange={handleBetChange}
+                            disabled={gameState === "PLAYING"}
+                        />
                     }
                     center={
                         gameState === "PLAYING" ? (
@@ -160,7 +162,11 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
                     right={
                         <>
                             <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(balance)} className="shrink-0 rounded-lg border border-purple-500/30 bg-[#1a2c38] px-3 py-3 text-xs font-black text-purple-400 active:scale-95 disabled:opacity-40">MAX</button>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <MobileHudCurrencyToggle
+                                isGC={currencyType === "GC"}
+                                disabled={gameState === "PLAYING"}
+                                onToggle={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))}
+                            />
                             <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
                         </>
                     }
@@ -178,8 +184,8 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
                     </div>
 
                     <div className="bg-[#0f171c] p-1 rounded-xl flex border border-white/5">
-                        <button onClick={() => setCurrencyType('GC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> Diamonds</button>
-                        <button onClick={() => setCurrencyType('FC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> Coins</button>
+                        <button onClick={() => setCurrencyType('GC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> GC</button>
+                        <button onClick={() => setCurrencyType('FC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> FC</button>
                     </div>
 
                     <div className="space-y-2 mt-2">

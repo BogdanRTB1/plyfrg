@@ -9,6 +9,7 @@ import { User as UserIcon, Calendar, Trophy, Medal, Star, Shield, Lock, Activity
 import Image from "next/image";
 import { motion } from "framer-motion";
 import AIGameModal from "@/components/AIGameModal";
+import { loadPublishedGames } from "@/utils/publishedGamesStorage";
 
 export default function ProfilePage() {
     const params = useParams();
@@ -116,21 +117,12 @@ export default function ProfilePage() {
                 setUniquePlayers(Math.floor(Math.random() * 5000) + 150);
 
                 // Load custom created games for this user from local storage
-                const aiGamesStr = localStorage.getItem('custom_published_games');
-                let allGames: any[] = [];
-                if (aiGamesStr) {
-                    try {
-                        const parsed = JSON.parse(aiGamesStr);
-                        allGames = parsed.filter((g: any) => {
-                            const matchUsername = g.creatorName?.toLowerCase() === username.toLowerCase();
-                            const matchCreatorName = foundCreator && g.creatorName?.toLowerCase() === foundCreator.display_name?.toLowerCase();
-                            return matchUsername || matchCreatorName;
-                        });
-
-                    } catch (e) {
-                        console.error(e);
-                    }
-                }
+                const parsedGames = await loadPublishedGames();
+                let allGames: any[] = (parsedGames || []).filter((g: any) => {
+                    const matchUsername = g.creatorName?.toLowerCase() === username.toLowerCase();
+                    const matchCreatorName = foundCreator && g.creatorName?.toLowerCase() === foundCreator.display_name?.toLowerCase();
+                    return matchUsername || matchCreatorName;
+                });
                 
                 // Also merge manually assigned games from the creator profile
                 if (foundCreator && foundCreator.assignedGames && Array.isArray(foundCreator.assignedGames)) {

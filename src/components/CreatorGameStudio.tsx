@@ -36,14 +36,18 @@ import {
 } from '@/types/hiloConfig';
 import CustomHiloModal from './CustomHiloModal';
 import { createClient } from '@/utils/supabase/client';
+import { deletePublishedGameById, loadPublishedGames, savePublishedGame } from '@/utils/publishedGamesStorage';
+import { playSlotReelTickSound, playSlotSpinSound } from '@/utils/slotSpinSound';
 
 // ─── Sound Helper ──────────────────────────────────────────────────────────
 const playSynthSound = (type: string) => {
     try {
         if (type === 'spin') {
-            const audio = new Audio('/game sounds/slots.mp3');
-            audio.volume = 0.5;
-            audio.play().catch(() => {});
+            playSlotSpinSound(0.34);
+            return;
+        }
+        if (type === 'reel_tick') {
+            playSlotReelTickSound(0.26);
             return;
         }
         const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -82,7 +86,28 @@ const WIN_EFFECTS = [
     { id: 'none', icon: '❌', name: 'None' },
 ];
 
+/** Wheel segments scaled to this RTP cap when published */
+const WHEEL_TARGET_CREATOR_RTP = 0.78;
+/** Case opening publishes scale-down multipliers to this RTP cap */
+const CASE_TARGET_CREATOR_RTP = 0.78;
+const MIN_VISIBLE_WIN_CHANCE = 0.08;
+const MAX_SCRATCH_WIN_PROBABILITY = 0.32;
+const SLOT_VOLATILITY_PAYOUT_SCALE: Record<'low' | 'medium' | 'high', number> = {
+    low: 0.60,
+    medium: 0.50,
+    high: 0.41,
+};
+/** Extra haircut on exported slot paytables (pairs with server /api/spin profile) */
+const SLOT_TEMPLATE_PAYTABLE_TRIM = 0.91;
+const CRASH_MIN_HOUSE_EDGE = 12;
+const CRASH_MAX_HOUSE_EDGE = 22;
+const SCRATCH_TARGET_CREATOR_RTP = 0.78;
+const SCRATCH_MAX_SYMBOL_PAYOUT = 6;
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
 type GameType = 'slots' | 'crash' | 'scratch' | 'wheel' | 'mines' | 'case' | 'hilo';
+type WheelOddsProfile = 'house_safe' | 'balanced' | 'volatile';
 
 interface CreatorGameStudioProps {
     creatorData: any;
@@ -154,6 +179,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
     // ─── Wheel Config State ─────────────────────────────────────────────────
     const [wheelSegments, setWheelSegments] = useState<WheelSegment[]>([...DEFAULT_WHEEL_SEGMENTS]);
+    const [wheelOddsProfile, setWheelOddsProfile] = useState<WheelOddsProfile>('house_safe');
     const [wheelPointerStyle, setWheelPointerStyle] = useState<'arrow' | 'finger' | 'sword' | 'microphone' | 'custom'>(DEFAULT_WHEEL_CONFIG.pointerStyle);
     const [wheelPointerImage, setWheelPointerImage] = useState<string | null>(null);
     const [wheelTexture, setWheelTexture] = useState(DEFAULT_WHEEL_CONFIG.wheelTexture);
@@ -280,18 +306,28 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
     // ─── Build Config JSON ─────────────────────────────────────────────────
     const buildConfig = useCallback((): SlotConfig => {
+        const volatilityScale = SLOT_VOLATILITY_PAYOUT_SCALE[volatility] ?? SLOT_VOLATILITY_PAYOUT_SCALE.medium;
+        const payoutSafeSymbols = symbols.map((symbol) => ({
+            ...symbol,
+            payouts: {
+                3: symbol.payouts[3] ? Number((Math.max(0, symbol.payouts[3]) * volatilityScale * SLOT_TEMPLATE_PAYTABLE_TRIM).toFixed(3)) : undefined,
+                4: symbol.payouts[4] ? Number((Math.max(0, symbol.payouts[4]) * volatilityScale * SLOT_TEMPLATE_PAYTABLE_TRIM).toFixed(3)) : undefined,
+                5: symbol.payouts[5] ? Number((Math.max(0, symbol.payouts[5]) * volatilityScale * SLOT_TEMPLATE_PAYTABLE_TRIM).toFixed(3)) : undefined,
+            },
+        }));
+
         return {
             gridLayout,
             rows: gridPreset.rows,
             cols: gridPreset.cols,
-            symbols,
+            symbols: payoutSafeSymbols,
             volatility,
             features: {
                 wildEnabled,
                 wildSymbolId: wildEnabled ? wildSymbolId : undefined,
                 scatterEnabled,
                 scatterSymbolId: scatterEnabled ? scatterSymbolId : undefined,
-                freeSpinsCount,
+                freeSpinsCount: Math.max(3, Math.min(freeSpinsCount, 8)),
                 progressiveMultiplier,
                 tumbleEnabled,
             },
@@ -307,6 +343,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
     // ─── Build Crash Config JSON ──────────────────────────────────────────
     const buildCrashConfig = useCallback((): CrashConfig => {
+        const boundedHouseEdge = clamp(crashHouseEdge, CRASH_MIN_HOUSE_EDGE, CRASH_MAX_HOUSE_EDGE);
         return {
             flyingObject: crashFlyingObjectImage || crashFlyingObject,
             crashImage: crashCrashImage,
@@ -315,7 +352,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
             backgroundColor: crashBgColor,
             graphColor: crashGraphColor,
             maxMultiplier: crashMaxMultiplier,
-            houseEdge: crashHouseEdge,
+            houseEdge: boundedHouseEdge,
             accelerationCurve: crashAcceleration,
             theme: {
                 gameName: crashGameName,
@@ -361,15 +398,29 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
     // ─── Build Scratch Config JSON ────────────────────────────────────────
     const buildScratchConfig = useCallback((): ScratchConfig => {
         const preset = GRID_SIZE_PRESETS[scratchGridSize];
+        const payoutSafeScratchSymbols = scratchSymbols.map((symbol) => ({
+            ...symbol,
+            payout: Math.max(1, Math.min(SCRATCH_MAX_SYMBOL_PAYOUT, Number(symbol.payout) || 1)),
+        }));
+        const averagePayout = scratchSymbols.length > 0
+            ? payoutSafeScratchSymbols.reduce((sum, symbol) => sum + Math.max(1, Number(symbol.payout) || 1), 0) / payoutSafeScratchSymbols.length
+            : 1;
+        const cappedWinProbability = Math.min(
+            scratchWinProbability,
+            MAX_SCRATCH_WIN_PROBABILITY,
+            SCRATCH_TARGET_CREATOR_RTP / Math.max(averagePayout, 1)
+        );
+        const safeWinProbability = clamp(cappedWinProbability, MIN_VISIBLE_WIN_CHANCE, MAX_SCRATCH_WIN_PROBABILITY);
+
         return {
             gridSize: scratchGridSize,
             rows: preset.rows,
             cols: preset.cols,
-            symbols: scratchSymbols,
+            symbols: payoutSafeScratchSymbols,
             coverImage: scratchCoverImage,
             brushShape: scratchBrushShape,
             brushSize: scratchBrushSize,
-            winProbability: scratchWinProbability,
+            winProbability: safeWinProbability,
             theme: {
                 gameName: scratchGameName,
                 gameDescription: scratchGameDescription,
@@ -397,6 +448,53 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
     // ─── Build Wheel Config JSON ─────────────────────────────────────────────
     const buildWheelConfig = useCallback((): WheelConfig => {
+        const profileWeights: Record<WheelOddsProfile, { low: number; medium: number; high: number; special: number }> = {
+            house_safe: { low: 0.72, medium: 0.18, high: 0.07, special: 0.03 },
+            balanced: { low: 0.58, medium: 0.28, high: 0.11, special: 0.03 },
+            volatile: { low: 0.48, medium: 0.3, high: 0.17, special: 0.05 },
+        };
+        const weights = profileWeights[wheelOddsProfile];
+
+        const categorized = wheelSegments.map((segment) => {
+            if (segment.specialType) return { ...segment, _bucket: 'special' as const };
+            const multiplier = Math.max(0, Number(segment.multiplier) || 0);
+            if (multiplier <= 1) return { ...segment, _bucket: 'low' as const };
+            if (multiplier <= 2.5) return { ...segment, _bucket: 'medium' as const };
+            return { ...segment, _bucket: 'high' as const };
+        });
+
+        const bucketCounts = categorized.reduce(
+            (acc, segment) => ({ ...acc, [segment._bucket]: acc[segment._bucket] + 1 }),
+            { low: 0, medium: 0, high: 0, special: 0 }
+        );
+
+        const probabilityTotal = categorized.reduce((sum, segment) => {
+            const bucketWeight = weights[segment._bucket];
+            const perSegmentWeight = bucketWeight / Math.max(1, bucketCounts[segment._bucket]);
+            return sum + perSegmentWeight;
+        }, 0);
+
+        const normalizedSegments = categorized.map((segment) => {
+            const bucketWeight = weights[segment._bucket];
+            const perSegmentWeight = bucketWeight / Math.max(1, bucketCounts[segment._bucket]);
+            return {
+            ...segment,
+            realProbability: probabilityTotal > 0
+                    ? perSegmentWeight / probabilityTotal
+                    : 1 / Math.max(wheelSegments.length, 1),
+            };
+        });
+        const expectedPayout = normalizedSegments.reduce(
+            (sum, segment) => sum + (Math.max(0, Number(segment.multiplier) || 0) * segment.realProbability),
+            0
+        );
+        const payoutScale = expectedPayout > WHEEL_TARGET_CREATOR_RTP ? WHEEL_TARGET_CREATOR_RTP / expectedPayout : 1;
+        const payoutSafeSegments = normalizedSegments.map((segment) =>
+            segment.specialType
+                ? segment
+                : { ...segment, multiplier: Number((Math.max(0, segment.multiplier) * payoutScale).toFixed(1)) }
+        );
+
         return {
             pointerStyle: wheelPointerStyle,
             pointerImage: wheelPointerImage,
@@ -406,7 +504,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
             backgroundImage: wheelBgImage,
             tickSound: wheelTickSound,
             tickSoundFile: wheelTickSoundFile,
-            segments: wheelSegments,
+            segments: payoutSafeSegments,
             enableTrollWheel: wheelEnableTrollWheel,
             confettiType: wheelConfettiType,
             confettiImage: wheelConfettiImage,
@@ -415,7 +513,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                 gameDescription: wheelGameDescription,
             },
         };
-    }, [wheelPointerStyle, wheelPointerImage, wheelTexture, wheelAccentColor, wheelBgColor, wheelBgImage, wheelTickSound, wheelTickSoundFile, wheelSegments, wheelEnableTrollWheel, wheelConfettiType, wheelConfettiImage, wheelGameName, wheelGameDescription]);
+    }, [wheelPointerStyle, wheelPointerImage, wheelTexture, wheelAccentColor, wheelBgColor, wheelBgImage, wheelTickSound, wheelTickSoundFile, wheelSegments, wheelEnableTrollWheel, wheelConfettiType, wheelConfettiImage, wheelGameName, wheelGameDescription, wheelOddsProfile]);
 
     // ─── Build Mines Config JSON ─────────────────────────────────────────────
     const buildMinesConfig = useCallback((): MinesConfig => {
@@ -444,6 +542,21 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
     // ─── Build Case Config JSON ──────────────────────────────────────────────
     const buildCaseConfig = useCallback((): CaseConfig => {
+        const totalProbability = caseItems.reduce((sum, item) => sum + Math.max(0, Number(item.probability) || 0), 0);
+        const normalizedItems = caseItems.map((item) => ({
+            ...item,
+            probability: totalProbability > 0
+                ? (Math.max(0, Number(item.probability) || 0) / totalProbability) * 100
+                : 100 / Math.max(caseItems.length, 1),
+        }));
+        const expectedPayout = normalizedItems.reduce((sum, item) => sum + (item.multiplier * item.probability) / 100, 0);
+        const payoutScale = expectedPayout > CASE_TARGET_CREATOR_RTP ? CASE_TARGET_CREATOR_RTP / expectedPayout : 1;
+        const payoutSafeItems = normalizedItems.map((item) => ({
+            ...item,
+            multiplier: Number((Math.max(0, item.multiplier) * payoutScale).toFixed(3)),
+            probability: Number(item.probability.toFixed(4)),
+        }));
+
         return {
             collectionName: caseCollectionName,
             caseDesign,
@@ -455,7 +568,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
             openingSoundType: caseOpeningSoundType,
             openingSoundFile: caseOpeningSoundFile,
             enableRareExplosionSound: caseEnableRareExplosion,
-            items: caseItems,
+            items: payoutSafeItems,
             scrollDuration: caseScrollDuration,
             theme: {
                 gameName: caseGameName,
@@ -605,61 +718,9 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
         }));
     };
 
-    const DATA_URL_SIZE_LIMIT = 120_000;
-    const MAX_PUBLISHED_GAMES = 50;
     const GAME_ASSETS_BUCKET = 'game-assets';
     const FALLBACK_ASSETS_BUCKET = 'avatars';
     const supabase = createClient();
-
-    const compactLargeDataUrls = (value: any): any => {
-        if (typeof value === 'string' && value.startsWith('data:') && value.length > DATA_URL_SIZE_LIMIT) {
-            return null;
-        }
-
-        if (Array.isArray(value)) {
-            return value.map(compactLargeDataUrls);
-        }
-
-        if (value && typeof value === 'object') {
-            const compacted: Record<string, any> = {};
-            Object.entries(value).forEach(([key, nestedValue]) => {
-                compacted[key] = compactLargeDataUrls(nestedValue);
-            });
-            return compacted;
-        }
-
-        return value;
-    };
-
-    const persistPublishedGames = (games: any[]) => {
-        const trimmedToLimit = games.slice(0, MAX_PUBLISHED_GAMES);
-
-        try {
-            localStorage.setItem('custom_published_games', JSON.stringify(trimmedToLimit));
-            window.dispatchEvent(new Event('storage'));
-            return true;
-        } catch (error) {
-            console.warn('Failed to store full game payload, trying compact mode.', error);
-        }
-
-        const compacted = trimmedToLimit.map(compactLargeDataUrls);
-        for (let keep = compacted.length; keep >= 1; keep -= 1) {
-            try {
-                localStorage.setItem('custom_published_games', JSON.stringify(compacted.slice(0, keep)));
-                window.dispatchEvent(new Event('storage'));
-                if (keep < compacted.length) {
-                    alert('Storage was almost full. Older games were trimmed to save the latest publish.');
-                } else {
-                    alert('Storage was full. Large embedded assets were trimmed from saved games.');
-                }
-                return true;
-            } catch {
-                // Continue trimming until payload fits.
-            }
-        }
-
-        return false;
-    };
 
     const getFileExtensionForDataUrl = (dataUrl: string) => {
         const mime = dataUrl.match(/^data:(.*?);base64,/)?.[1] || '';
@@ -741,24 +802,25 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
     };
 
     // ─── Delete Game ───────────────────────────────────────────────────────
-    const deleteGame = (gameId: string) => {
-        const data = localStorage.getItem('custom_published_games');
-        if (data) {
-            const allGames = JSON.parse(data);
-            const filtered = allGames.filter((g: any) => g.id !== gameId);
-            persistPublishedGames(filtered);
+    const deleteGame = async (gameId: string) => {
+        const ok = await deletePublishedGameById(gameId);
+        if (!ok) {
+            alert("Failed to delete game from database.");
         }
     };
 
     // ─── Publish ───────────────────────────────────────────────────────────
-    const handlePublish = () => {
+    const hasDuplicateName = async (name: string) => {
+        const existing = await loadPublishedGames();
+        return existing.some((g: any) => (g?.name || "").toLowerCase() === name.trim().toLowerCase());
+    };
+
+    const handlePublish = async () => {
         if (gameType === 'slots') {
             if (!gameName.trim()) { alert("Please provide a game name."); return; }
             if (!coverImage) { alert("Please upload a cover image before publishing."); return; }
 
-            const existingStr = localStorage.getItem('custom_published_games');
-            const existing = existingStr ? JSON.parse(existingStr) : [];
-            if (existing.some((g: any) => g.name.toLowerCase() === gameName.trim().toLowerCase())) {
+            if (await hasDuplicateName(gameName)) {
                 alert("A game with this name already exists. Please choose a unique name.");
                 return;
             }
@@ -784,11 +846,12 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                 };
                 const preparedGame = await prepareGameForStorage(newGame);
 
-                const gamesStr = localStorage.getItem('custom_published_games');
-                const games = gamesStr ? JSON.parse(gamesStr) : [];
-                if (!persistPublishedGames([preparedGame, ...games])) {
+                const saveResult = await savePublishedGame(preparedGame);
+                if (!saveResult.ok) {
                     setIsPublishing(false);
-                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    alert(saveResult.reason === 'duplicate_name'
+                        ? 'A game with this name already exists. Please choose a unique name.'
+                        : 'Could not save the game. Please try again.');
                     return;
                 }
                 setIsPublishing(false);
@@ -806,9 +869,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
             if (!crashGameName.trim()) { alert("Please provide a game name."); return; }
             if (!crashCoverImage) { alert("Please upload a cover image before publishing."); return; }
 
-            const existingStr = localStorage.getItem('custom_published_games');
-            const existing = existingStr ? JSON.parse(existingStr) : [];
-            if (existing.some((g: any) => g.name.toLowerCase() === crashGameName.trim().toLowerCase())) {
+            if (await hasDuplicateName(crashGameName)) {
                 alert("A game with this name already exists. Please choose a unique name.");
                 return;
             }
@@ -837,11 +898,12 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                 };
                 const preparedGame = await prepareGameForStorage(newGame);
 
-                const gamesStr = localStorage.getItem('custom_published_games');
-                const games = gamesStr ? JSON.parse(gamesStr) : [];
-                if (!persistPublishedGames([preparedGame, ...games])) {
+                const saveResult = await savePublishedGame(preparedGame);
+                if (!saveResult.ok) {
                     setIsPublishing(false);
-                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    alert(saveResult.reason === 'duplicate_name'
+                        ? 'A game with this name already exists. Please choose a unique name.'
+                        : 'Could not save the game. Please try again.');
                     return;
                 }
                 setIsPublishing(false);
@@ -859,9 +921,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
             if (!scratchGameName.trim()) { alert("Please provide a game name."); return; }
             if (!scratchLobbyCover) { alert("Please upload a cover image before publishing."); return; }
 
-            const existingStr = localStorage.getItem('custom_published_games');
-            const existing = existingStr ? JSON.parse(existingStr) : [];
-            if (existing.some((g: any) => g.name.toLowerCase() === scratchGameName.trim().toLowerCase())) {
+            if (await hasDuplicateName(scratchGameName)) {
                 alert("A game with this name already exists. Please choose a unique name.");
                 return;
             }
@@ -887,11 +947,12 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                 };
                 const preparedGame = await prepareGameForStorage(newGame);
 
-                const gamesStr = localStorage.getItem('custom_published_games');
-                const games = gamesStr ? JSON.parse(gamesStr) : [];
-                if (!persistPublishedGames([preparedGame, ...games])) {
+                const saveResult = await savePublishedGame(preparedGame);
+                if (!saveResult.ok) {
                     setIsPublishing(false);
-                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    alert(saveResult.reason === 'duplicate_name'
+                        ? 'A game with this name already exists. Please choose a unique name.'
+                        : 'Could not save the game. Please try again.');
                     return;
                 }
                 setIsPublishing(false);
@@ -909,9 +970,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
             if (!wheelGameName.trim()) { alert("Please provide a game name."); return; }
             if (!wheelCoverImage) { alert("Please upload a cover image before publishing."); return; }
 
-            const existingStr = localStorage.getItem('custom_published_games');
-            const existing = existingStr ? JSON.parse(existingStr) : [];
-            if (existing.some((g: any) => g.name.toLowerCase() === wheelGameName.trim().toLowerCase())) {
+            if (await hasDuplicateName(wheelGameName)) {
                 alert("A game with this name already exists. Please choose a unique name.");
                 return;
             }
@@ -937,11 +996,12 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                 };
                 const preparedGame = await prepareGameForStorage(newGame);
 
-                const gamesStr = localStorage.getItem('custom_published_games');
-                const games = gamesStr ? JSON.parse(gamesStr) : [];
-                if (!persistPublishedGames([preparedGame, ...games])) {
+                const saveResult = await savePublishedGame(preparedGame);
+                if (!saveResult.ok) {
                     setIsPublishing(false);
-                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    alert(saveResult.reason === 'duplicate_name'
+                        ? 'A game with this name already exists. Please choose a unique name.'
+                        : 'Could not save the game. Please try again.');
                     return;
                 }
                 setIsPublishing(false);
@@ -959,9 +1019,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
             if (!minesGameName.trim()) { alert("Please provide a game name."); return; }
             if (!minesCoverImage) { alert("Please upload a cover image before publishing."); return; }
 
-            const existingStr = localStorage.getItem('custom_published_games');
-            const existing = existingStr ? JSON.parse(existingStr) : [];
-            if (existing.some((g: any) => g.name.toLowerCase() === minesGameName.trim().toLowerCase())) {
+            if (await hasDuplicateName(minesGameName)) {
                 alert("A game with this name already exists. Please choose a unique name.");
                 return;
             }
@@ -987,11 +1045,12 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                 };
                 const preparedGame = await prepareGameForStorage(newGame);
 
-                const gamesStr = localStorage.getItem('custom_published_games');
-                const games = gamesStr ? JSON.parse(gamesStr) : [];
-                if (!persistPublishedGames([preparedGame, ...games])) {
+                const saveResult = await savePublishedGame(preparedGame);
+                if (!saveResult.ok) {
                     setIsPublishing(false);
-                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    alert(saveResult.reason === 'duplicate_name'
+                        ? 'A game with this name already exists. Please choose a unique name.'
+                        : 'Could not save the game. Please try again.');
                     return;
                 }
                 setIsPublishing(false);
@@ -1008,9 +1067,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
             if (!caseGameName.trim()) { alert("Please provide a game name."); return; }
             if (!caseCoverImage) { alert("Please upload a cover image before publishing."); return; }
 
-            const existingStr = localStorage.getItem('custom_published_games');
-            const existing = existingStr ? JSON.parse(existingStr) : [];
-            if (existing.some((g: any) => g.name.toLowerCase() === caseGameName.trim().toLowerCase())) {
+            if (await hasDuplicateName(caseGameName)) {
                 alert("A game with this name already exists. Please choose a unique name.");
                 return;
             }
@@ -1043,11 +1100,12 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                 };
                 const preparedGame = await prepareGameForStorage(newGame);
 
-                const gamesStr = localStorage.getItem('custom_published_games');
-                const games = gamesStr ? JSON.parse(gamesStr) : [];
-                if (!persistPublishedGames([preparedGame, ...games])) {
+                const saveResult = await savePublishedGame(preparedGame);
+                if (!saveResult.ok) {
                     setIsPublishing(false);
-                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    alert(saveResult.reason === 'duplicate_name'
+                        ? 'A game with this name already exists. Please choose a unique name.'
+                        : 'Could not save the game. Please try again.');
                     return;
                 }
                 setIsPublishing(false);
@@ -1064,9 +1122,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
             if (!hiloGameName.trim()) { alert("Please provide a game name."); return; }
             if (!hiloCoverImage) { alert("Please upload a cover image before publishing."); return; }
 
-            const existingStr = localStorage.getItem('custom_published_games');
-            const existing = existingStr ? JSON.parse(existingStr) : [];
-            if (existing.some((g: any) => g.name.toLowerCase() === hiloGameName.trim().toLowerCase())) {
+            if (await hasDuplicateName(hiloGameName)) {
                 alert("A game with this name already exists. Please choose a unique name.");
                 return;
             }
@@ -1092,11 +1148,12 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                 };
                 const preparedGame = await prepareGameForStorage(newGame);
 
-                const gamesStr = localStorage.getItem('custom_published_games');
-                const games = gamesStr ? JSON.parse(gamesStr) : [];
-                if (!persistPublishedGames([preparedGame, ...games])) {
+                const saveResult = await savePublishedGame(preparedGame);
+                if (!saveResult.ok) {
                     setIsPublishing(false);
-                    alert('Could not save the game because browser storage is full. Remove a few old games and try again.');
+                    alert(saveResult.reason === 'duplicate_name'
+                        ? 'A game with this name already exists. Please choose a unique name.'
+                        : 'Could not save the game. Please try again.');
                     return;
                 }
                 setIsPublishing(false);
@@ -1141,49 +1198,49 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
     return (
         <>
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full space-y-6">
-            <div className="bg-[#0b1622]/90 backdrop-blur-xl rounded-[32px] p-6 sm:p-8 border border-white/10 relative overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+            <div className="bg-[#0b1622]/90 backdrop-blur-xl rounded-[24px] border border-white/10 relative overflow-hidden p-4 shadow-[0_0_50px_rgba(0,0,0,0.5)] sm:rounded-[28px] sm:p-6 md:rounded-[32px] md:p-8">
 
                 {/* ─── Header ─────────────────────────────────────────────── */}
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${gameType === 'crash' ? 'bg-emerald-500/20 text-emerald-400' : gameType === 'scratch' ? 'bg-amber-500/20 text-amber-400' : gameType === 'wheel' ? 'bg-rose-500/20 text-rose-400' : gameType === 'mines' ? 'bg-orange-500/20 text-orange-400' : 'bg-purple-500/20 text-purple-400'}`}>
-                                {gameType === 'crash' ? <Rocket size={24} /> : gameType === 'scratch' ? <Sparkles size={24} /> : gameType === 'wheel' ? <RotateCcw size={24} /> : gameType === 'mines' ? <Grid3X3 size={24} /> : <Sparkles size={24} />}
+                <div className="mb-4 flex justify-between items-center sm:mb-6">
+                    <div className="min-w-0">
+                        <div className="mb-2 flex items-center gap-2 sm:gap-3">
+                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 sm:rounded-xl ${gameType === 'crash' ? 'bg-emerald-500/20 text-emerald-400' : gameType === 'scratch' ? 'bg-amber-500/20 text-amber-400' : gameType === 'wheel' ? 'bg-rose-500/20 text-rose-400' : gameType === 'mines' ? 'bg-orange-500/20 text-orange-400' : gameType === 'case' ? 'bg-indigo-500/20 text-indigo-400' : gameType === 'hilo' ? 'bg-sky-500/20 text-sky-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                                {gameType === 'crash' ? <Rocket size={18} className="sm:h-6 sm:w-6" /> : gameType === 'scratch' ? <Sparkles size={18} className="sm:h-6 sm:w-6" /> : gameType === 'wheel' ? <RotateCcw size={18} className="sm:h-6 sm:w-6" /> : gameType === 'mines' ? <Grid3X3 size={18} className="sm:h-6 sm:w-6" /> : <Sparkles size={18} className="sm:h-6 sm:w-6" />}
                             </div>
-                            <h2 className="text-3xl font-black text-white tracking-tight">Game Creator Studio</h2>
+                            <h2 className="truncate text-xl font-black tracking-tight text-white sm:text-2xl md:text-3xl">Game Creator Studio</h2>
                         </div>
-                        <p className="text-slate-400 font-medium">Choose a game type and customize every detail — then publish to the casino lobby.</p>
+                        <p className="text-sm font-medium leading-snug text-slate-400 md:text-[15px]">Choose a game type and customize every detail — then publish to the casino lobby.</p>
                     </div>
                 </div>
 
-                <div className="relative mb-8 z-50">
+                <div className="relative z-50 mb-6 md:mb-8">
                     <button 
                         onClick={() => setIsGameDropdownOpen(!isGameDropdownOpen)}
-                        className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between shadow-lg ${
+                        className={`flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left shadow-lg transition-all sm:p-4 ${
                             isGameDropdownOpen 
-                                ? 'bg-[#111c2a] border-indigo-500/50 shadow-[0_0_30px_rgba(99,102,241,0.15)]' 
-                                : 'bg-[#0a111a] border-white/10 hover:border-white/20 hover:bg-white/[0.02]'
+                                ? 'border-indigo-500/50 bg-[#111c2a] shadow-[0_0_30px_rgba(99,102,241,0.15)]' 
+                                : 'border-white/10 bg-[#0a111a] hover:border-white/20 hover:bg-white/[0.02]'
                         }`}
                     >
                         {(() => {
                             const current = GAME_TYPES_INFO.find(t => t.id === gameType);
                             return (
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl ${current?.iconBg}`}>
+                                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl sm:h-14 sm:w-14 sm:rounded-2xl sm:text-3xl ${current?.iconBg}`}>
                                         {current?.icon}
                                     </div>
-                                    <div>
-                                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="mb-0.5 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-slate-500 sm:text-[10px]">
                                             Selected Template
                                         </div>
-                                        <h3 className="text-2xl font-black text-white">{current?.label}</h3>
-                                        <p className="text-xs text-slate-400 mt-0.5">{current?.desc}</p>
+                                        <h3 className="truncate text-lg font-black text-white sm:text-2xl">{current?.label}</h3>
+                                        <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-400 sm:text-xs">{current?.desc}</p>
                                     </div>
                                 </div>
                             );
                         })()}
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-white/5 transition-transform ${isGameDropdownOpen ? 'rotate-180 bg-indigo-500/20 text-indigo-400' : 'text-slate-400'}`}>
-                            <ChevronDown size={20} />
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 transition-transform sm:h-10 sm:w-10 ${isGameDropdownOpen ? 'rotate-180 bg-indigo-500/20 text-indigo-400' : 'text-slate-400'}`}>
+                            <ChevronDown size={18} className="sm:h-5 sm:w-5" />
                         </div>
                     </button>
 
@@ -1193,9 +1250,9 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                 initial={{ opacity: 0, y: -10 }} 
                                 animate={{ opacity: 1, y: 0 }} 
                                 exit={{ opacity: 0, y: -10 }}
-                                className="absolute top-[calc(100%+0.5rem)] left-0 right-0 bg-[#0f1722] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-50 p-3"
+                                className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 max-h-[min(70vh,560px)] overflow-y-auto rounded-2xl border border-white/10 bg-[#0f1722] p-2 shadow-[0_20px_50px_rgba(0,0,0,0.7)] overscroll-contain sm:p-3"
                             >
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2 lg:grid-cols-3 md:gap-2">
                                     {GAME_TYPES_INFO.map((g) => (
                                         <button
                                             key={g.id}
@@ -1203,20 +1260,20 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                                 setGameType(g.id as GameType);
                                                 setIsGameDropdownOpen(false);
                                             }}
-                                            className={`p-4 rounded-xl border text-left transition-all flex items-center gap-4 w-full group ${
+                                            className={`group flex w-full items-center gap-2.5 rounded-lg border p-2.5 text-left transition-all sm:gap-4 sm:rounded-xl sm:p-4 ${
                                                 gameType === g.id 
                                                     ? g.style 
-                                                    : 'border-transparent bg-white/[0.01] hover:bg-white/5 hover:border-white/10'
+                                                    : 'border-transparent bg-white/[0.01] hover:border-white/10 hover:bg-white/5'
                                             }`}
                                         >
-                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${g.iconBg} group-hover:scale-110 transition-transform ${gameType === g.id ? 'scale-110' : ''}`}>
+                                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-lg sm:h-12 sm:w-12 sm:rounded-xl sm:text-2xl ${g.iconBg} transition-transform group-hover:scale-110 ${gameType === g.id ? 'scale-105 sm:scale-110' : ''}`}>
                                                 {g.icon}
                                             </div>
-                                            <div className="flex-1">
-                                                <h4 className={`font-black text-lg ${gameType === g.id ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>{g.label}</h4>
-                                                <p className="text-xs text-slate-500 line-clamp-1">{g.desc}</p>
+                                            <div className="min-w-0 flex-1">
+                                                <h4 className={`text-sm font-black sm:text-lg ${gameType === g.id ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>{g.label}</h4>
+                                                <p className="line-clamp-2 text-[10px] text-slate-500 sm:line-clamp-1 sm:text-xs">{g.desc}</p>
                                             </div>
-                                            {gameType === g.id && <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center"><Check size={14} className="opacity-100 text-white" /></div>}
+                                            {gameType === g.id && <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 sm:h-6 sm:w-6"><Check size={12} className="text-white opacity-100 sm:h-3.5 sm:w-3.5" /></div>}
                                         </button>
                                     ))}
                                 </div>
@@ -1636,22 +1693,22 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
                                 {/* Volatility Presets */}
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block">Volatility Template</label>
-                                    <div className="grid grid-cols-3 gap-3">
+                                    <label className="mb-3 block text-xs font-bold uppercase tracking-widest text-slate-500">Volatility Template</label>
+                                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
                                         {(Object.entries(VOLATILITY_PRESETS) as [string, typeof VOLATILITY_PRESETS['low']][]).map(([key, preset]) => (
                                             <button
                                                 key={key}
                                                 onClick={() => applyVolatility(key as any)}
-                                                className={`p-4 rounded-xl border-2 transition-all text-left ${volatility === key
+                                                className={`rounded-lg border-2 p-2.5 text-left transition-all sm:rounded-xl sm:p-4 ${volatility === key
                                                     ? 'border-amber-500 bg-gradient-to-br from-amber-500/10 to-amber-600/5'
                                                     : 'border-white/10 bg-[#0a111a] hover:border-white/20'
                                                 }`}
                                             >
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <div className={`w-3 h-3 rounded-full ${key === 'low' ? 'bg-green-400' : key === 'medium' ? 'bg-amber-400' : 'bg-red-400'}`} />
-                                                    <span className={`text-sm font-black ${volatility === key ? 'text-white' : 'text-slate-400'}`}>{preset.label}</span>
+                                                <div className="mb-1.5 flex items-center gap-1.5 sm:mb-2 sm:gap-2">
+                                                    <div className={`h-2.5 w-2.5 shrink-0 rounded-full sm:h-3 sm:w-3 ${key === 'low' ? 'bg-green-400' : key === 'medium' ? 'bg-amber-400' : 'bg-red-400'}`} />
+                                                    <span className={`text-[11px] font-black sm:text-sm ${volatility === key ? 'text-white' : 'text-slate-400'}`}>{preset.label}</span>
                                                 </div>
-                                                <p className="text-[11px] text-slate-500">{preset.description}</p>
+                                                <p className="text-[9px] leading-snug text-slate-500 sm:text-[11px]">{preset.description}</p>
                                             </button>
                                         ))}
                                     </div>
@@ -1669,9 +1726,58 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                         </button>
                                     </div>
 
-                                    <div className="bg-[#0a111a] rounded-xl border border-white/10 overflow-hidden">
-                                        {/* Header */}
-                                        <div className="grid grid-cols-[60px_1fr_80px_60px_60px_60px_40px] gap-2 p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-white/5 bg-[#080d14]">
+                                    {/* Mobile: stacked symbol cards */}
+                                    <div className="space-y-3 md:hidden">
+                                        {symbols.map((sym) => (
+                                            <div key={sym.id} className="space-y-3 rounded-xl border border-white/10 bg-[#0a111a] p-3">
+                                                <div className="flex items-start gap-2">
+                                                    <label className="relative flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[#121c22] transition-colors hover:border-purple-400/50 group">
+                                                        {sym.image.startsWith('data:image') || sym.image.startsWith('http') || sym.image.startsWith('/')
+                                                            ? <img src={sym.image} className="h-full w-full object-contain p-1" alt="" />
+                                                            : <span className="text-lg">{sym.image}</span>
+                                                        }
+                                                        <div className="absolute inset-0 flex items-center justify-center bg-black/70 opacity-0 transition-opacity group-hover:opacity-100">
+                                                            <Upload size={12} className="text-white" />
+                                                        </div>
+                                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSymbolImageUpload(sym.id, e)} />
+                                                    </label>
+                                                    <div className="min-w-0 flex-1 space-y-2">
+                                                        <input type="text" value={sym.name} onChange={(e) => setSymbols(prev => prev.map(s => s.id === sym.id ? { ...s, name: e.target.value } : s))}
+                                                            className="w-full border-b border-white/5 bg-transparent px-1 py-1 text-sm font-bold text-white transition-colors focus:border-purple-400 focus:outline-none" />
+                                                        <select value={sym.type} onChange={(e) => {
+                                                            const newType = e.target.value as 'normal' | 'wild' | 'scatter';
+                                                            setSymbols(prev => prev.map(s => s.id === sym.id ? { ...s, type: newType } : s));
+                                                            if (newType === 'wild') setWildSymbolId(sym.id);
+                                                            if (newType === 'scatter') setScatterSymbolId(sym.id);
+                                                        }}
+                                                            className="w-full cursor-pointer rounded-lg border border-white/10 bg-[#080d14] px-2 py-2 text-[11px] font-bold text-white focus:outline-none">
+                                                            <option value="normal">Normal</option>
+                                                            <option value="wild">Wild</option>
+                                                            <option value="scatter">Scatter</option>
+                                                        </select>
+                                                    </div>
+                                                    <button type="button" onClick={() => { if (symbols.length > 2) setSymbols(prev => prev.filter(s => s.id !== sym.id)); }}
+                                                        className="shrink-0 rounded p-1.5 text-slate-600 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40" disabled={symbols.length <= 2} aria-label="Remove symbol">
+                                                        <X size={16} />
+                                                    </button>
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {[3, 4, 5].map((n) => (
+                                                        <div key={n} className="space-y-1">
+                                                            <div className="text-center text-[9px] font-bold uppercase tracking-wider text-slate-500">{n}× pay</div>
+                                                            <div className="w-full rounded-lg border border-white/5 bg-[#0d1520] py-2 text-center font-mono text-xs text-white opacity-90">
+                                                                {(sym.payouts[n as 3 | 4 | 5] || 0).toFixed(1)}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Desktop: wide table */}
+                                    <div className="hidden overflow-hidden rounded-xl border border-white/10 bg-[#0a111a] md:block">
+                                        <div className="grid grid-cols-[60px_1fr_80px_60px_60px_60px_40px] gap-2 border-b border-white/5 bg-[#080d14] p-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                                             <div>Icon</div>
                                             <div>Name</div>
                                             <div>Type</div>
@@ -1681,49 +1787,42 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                             <div></div>
                                         </div>
 
-                                        {/* Symbol Rows */}
                                         {symbols.map((sym) => (
-                                            <div key={sym.id} className="grid grid-cols-[60px_1fr_80px_60px_60px_60px_40px] gap-2 p-3 items-center border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
-                                                {/* Icon */}
-                                                <label className="w-10 h-10 rounded-lg bg-[#121c22] border border-white/10 flex items-center justify-center cursor-pointer hover:border-purple-400/50 transition-colors relative overflow-hidden group">
+                                            <div key={sym.id} className="grid grid-cols-[60px_1fr_80px_60px_60px_60px_40px] items-center gap-2 border-b border-white/[0.03] p-3 transition-colors hover:bg-white/[0.02]">
+                                                <label className="group relative flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[#121c22] transition-colors hover:border-purple-400/50">
                                                     {sym.image.startsWith('data:image') || sym.image.startsWith('http') || sym.image.startsWith('/')
-                                                        ? <img src={sym.image} className="w-full h-full object-contain p-1" alt="" />
+                                                        ? <img src={sym.image} className="h-full w-full object-contain p-1" alt="" />
                                                         : <span className="text-lg">{sym.image}</span>
                                                     }
-                                                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/70 opacity-0 transition-opacity group-hover:opacity-100">
                                                         <Upload size={12} className="text-white" />
                                                     </div>
                                                     <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSymbolImageUpload(sym.id, e)} />
                                                 </label>
 
-                                                {/* Name */}
                                                 <input type="text" value={sym.name} onChange={(e) => setSymbols(prev => prev.map(s => s.id === sym.id ? { ...s, name: e.target.value } : s))}
-                                                    className="bg-transparent border-b border-white/5 focus:border-purple-400 text-white text-sm font-bold px-1 py-1 focus:outline-none transition-colors" />
+                                                    className="border-b border-white/5 bg-transparent px-1 py-1 text-sm font-bold text-white transition-colors focus:border-purple-400 focus:outline-none" />
 
-                                                {/* Type */}
                                                 <select value={sym.type} onChange={(e) => {
                                                     const newType = e.target.value as 'normal' | 'wild' | 'scatter';
                                                     setSymbols(prev => prev.map(s => s.id === sym.id ? { ...s, type: newType } : s));
                                                     if (newType === 'wild') setWildSymbolId(sym.id);
                                                     if (newType === 'scatter') setScatterSymbolId(sym.id);
                                                 }}
-                                                    className="bg-[#0a111a] border border-white/10 text-white text-[11px] font-bold rounded-lg px-2 py-1.5 focus:outline-none cursor-pointer">
+                                                    className="cursor-pointer rounded-lg border border-white/10 bg-[#0a111a] px-2 py-1.5 text-[11px] font-bold text-white focus:outline-none">
                                                     <option value="normal">Normal</option>
                                                     <option value="wild">Wild</option>
                                                     <option value="scatter">Scatter</option>
                                                 </select>
 
-                                                {/* Payouts */}
                                                 {[3, 4, 5].map(n => (
-                                                    <input key={n} type="number" step="0.1" min="0"
-                                                        value={sym.payouts[n as 3 | 4 | 5] || 0}
-                                                        onChange={(e) => setSymbols(prev => prev.map(s => s.id === sym.id ? { ...s, payouts: { ...s.payouts, [n]: parseFloat(e.target.value) || 0 } } : s))}
-                                                        className="w-full bg-[#0d1520] border border-white/5 text-center text-white font-mono text-xs rounded-lg py-1 focus:outline-none focus:border-purple-400 transition-colors" />
+                                                    <div key={n} className="w-full rounded-lg border border-white/5 bg-[#0d1520] py-1.5 text-center font-mono text-xs text-white opacity-80">
+                                                        {(sym.payouts[n as 3 | 4 | 5] || 0).toFixed(1)}
+                                                    </div>
                                                 ))}
 
-                                                {/* Delete */}
-                                                <button onClick={() => { if (symbols.length > 2) setSymbols(prev => prev.filter(s => s.id !== sym.id)); }}
-                                                    className="text-slate-600 hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10 mx-auto" disabled={symbols.length <= 2}>
+                                                <button type="button" onClick={() => { if (symbols.length > 2) setSymbols(prev => prev.filter(s => s.id !== sym.id)); }}
+                                                    className="mx-auto rounded p-1 text-slate-600 transition-colors hover:bg-red-500/10 hover:text-red-400" disabled={symbols.length <= 2} aria-label="Remove symbol">
                                                     <X size={14} />
                                                 </button>
                                             </div>
@@ -1794,13 +1893,13 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     {/* Engine Preview */}
                                     <div className="lg:col-span-2 space-y-3">
-                                        <div className="bg-[#060b11] border border-white/10 rounded-2xl overflow-hidden h-[450px] relative flex flex-col items-center justify-center p-8 text-center" style={{ boxShadow: `0 0 40px ${accentColor}15` }}>
+                                        <div className="relative flex h-[min(42vh,380px)] min-h-[240px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#060b11] p-5 text-center sm:p-8 md:h-[450px] md:min-h-0" style={{ boxShadow: `0 0 40px ${accentColor}15` }}>
                                             <div className="w-24 h-32 bg-[#121c22] rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center mb-6 shadow-2xl relative overflow-hidden">
                                                 <Gamepad2 className="text-purple-500/50" size={40} />
                                             </div>
                                             <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Slot Engine Ready</h4>
                                             <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom symbols, grid layouts, and logic in a fully functional preview environment.</p>
-                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'slot_engine', slotConfig: buildConfig(), name: gameName, isPreview: true } }))} className="bg-gradient-to-r from-purple-600 to-purple-700 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-purple-500/20">
+                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'slot_engine', slotConfig: buildConfig(), name: gameName, gameDescription, winEffect, winSound, themeColor: accentColor, isPreview: true } }))} className="bg-gradient-to-r from-purple-600 to-purple-700 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-purple-500/20">
                                                 <Play size={20} /> Launch Full Preview
                                             </button>
                                         </div>
@@ -2039,13 +2138,6 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                             </button>
                                         ))}
                                     </div>
-                                    <div className="mt-3 flex items-center gap-4 bg-[#0a111a] p-3 rounded-xl border border-white/5">
-                                        <label className="text-xs font-bold text-slate-500 whitespace-nowrap">Custom Edge %</label>
-                                        <input type="number" min="1" max="20" step="0.5" value={crashHouseEdge}
-                                            onChange={(e) => setCrashHouseEdge(Math.min(20, Math.max(1, parseFloat(e.target.value) || 5)))}
-                                            className="w-20 bg-[#121c22] border border-white/10 text-white text-sm font-mono text-center rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-400" />
-                                        <span className="text-xs text-slate-400 font-bold">→ RTP: {(100 - crashHouseEdge).toFixed(1)}%</span>
-                                    </div>
                                 </div>
 
                                 {/* Max Multiplier */}
@@ -2151,7 +2243,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                             </div>
                                             <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Crash Engine Ready</h4>
                                             <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom graphics, multipliers, and game logic in a fully functional preview environment.</p>
-                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'crash', crashConfig: buildCrashConfig(), name: crashGameName, isPreview: true } }))} className="bg-gradient-to-r from-emerald-600 to-green-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-emerald-500/20">
+                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'crash', crashConfig: buildCrashConfig(), name: crashGameName, gameDescription: crashGameDescription, winEffect, winSound, themeColor: crashAccentColor, isPreview: true } }))} className="bg-gradient-to-r from-emerald-600 to-green-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-emerald-500/20">
                                                 <Play size={20} /> Launch Full Preview
                                             </button>
                                         </div>
@@ -2447,7 +2539,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
 
                                 {/* Symbol Payouts Table */}
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block">Symbol Payouts (3-match multiplier)</label>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 block">Symbol Payouts (auto-managed by win rate)</label>
                                     <div className="bg-[#0a111a] rounded-xl border border-white/10 overflow-hidden">
                                         <div className="grid grid-cols-[60px_1fr_100px] gap-2 p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-white/5 bg-[#080d14]">
                                             <div>Icon</div>
@@ -2463,9 +2555,9 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                                     }
                                                 </div>
                                                 <span className="text-white text-sm font-bold">{sym.name}</span>
-                                                <input type="number" min="1" step="1" value={sym.payout}
-                                                    onChange={(e) => setScratchSymbols(prev => prev.map(s => s.id === sym.id ? { ...s, payout: parseInt(e.target.value) || 1 } : s))}
-                                                    className="w-full bg-[#0d1520] border border-white/5 text-center text-white font-mono text-sm rounded-lg py-2 focus:outline-none focus:border-amber-400 transition-colors" />
+                                                <div className="w-full bg-[#0d1520] border border-white/5 text-center text-white font-mono text-sm rounded-lg py-2 opacity-80">
+                                                    {Math.max(1, Math.min(SCRATCH_MAX_SYMBOL_PAYOUT, sym.payout)).toFixed(1)}
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -2489,7 +2581,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                             </div>
                                             <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Scratch Engine Ready</h4>
                                             <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom card designs, scratching logic, and win animations in a fully functional preview environment.</p>
-                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'scratch', scratchConfig: buildScratchConfig(), name: scratchGameName, isPreview: true } }))} className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-amber-500/20">
+                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'scratch', scratchConfig: buildScratchConfig(), name: scratchGameName, gameDescription: scratchGameDescription, winEffect, winSound, themeColor: scratchAccentColor, isPreview: true } }))} className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-amber-500/20">
                                                 <Play size={20} /> Launch Full Preview
                                             </button>
                                         </div>
@@ -2765,6 +2857,24 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                             </button>
                                         </div>
                                     </div>
+                                    <div className="mb-3 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3">
+                                        <label className="text-[10px] font-bold uppercase tracking-widest text-rose-300 block mb-2">Odds Profile (weights low segments; cap ~78% RTP)</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[
+                                                { id: 'house_safe', label: 'Safe' },
+                                                { id: 'balanced', label: 'Mixed' },
+                                                { id: 'volatile', label: 'Volatile' },
+                                            ].map((profile) => (
+                                                <button
+                                                    key={profile.id}
+                                                    onClick={() => setWheelOddsProfile(profile.id as WheelOddsProfile)}
+                                                    className={`rounded-lg border px-2 py-2 text-[11px] font-bold transition-all ${wheelOddsProfile === profile.id ? 'border-rose-400 bg-rose-500/20 text-white' : 'border-white/10 bg-[#0d1520] text-slate-300 hover:border-white/20'}`}
+                                                >
+                                                    {profile.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
 
                                     <div className="bg-[#0a111a] rounded-xl border border-white/10 overflow-hidden">
                                         {/* Table Header */}
@@ -2794,10 +2904,9 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                                     {seg.specialType === 'respin' ? '🔄 Respin' : seg.specialType === 'multiplier_x2' ? '✖️2 Mult' : '💰 Normal'}
                                                 </span>
                                                 {/* Multiplier */}
-                                                <input type="number" step="0.5" min="0" value={seg.multiplier}
-                                                    onChange={(e) => setWheelSegments(prev => prev.map(s => s.id === seg.id ? { ...s, multiplier: parseFloat(e.target.value) || 0 } : s))}
-                                                    disabled={!!seg.specialType}
-                                                    className="w-full bg-[#0d1520] border border-white/5 text-center text-white font-mono text-xs rounded-lg py-1.5 focus:outline-none focus:border-rose-400 transition-colors disabled:opacity-40" />
+                                                <div className="w-full bg-[#0d1520] border border-white/5 text-center text-white font-mono text-xs rounded-lg py-1.5 opacity-80">
+                                                    {seg.specialType ? 'auto' : `${Math.max(0, seg.multiplier).toFixed(1)}x`}
+                                                </div>
                                                 {/* Visual Weight (troll mode only) */}
                                                 {wheelEnableTrollWheel && (
                                                     <input type="number" step="0.1" min="0.1" value={seg.visualWeight}
@@ -2805,13 +2914,9 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                                         className="w-full bg-[#0d1520] border border-white/5 text-center text-white font-mono text-xs rounded-lg py-1.5 focus:outline-none focus:border-amber-400 transition-colors" />
                                                 )}
                                                 {/* Real Probability */}
-                                                <input type="number" step="1" min="1" max="100"
-                                                    value={Math.round(seg.realProbability * 100)}
-                                                    onChange={(e) => {
-                                                        const val = Math.max(1, Math.min(100, parseInt(e.target.value) || 1));
-                                                        setWheelSegments(prev => prev.map(s => s.id === seg.id ? { ...s, realProbability: val / 100 } : s));
-                                                    }}
-                                                    className="w-full bg-[#0d1520] border border-white/5 text-center text-white font-mono text-xs rounded-lg py-1.5 focus:outline-none focus:border-rose-400 transition-colors" />
+                                                <div className="w-full bg-[#0d1520] border border-white/5 text-center text-white font-mono text-xs rounded-lg py-1.5 opacity-80">
+                                                    Auto
+                                                </div>
                                                 {/* Delete */}
                                                 <button onClick={() => { if (wheelSegments.length > 2) setWheelSegments(prev => prev.filter(s => s.id !== seg.id)); }}
                                                     className="text-slate-600 hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10 mx-auto" disabled={wheelSegments.length <= 2}>
@@ -2879,7 +2984,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                             </div>
                                             <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Wheel Engine Ready</h4>
                                             <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom wheel segments, physics logic, and animations in a fully functional preview environment.</p>
-                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'wheel', wheelConfig: buildWheelConfig(), name: wheelGameName, isPreview: true } }))} className="bg-gradient-to-r from-rose-600 to-pink-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-rose-500/20">
+                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'wheel', wheelConfig: buildWheelConfig(), name: wheelGameName, gameDescription: wheelGameDescription, winEffect, winSound, themeColor: wheelAccentColor, isPreview: true } }))} className="bg-gradient-to-r from-rose-600 to-pink-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-rose-500/20">
                                                 <Play size={20} /> Launch Full Preview
                                             </button>
                                         </div>
@@ -3228,7 +3333,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                             </div>
                                             <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Mines Engine Ready</h4>
                                             <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom grid logic, bomb placements, and animations in a fully functional preview environment.</p>
-                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'mines', minesConfig: buildMinesConfig(), name: minesGameName, isPreview: true } }))} className="bg-gradient-to-r from-orange-600 to-amber-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-orange-500/20">
+                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'mines', minesConfig: buildMinesConfig(), name: minesGameName, gameDescription: minesGameDescription, winEffect, winSound, themeColor: minesAccentColor, isPreview: true } }))} className="bg-gradient-to-r from-orange-600 to-amber-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-orange-500/20">
                                                 <Play size={20} /> Launch Full Preview
                                             </button>
                                         </div>
@@ -3589,7 +3694,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                             </div>
                                             <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Case Engine Ready</h4>
                                             <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom items, probabilities, and unboxing animation in a fully functional preview environment.</p>
-                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'case', caseConfig: buildCaseConfig(), name: caseGameName, isPreview: true } }))} className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-indigo-500/20">
+                                            <button onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'case', caseConfig: buildCaseConfig(), name: caseGameName, gameDescription: caseGameDescription, winEffect, winSound, themeColor: caseAccentColor, isPreview: true } }))} className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-indigo-500/20">
                                                 <Play size={20} /> Launch Full Preview
                                             </button>
                                         </div>
@@ -3815,7 +3920,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                              <h4 className="text-xl font-black text-white mb-2 tracking-widest uppercase">Hi-Lo Engine Ready</h4>
                                              <p className="text-sm text-slate-400 max-w-sm mx-auto mb-8">Test your custom card designs, colors, and audio logic in a fully functional preview environment.</p>
                                              <button
-                                                  onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'hilo', hiloConfig: buildHiloConfig(), name: hiloGameName, isPreview: true } }))}
+                                                  onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'hilo', hiloConfig: buildHiloConfig(), name: hiloGameName, gameDescription: hiloGameDescription, winEffect, winSound, themeColor: hiloAccentColor, isPreview: true } }))}
                                                   className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg shadow-blue-500/20"
                                               >
                                                   <Play size={20} /> Launch Preview

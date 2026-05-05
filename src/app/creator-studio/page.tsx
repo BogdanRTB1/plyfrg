@@ -2,11 +2,12 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, Users, Presentation, Target, DollarSign, Activity, Gamepad2, Edit, Layers, Play, Sparkles, Clock, Trash2, Eye } from 'lucide-react';
+import { TrendingUp, Users, Target, DollarSign, Activity, Gamepad2, Edit, Layers, Play, Sparkles, Clock, Trash2, Eye } from 'lucide-react';
 import EditCreatorModal from '@/components/EditCreatorModal';
 import CreatorGameStudio from '@/components/CreatorGameStudio';
 import { createClient } from '@/utils/supabase/client';
-import { migratePublishedGamesAssetsToSupabase } from '@/utils/publishedGamesStorage';
+import { deletePublishedGameById, loadPublishedGames, migratePublishedGamesAssetsToSupabase } from '@/utils/publishedGamesStorage';
+import { toast } from 'sonner';
 
 export default function CreatorStudioPage() {
     const [creatorData, setCreatorData] = useState<any>(null);
@@ -17,6 +18,10 @@ export default function CreatorStudioPage() {
     const [gamePlays, setGamePlays] = useState<any[]>([]);
     const [profileViews, setProfileViews] = useState<any[]>([]);
     const hasMigratedAssetsRef = useRef(false);
+    const [creatorWithdrawAmount, setCreatorWithdrawAmount] = useState('');
+    const [creatorWithdrawEmail, setCreatorWithdrawEmail] = useState('');
+    const [creatorWithdrawAddress, setCreatorWithdrawAddress] = useState('');
+    const [isSubmittingWithdraw, setIsSubmittingWithdraw] = useState(false);
 
     useEffect(() => {
         const checkCreatorStatus = async () => {
@@ -60,20 +65,19 @@ export default function CreatorStudioPage() {
 
     // Load published games
     useEffect(() => {
-        const loadPublishedGames = async () => {
+        const loadPublishedGamesForCreator = async () => {
             try {
                 if (!hasMigratedAssetsRef.current) {
                     await migratePublishedGamesAssetsToSupabase();
                     hasMigratedAssetsRef.current = true;
                 }
 
-                const data = localStorage.getItem('custom_published_games');
-                if (!data || !creatorData) {
+                const allGames = await loadPublishedGames();
+                if (!allGames?.length || !creatorData) {
                     setPublishedGames([]);
                     return;
                 }
 
-                const allGames = JSON.parse(data);
                 const myGames = allGames.filter((g: any) =>
                     g.creatorId === (creatorData.id || creatorData.name) ||
                     g.creatorName === creatorData.name
@@ -85,72 +89,74 @@ export default function CreatorStudioPage() {
         };
 
         const handleStorage = () => {
-            void loadPublishedGames();
+            void loadPublishedGamesForCreator();
         };
 
-        void loadPublishedGames();
+        void loadPublishedGamesForCreator();
         window.addEventListener('storage', handleStorage);
         return () => window.removeEventListener('storage', handleStorage);
     }, [creatorData]);
 
-    // Load earnings
+    // Load earnings, game plays, and profile views from Supabase
     useEffect(() => {
-        const loadEarnings = () => {
-             if (creatorData) {
-                  try {
-                      const data = localStorage.getItem('creator_earnings');
-                      if (data) {
-                          const allEarnings = JSON.parse(data);
-                          const myEarnings = allEarnings.filter((e: any) => 
-                              e.creatorId === (creatorData.id || creatorData.name) || 
-                              e.creatorName === creatorData.name
-                          );
-                          setEarnings(myEarnings);
-                      }
-                  } catch (e) {
-                      console.error(e);
-                  }
-             }
-        };
-        loadEarnings();
-        window.addEventListener('storage', loadEarnings);
-        return () => window.removeEventListener('storage', loadEarnings);
-    }, [creatorData]);
+        if (!creatorData) return;
+        const supabase = createClient();
 
-    // Load game plays
-    useEffect(() => {
-        const loadGamePlays = () => {
-             if (creatorData) {
-                  try {
-                      const data = localStorage.getItem('creator_game_plays');
-                      if (data) {
-                          const allPlays = JSON.parse(data);
-                          const myPlays = allPlays.filter((p: any) => 
-                              p.creatorId === (creatorData.id || creatorData.name)
-                          );
-                          setGamePlays(myPlays);
-                      }
-                  } catch (e) {
-                      console.error(e);
-                  }
+        const loadAnalytics = async () => {
+            try {
+                // Earnings
+                const { data: earningsData, error: earningsErr } = await supabase
+                    .from('creator_earnings')
+                    .select('*')
+                    .eq('creator_id', creatorData.id)
+                    .order('created_at', { ascending: false });
+                
+                if (earningsErr) console.error('[Dashboard] Earnings load error:', earningsErr.message);
+                
+                setEarnings((earningsData || []).map((e: any) => ({
+                    ...e,
+                    gameId: e.game_id ?? e.gameId,
+                    date: e.created_at,
+                    currency: e.currency || 'FC',
+                    amount: Number(e.profit),
+                    usdValue: Number(e.profit) * 0.80,
+                })));
 
-                  try {
-                      const vdata = localStorage.getItem('creator_profile_views');
-                      if (vdata) {
-                          const allViews = JSON.parse(vdata);
-                          const myViews = allViews.filter((v: any) => 
-                              v.creatorId === (creatorData.id || creatorData.name) || v.creatorName === creatorData.name
-                          );
-                          setProfileViews(myViews);
-                      }
-                  } catch (e) {
-                      console.error(e);
-                  }
-             }
+                // Game Plays
+                const { data: playsData, error: playsErr } = await supabase
+                    .from('creator_game_plays')
+                    .select('*')
+                    .eq('creator_id', creatorData.id)
+                    .order('created_at', { ascending: false });
+                
+                if (playsErr) console.error('[Dashboard] Plays load error:', playsErr.message);
+                
+                setGamePlays((playsData || []).map((p: any) => ({
+                    ...p,
+                    date: p.created_at,
+                    playerId: p.player_id || 'anonymous',
+                    gameId: p.game_id,
+                })));
+
+                // Profile Views
+                const { data: viewsData, error: viewsErr } = await supabase
+                    .from('creator_profile_views')
+                    .select('*')
+                    .eq('creator_id', creatorData.id)
+                    .order('created_at', { ascending: false });
+                
+                if (viewsErr) console.error('[Dashboard] Views load error:', viewsErr.message);
+                
+                setProfileViews((viewsData || []).map((v: any) => ({
+                    ...v,
+                    date: v.created_at,
+                })));
+            } catch (e) {
+                console.error('[Dashboard] Analytics load exception:', e);
+            }
         };
-        loadGamePlays();
-        window.addEventListener('storage', loadGamePlays);
-        return () => window.removeEventListener('storage', loadGamePlays);
+
+        loadAnalytics();
     }, [creatorData]);
 
     if (!creatorData) {
@@ -162,61 +168,152 @@ export default function CreatorStudioPage() {
         );
     }
 
-    // Dynamic Chart Data for Revenue
-    const currentMonthStr = new Date().toISOString().substring(0, 7);
-    const thisMonthEarnings = earnings.filter(e => e.date && e.date.startsWith(currentMonthStr) && e.currency === 'FC');
-    const totalThisMonth = thisMonthEarnings.reduce((acc, curr) => acc + (curr.usdValue || curr.amount * 0.90), 0);
+    // ─── Hourly Chart Data for Today ────────────────────────────────────────
+    const todayStr = new Date().toISOString().substring(0, 10); // YYYY-MM-DD
+    const todayEarnings = earnings.filter(e => e.date && e.date.startsWith(todayStr) && e.currency === 'FC');
+    const totalToday = todayEarnings.reduce((acc, curr) => acc + (curr.usdValue || curr.amount * 0.80), 0);
 
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const groupedEarnings = {} as Record<string, number>;
+    // Group earnings and plays by hour (0-23)
+    const groupedEarningsByHour = {} as Record<number, number>;
     earnings.forEach(e => {
-        if (!e.date || e.currency !== 'FC') return;
-        const monthIndex = new Date(e.date).getMonth();
-        const valueInUsd = e.usdValue || e.amount * 0.90;
-        groupedEarnings[months[monthIndex]] = (groupedEarnings[months[monthIndex]] || 0) + valueInUsd;
+        if (!e.date || e.currency !== 'FC' || !e.date.startsWith(todayStr)) return;
+        const hour = new Date(e.date).getHours();
+        const valueInUsd = e.usdValue || e.amount * 0.80;
+        groupedEarningsByHour[hour] = (groupedEarningsByHour[hour] || 0) + valueInUsd;
     });
 
-    const groupedPlayers = {} as Record<string, Set<string>>;
+    const groupedPlayersByHour = {} as Record<number, Set<string>>;
     gamePlays.forEach(p => {
-        if (!p.date) return;
-        const monthIndex = new Date(p.date).getMonth();
-        const monthLabel = months[monthIndex];
-        if (!groupedPlayers[monthLabel]) groupedPlayers[monthLabel] = new Set();
-        groupedPlayers[monthLabel].add(p.playerId);
+        if (!p.date || !p.date.startsWith(todayStr)) return;
+        const hour = new Date(p.date).getHours();
+        if (!groupedPlayersByHour[hour]) groupedPlayersByHour[hour] = new Set();
+        groupedPlayersByHour[hour].add(p.playerId);
     });
 
-    const currentMonthIdx = new Date().getMonth();
-    const startMonthIdx = Math.max(0, currentMonthIdx - 5); // display up to 6 months
-    const monthlyStats = [];
-    
-    const fakeRevenues = [240, 180, 350, 420, 290, 385];
-    const fakePlayers = [12000, 15000, 24000, 31000, 28000, 35000];
-    
-    for (let i = 0; i < 6; i++) {
-        const monthIdx = (startMonthIdx + i) % 12;
-        const rev = fakeRevenues[i];
-        const pCount = fakePlayers[i];
-        monthlyStats.push({
-            label: months[monthIdx],
-            revenue: (rev / 450) * 100, // max is 450
-            players: (pCount / 40000) * 100, // max is 40k
+    // Build hourly stats — show last 12 hour slots up to current hour
+    const currentHour = new Date().getHours();
+    const startHour = Math.max(0, currentHour - 11);
+    const hourlyStats: { label: string; revenue: number; players: number; realRev: number; realPlayers: number }[] = [];
+    for (let h = startHour; h <= currentHour; h++) {
+        const rev = groupedEarningsByHour[h] || 0;
+        const pCount = groupedPlayersByHour[h] ? groupedPlayersByHour[h].size : 0;
+        hourlyStats.push({
+            label: `${h.toString().padStart(2, '0')}:00`,
+            revenue: rev,
+            players: pCount,
             realRev: rev,
-            realPlayers: pCount
+            realPlayers: pCount,
         });
     }
 
-    // Dynamic Active Players
-    const thisMonthPlays = gamePlays.filter(p => p.date && p.date.startsWith(currentMonthStr));
-    const uniquePlayersThisMonth = new Set(thisMonthPlays.map(p => p.playerId)).size;
+    // Dynamic Active Players (Today)
+    const todayPlays = gamePlays.filter(p => p.date && p.date.startsWith(todayStr));
+    const uniquePlayersToday = new Set(todayPlays.map(p => p.playerId)).size;
 
-    // Dynamic Profile Views & Conversion
-    const thisMonthViews = profileViews.filter(v => v.date && v.date.startsWith(currentMonthStr));
-    const viewsThisMonthCount = thisMonthViews.length;
+    // All-time aggregates
+    const totalAllTimeRevenue = earnings
+        .filter(e => e.currency === 'FC')
+        .reduce((acc, curr) => acc + (curr.usdValue || curr.amount * 0.80), 0);
+    const totalPlays = gamePlays.length;
+    const uniquePlayersAllTime = new Set(gamePlays.map(p => p.playerId)).size;
+
+    // Dynamic Profile Views & Conversion (Today)
+    const todayViews = profileViews.filter(v => v.date && v.date.startsWith(todayStr));
+    const viewsTodayCount = todayViews.length;
     let conversionRate = 0;
-    if (viewsThisMonthCount > 0) {
-        conversionRate = (uniquePlayersThisMonth / viewsThisMonthCount) * 100;
-        if (conversionRate > 100) conversionRate = 100; // Cap it gracefully for testing edge-cases
+    if (viewsTodayCount > 0) {
+        conversionRate = (uniquePlayersToday / viewsTodayCount) * 100;
+        if (conversionRate > 100) conversionRate = 100;
     }
+
+    const REDEEM_USD_RATE = 0.8;
+    const availableCreatorFc = earnings
+        .filter((e: any) => e.currency === 'FC')
+        .reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0);
+    const availableCreatorUsd = availableCreatorFc * REDEEM_USD_RATE;
+
+    const gameRevenueRows = publishedGames.map((game: any) => {
+        const gEarn = earnings.filter((e: any) => e.gameId === game.id && e.currency === 'FC');
+        const gRevenueFc = gEarn.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0);
+        const gRevenueUsd = gEarn.reduce((acc: number, curr: any) => acc + Number(curr.usdValue || (Number(curr.amount || 0) * REDEEM_USD_RATE)), 0);
+        const gPlays = gamePlays.filter((p: any) => p.gameId === game.id);
+        const gUnique = new Set(gPlays.map((p: any) => p.playerId)).size;
+        return {
+            id: game.id,
+            name: game.name,
+            emoji: game.themeEmoji || '🎮',
+            color: game.themeColor || '#00b9f0',
+            plays: gPlays.length,
+            uniquePlayers: gUnique,
+            revenueFc: gRevenueFc,
+            revenueUsd: gRevenueUsd,
+            status: gPlays.length > 0 ? 'Active' : 'Idle',
+        };
+    }).sort((a, b) => b.revenueUsd - a.revenueUsd);
+
+    const handleCreatorWithdrawal = async () => {
+        const fcAmount = Number(creatorWithdrawAmount);
+        const email = creatorWithdrawEmail.trim().toLowerCase();
+        const btcAddress = creatorWithdrawAddress.trim();
+        const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+        if (!emailValid) {
+            toast.error('Please enter a valid email address');
+            return;
+        }
+        if (!btcAddress) {
+            toast.error('Please enter your BTC wallet address');
+            return;
+        }
+        if (Number.isNaN(fcAmount) || fcAmount < 10) {
+            toast.error('Minimum withdrawal is 10 FC');
+            return;
+        }
+        if (fcAmount > availableCreatorFc) {
+            toast.error('Insufficient creator earnings balance');
+            return;
+        }
+
+        setIsSubmittingWithdraw(true);
+        try {
+            const supabase = createClient();
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                toast.error('Please log in first');
+                setIsSubmittingWithdraw(false);
+                return;
+            }
+
+            const res = await fetch('/api/creator/withdrawal-request', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                    amountFc: fcAmount,
+                    email,
+                    address: btcAddress,
+                    currency: 'btc',
+                }),
+            });
+            const payload = await res.json();
+            if (!res.ok || !payload.success) {
+                toast.error(payload.error || 'Failed to submit creator withdrawal request');
+                setIsSubmittingWithdraw(false);
+                return;
+            }
+
+            toast.success('Withdrawal request submitted. It is now visible in Admin Redeems.');
+            setCreatorWithdrawAmount('');
+            setCreatorWithdrawEmail('');
+            setCreatorWithdrawAddress('');
+        } catch (e) {
+            console.error(e);
+            toast.error('Failed to submit creator withdrawal request');
+        }
+        setIsSubmittingWithdraw(false);
+    };
 
     return (
         <div className="flex-1 h-full overflow-y-auto overflow-x-hidden bg-[#050B14] relative custom-scrollbar z-0 p-4 sm:p-6 lg:p-12 pb-32">
@@ -337,90 +434,157 @@ export default function CreatorStudioPage() {
                                         <div>
                                             <h2 className="text-slate-400 font-medium mb-1 text-sm">Total Revenue</h2>
                                             <div className="flex items-center gap-3">
-                                                <span className="text-4xl sm:text-5xl font-black text-white">$105K</span>
-                                                <span className="flex items-center text-emerald-400 font-bold text-sm bg-emerald-500/10 px-2 py-1 rounded-lg">
-                                                    <TrendingUp size={16} className="mr-1" /> 84%
-                                                </span>
+                                                <span className="text-4xl sm:text-5xl font-black text-white">${totalAllTimeRevenue < 1000 ? totalAllTimeRevenue.toFixed(2) : (totalAllTimeRevenue / 1000).toFixed(1) + 'K'}</span>
+                                                {totalAllTimeRevenue > 0 && (
+                                                    <span className="flex items-center text-emerald-400 font-bold text-sm bg-emerald-500/10 px-2 py-1 rounded-lg">
+                                                        <TrendingUp size={16} className="mr-1" /> Live
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
-                                        <button className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2.5 rounded-xl text-white font-bold transition-colors">
-                                            <Presentation size={16} /> Report
-                                        </button>
                                     </div>
 
-                                    {/* SVG Line Chart (1 Month) */}
-                                    <div className="w-full h-48 sm:h-64 relative mb-12 z-10">
-                                        {/* Y-axis Labels */}
-                                        <div className="absolute left-0 top-0 bottom-6 flex flex-col justify-between text-xs text-slate-500 font-medium">
-                                            <span>$5K</span>
-                                            <span>$2.5K</span>
-                                            <span>$0</span>
-                                        </div>
+                                    {/* SVG Bar Chart + Cumulative Profit Line (Hourly — Today) */}
+                                    {(() => {
+                                        // Pre-compute cumulative revenue for the line
+                                        const cumulativeRevenue: number[] = [];
+                                        let runningTotal = 0;
+                                        hourlyStats.forEach(s => {
+                                            runningTotal += s.realRev;
+                                            cumulativeRevenue.push(runningTotal);
+                                        });
+                                        const maxCumulative = Math.max(...cumulativeRevenue, 0.01);
+                                        const maxRev = Math.max(...hourlyStats.map(s => s.realRev), 1);
+                                        const barCount = hourlyStats.length || 1;
 
-                                        {/* Chart Container */}
-                                        <div className="absolute left-12 right-0 top-2 bottom-6">
-                                            {/* Horizontal Grid Lines */}
-                                            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-                                                <div className="w-full h-px bg-white/5"></div>
-                                                <div className="w-full h-px bg-white/5"></div>
-                                                <div className="w-full h-px bg-white/5"></div>
+                                        return (
+                                            <div className="w-full h-48 sm:h-64 relative mb-6 z-10">
+                                                {/* Bars */}
+                                                <div className="absolute left-0 right-0 top-0 bottom-6 flex items-end gap-2 sm:gap-4 px-2">
+                                                    {hourlyStats.map((stat, i) => {
+                                                        const heightPct = (stat.realRev / maxRev) * 85;
+                                                        return (
+                                                            <div key={i} className="flex-1 flex flex-col items-center gap-1 relative group">
+                                                                <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-[#00b9f0] text-black text-[9px] font-black px-2 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                                                                    ${stat.realRev.toFixed(2)} | {stat.realPlayers} players
+                                                                </div>
+                                                                <div
+                                                                    className="w-full rounded-t-lg transition-all duration-500 relative overflow-hidden"
+                                                                    style={{
+                                                                        height: `${Math.max(heightPct, 2)}%`,
+                                                                        background: 'linear-gradient(180deg, #00b9f0, #0078a0)',
+                                                                        boxShadow: stat.realRev > 0 ? '0 0 12px rgba(0,185,240,0.3)' : 'none',
+                                                                    }}
+                                                                >
+                                                                    <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent" />
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {/* Cumulative Profit Line Overlay */}
+                                                {maxCumulative > 0 && (
+                                                    <svg
+                                                        className="absolute left-0 right-0 top-0 bottom-6 pointer-events-none"
+                                                        viewBox={`0 0 ${barCount * 100} 100`}
+                                                        preserveAspectRatio="none"
+                                                        style={{ width: '100%', height: 'calc(100% - 24px)', padding: '0 8px' }}
+                                                    >
+                                                        {/* Gradient fill under the line */}
+                                                        <defs>
+                                                            <linearGradient id="profitLineGrad" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="0%" stopColor="#a855f7" stopOpacity="0.35" />
+                                                                <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        {/* Area fill */}
+                                                        <polygon
+                                                            points={
+                                                                cumulativeRevenue.map((val, i) => {
+                                                                    const x = (i + 0.5) * (barCount * 100 / barCount);
+                                                                    const y = 100 - (val / maxCumulative) * 85;
+                                                                    return `${x},${y}`;
+                                                                }).join(' ') +
+                                                                ` ${barCount * 100},100 0,100`
+                                                            }
+                                                            fill="url(#profitLineGrad)"
+                                                        />
+                                                        {/* The line itself */}
+                                                        <polyline
+                                                            points={cumulativeRevenue.map((val, i) => {
+                                                                const x = (i + 0.5) * (barCount * 100 / barCount);
+                                                                const y = 100 - (val / maxCumulative) * 85;
+                                                                return `${x},${y}`;
+                                                            }).join(' ')}
+                                                            fill="none"
+                                                            stroke="#a855f7"
+                                                            strokeWidth="2.5"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            vectorEffect="non-scaling-stroke"
+                                                        />
+                                                        {/* Dots at each data point */}
+                                                        {cumulativeRevenue.map((val, i) => {
+                                                            const x = (i + 0.5) * (barCount * 100 / barCount);
+                                                            const y = 100 - (val / maxCumulative) * 85;
+                                                            return (
+                                                                <circle
+                                                                    key={i}
+                                                                    cx={x}
+                                                                    cy={y}
+                                                                    r="4"
+                                                                    fill="#a855f7"
+                                                                    stroke="#0b1622"
+                                                                    strokeWidth="2"
+                                                                    vectorEffect="non-scaling-stroke"
+                                                                />
+                                                            );
+                                                        })}
+                                                    </svg>
+                                                )}
+
+                                                {/* Cumulative total label */}
+                                                {maxCumulative > 0 && (
+                                                    <div className="absolute top-2 right-3 bg-purple-500/15 border border-purple-500/30 rounded-lg px-3 py-1.5 flex items-center gap-2 z-20">
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_6px_rgba(168,85,247,0.6)]" />
+                                                        <span className="text-[10px] font-bold text-purple-300">Cumulative: ${runningTotal.toFixed(2)}</span>
+                                                    </div>
+                                                )}
+
+                                                {/* X-axis Labels */}
+                                                <div className="absolute left-0 right-0 bottom-0 flex justify-around text-[10px] sm:text-xs text-slate-500 font-medium px-2">
+                                                    {hourlyStats.map((stat, i) => (
+                                                        <span key={i} className="flex-1 text-center">{stat.label}</span>
+                                                    ))}
+                                                </div>
                                             </div>
-
-                                            <svg className="w-full h-full overflow-visible relative z-10" preserveAspectRatio="none" viewBox="0 0 1000 100">
-                                                {/* Dotted Line (Previous Month) */}
-                                                <path 
-                                                    d="M 0 95 C 50 95, 80 80, 120 85 C 160 90, 200 40, 250 30 C 300 20, 350 95, 400 80 C 450 65, 500 50, 550 40 C 600 30, 650 60, 700 55 C 750 50, 800 80, 850 70 C 900 60, 950 85, 1000 80" 
-                                                    fill="none" 
-                                                    stroke="rgba(255,255,255,0.2)" 
-                                                    strokeWidth="2" 
-                                                    strokeDasharray="8,8" 
-                                                />
-                                                
-                                                {/* Solid Line (Current Month) */}
-                                                <path 
-                                                    d="M 0 95 C 100 95, 150 70, 180 50 C 210 30, 250 20, 280 40 C 310 60, 330 10, 360 20 C 390 30, 420 80, 450 70 C 480 60, 500 40, 550 35 C 600 30, 620 60, 650 70 C 680 80, 700 30, 750 45 C 800 60, 820 40, 850 45 C 880 50, 920 90, 950 80 C 980 70, 990 95, 1000 95" 
-                                                    fill="none" 
-                                                    stroke="#00b9f0" 
-                                                    strokeWidth="3.5" 
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    className="drop-shadow-[0_0_12px_rgba(0,185,240,0.6)]"
-                                                />
-                                            </svg>
-                                        </div>
-
-                                        {/* X-axis Labels */}
-                                        <div className="absolute left-12 right-0 bottom-0 flex justify-between text-[10px] sm:text-xs text-slate-500 font-medium">
-                                            <span>Apr 1</span>
-                                            <span>Apr 10</span>
-                                            <span>Apr 20</span>
-                                            <span>Apr 30</span>
-                                        </div>
-                                    </div>
+                                        );
+                                    })()}
 
                                     {/* Bottom KPI Cards */}
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 relative z-10">
                                         <div className="bg-white/[0.02] hover:bg-white/[0.04] transition-colors rounded-xl p-4 border border-white/5">
                                             <h4 className="text-slate-400 text-xs sm:text-sm font-medium mb-1 truncate">Total Plays</h4>
-                                            <div className="text-lg sm:text-xl font-black text-white mb-1">142.5K</div>
-                                            <div className="text-emerald-400 text-[10px] sm:text-xs font-bold flex items-center"><TrendingUp size={12} className="mr-1"/> 37%</div>
+                                            <div className="text-lg sm:text-xl font-black text-white mb-1">{totalPlays.toLocaleString()}</div>
+                                            <div className="text-slate-500 text-[10px] sm:text-xs font-bold">All time</div>
                                         </div>
                                         <div className="bg-[#00b9f0]/10 rounded-xl p-4 border border-[#00b9f0]/30 relative overflow-hidden">
                                             <div className="relative z-10">
-                                                <h4 className="text-slate-300 text-xs sm:text-sm font-medium mb-1 truncate">Total Revenue</h4>
-                                                <div className="text-lg sm:text-xl font-black text-white mb-1">$105K</div>
-                                                <div className="text-emerald-400 text-[10px] sm:text-xs font-bold flex items-center"><TrendingUp size={12} className="mr-1"/> 84%</div>
+                                                <h4 className="text-slate-300 text-xs sm:text-sm font-medium mb-1 truncate">Today</h4>
+                                                <div className="text-lg sm:text-xl font-black text-white mb-1">${totalToday < 1000 ? totalToday.toFixed(2) : (totalToday / 1000).toFixed(1) + 'K'}</div>
+                                                <div className="text-[#00b9f0] text-[10px] sm:text-xs font-bold">{new Date().toLocaleDateString('default', { month: 'short', day: 'numeric' })}</div>
                                             </div>
                                         </div>
                                         <div className="bg-white/[0.02] hover:bg-white/[0.04] transition-colors rounded-xl p-4 border border-white/5">
                                             <h4 className="text-slate-400 text-xs sm:text-sm font-medium mb-1 truncate">Active Players</h4>
-                                            <div className="text-lg sm:text-xl font-black text-white mb-1">45.2K</div>
-                                            <div className="text-emerald-400 text-[10px] sm:text-xs font-bold flex items-center"><TrendingUp size={12} className="mr-1"/> 60%</div>
+                                            <div className="text-lg sm:text-xl font-black text-white mb-1">{uniquePlayersAllTime.toLocaleString()}</div>
+                                            <div className="text-slate-500 text-[10px] sm:text-xs font-bold">Unique players</div>
                                         </div>
                                         <div className="bg-white/[0.02] hover:bg-white/[0.04] transition-colors rounded-xl p-4 border border-white/5">
                                             <h4 className="text-slate-400 text-xs sm:text-sm font-medium mb-1 truncate">Conversion</h4>
-                                            <div className="text-lg sm:text-xl font-black text-white mb-1">8.68%</div>
-                                            <div className="text-emerald-400 text-[10px] sm:text-xs font-bold flex items-center"><TrendingUp size={12} className="mr-1"/> 15%</div>
+                                            <div className="text-lg sm:text-xl font-black text-white mb-1">{conversionRate > 0 ? conversionRate.toFixed(1) + '%' : '—'}</div>
+                                            <div className="text-slate-500 text-[10px] sm:text-xs font-bold">Views → Plays</div>
                                         </div>
                                     </div>
                                 </motion.div>
@@ -491,26 +655,49 @@ export default function CreatorStudioPage() {
                             className="space-y-6"
                         >
                             {/* Payout Header */}
-                            <div className="bg-[#0b1622]/80 backdrop-blur-xl rounded-[32px] p-8 border border-white/10 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+                            <div className="bg-[#0b1622]/80 backdrop-blur-xl rounded-[32px] p-8 border border-white/10 relative overflow-hidden">
                                  <div>
                                       <h2 className="text-3xl font-black text-white tracking-tight">Available Balance</h2>
                                       <p className="text-slate-400 font-medium">Earnings ready for withdrawal.</p>
                                  </div>
-                                 <div className="flex items-center gap-6">
-                                      <span className="text-5xl font-black text-emerald-400">${totalThisMonth.toFixed(2)}</span>
-                                      <button 
-                                          onClick={() => {
-                                              if (totalThisMonth < 100) {
-                                                   alert('Minimum $100 payout is required.');
-                                              } else {
-                                                   alert('Withdrawal request initialized! Processing...');
-                                              }
-                                          }}
-                                          disabled={totalThisMonth < 100}
-                                          className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black uppercase tracking-widest rounded-xl transition-colors shadow-[0_0_20px_rgba(16,185,129,0.3)]"
-                                      >
-                                          Withdraw
-                                      </button>
+                                 <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                                      <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5">
+                                          <p className="text-xs font-bold uppercase tracking-widest text-emerald-300">Balance</p>
+                                          <p className="mt-1 text-4xl font-black text-emerald-400">{availableCreatorFc.toFixed(2)} FC</p>
+                                          <p className="text-sm text-emerald-200/80">~ ${availableCreatorUsd.toFixed(2)} USD at $0.80/FC</p>
+                                      </div>
+                                      <div className="space-y-3">
+                                          <input
+                                              type="number"
+                                              min="10"
+                                              step="0.01"
+                                              value={creatorWithdrawAmount}
+                                              onChange={(e) => setCreatorWithdrawAmount(e.target.value)}
+                                              placeholder="Withdrawal amount (FC)"
+                                              className="w-full bg-[#0a161f] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                                          />
+                                          <input
+                                              type="email"
+                                              value={creatorWithdrawEmail}
+                                              onChange={(e) => setCreatorWithdrawEmail(e.target.value)}
+                                              placeholder="Contact email"
+                                              className="w-full bg-[#0a161f] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                                          />
+                                          <input
+                                              type="text"
+                                              value={creatorWithdrawAddress}
+                                              onChange={(e) => setCreatorWithdrawAddress(e.target.value)}
+                                              placeholder="BTC wallet address"
+                                              className="w-full bg-[#0a161f] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                                          />
+                                          <button
+                                              onClick={handleCreatorWithdrawal}
+                                              disabled={isSubmittingWithdraw || !creatorWithdrawAmount || !creatorWithdrawEmail || !creatorWithdrawAddress || Number(creatorWithdrawAmount) < 10}
+                                              className="w-full px-6 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black uppercase tracking-widest rounded-xl transition-colors shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                                          >
+                                              {isSubmittingWithdraw ? 'Submitting...' : 'Submit Withdrawal'}
+                                          </button>
+                                      </div>
                                  </div>
                             </div>
                             
@@ -540,76 +727,32 @@ export default function CreatorStudioPage() {
                                             <div className="text-right pr-4">Total Revenue</div>
                                         </div>
                                         <div className="divide-y divide-white/5">
-                                            {[
-                                                { game: "Hype Drop", status: "Active", plays: "142,450", payout: "$ 385.50", color: "#00b9f0", emoji: "🚀" },
-                                                { game: "Viral Slots", status: "Active", plays: "98,230", payout: "$ 290.00", color: "#a855f7", emoji: "🎰" },
-                                                { game: "Creator Clash", status: "Active", plays: "115,800", payout: "$ 400.00", color: "#f59e0b", emoji: "🥊" },
-                                                { game: "Mystery Box", status: "Active", plays: "89,120", payout: "$ 310.25", color: "#10b981", emoji: "📦" },
-                                                { game: "Influencer Run", status: "Trending", plays: "155,400", payout: "$ 395.00", color: "#ec4899", emoji: "🏃" },
-                                            ].map((win, i) => (
-                                                <div key={i} className="grid grid-cols-4 p-5 hover:bg-white/[0.04] text-sm items-center transition-all duration-300 group">
+                                            {gameRevenueRows.map((win, i) => (
+                                                <div key={win.id || i} className="grid grid-cols-4 p-5 hover:bg-white/[0.04] text-sm items-center transition-all duration-300 group">
                                                     <div className="font-black text-white flex items-center gap-4 pl-4">
                                                         <div className="w-10 h-10 rounded-xl bg-[#1a2c38] flex items-center justify-center text-xl border border-white/10 group-hover:border-white/30 transition-all shrink-0 group-hover:scale-110" style={{ boxShadow: `0 0 20px ${win.color}30` }}>
                                                             {win.emoji}
                                                         </div>
-                                                        <span className="hidden sm:inline truncate max-w-[140px] text-base group-hover:text-[#00b9f0] transition-colors">{win.game}</span>
+                                                        <span className="hidden sm:inline truncate max-w-[140px] text-base group-hover:text-[#00b9f0] transition-colors">{win.name}</span>
                                                     </div>
                                                     <div className="font-bold text-xs flex items-center gap-2">
-                                                        <div className={`w-2 h-2 rounded-full animate-pulse ${win.status === 'Trending' ? 'bg-pink-500 shadow-[0_0_10px_#ec4899]' : 'bg-emerald-500 shadow-[0_0_10px_#10b981]'}`}></div>
-                                                        <span className={win.status === 'Trending' ? 'text-pink-400' : 'text-emerald-400'}>{win.status}</span>
+                                                        <div className={`w-2 h-2 rounded-full animate-pulse ${win.status === 'Active' ? 'bg-emerald-500 shadow-[0_0_10px_#10b981]' : 'bg-slate-500'}`}></div>
+                                                        <span className={win.status === 'Active' ? 'text-emerald-400' : 'text-slate-400'}>{win.status}</span>
                                                     </div>
-                                                    <div className="text-right font-bold text-slate-300 text-base">{win.plays}</div>
+                                                    <div className="text-right font-bold text-slate-300 text-base">{win.plays.toLocaleString()}</div>
                                                     <div className="text-right font-black pr-4 text-xl tracking-tight">
                                                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-300 drop-shadow-[0_0_12px_rgba(52,211,153,0.6)]">
-                                                            {win.payout}
+                                                            ${win.revenueUsd.toFixed(2)}
                                                         </span>
                                                     </div>
                                                 </div>
                                             ))}
+                                            {gameRevenueRows.length === 0 && (
+                                                <div className="p-8 text-center text-slate-500 text-sm">No game revenue yet.</div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-
-                            {/* Table Breakdown */}
-                            <div className="bg-[#0b1622]/80 backdrop-blur-xl rounded-[32px] p-8 border border-white/10">
-                                 <h2 className="text-xl font-black text-white tracking-tight mb-6">Game Performance</h2>
-                                 <div className="w-full overflow-x-auto">
-                                      <table className="w-full text-left border-collapse">
-                                           <thead>
-                                                <tr className="border-b border-white/10">
-                                                     <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Game Name</th>
-                                                     <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Total Earnings</th>
-                                                     <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Unique Players</th>
-                                                </tr>
-                                           </thead>
-                                           <tbody>
-                                                {publishedGames.map(game => {
-                                                     const gEarn = earnings.filter(e => e.gameId === game.id);
-                                                     const gTotal = gEarn.reduce((acc, curr) => acc + (curr.usdValue || curr.amount * 0.90), 0);
-                                                     const gPlays = gamePlays.filter(p => p.gameId === game.id);
-                                                     const gUnique = new Set(gPlays.map(p => p.playerId)).size;
-                                                     return (
-                                                         <tr key={game.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                                                              <td className="p-4 flex items-center gap-3 text-sm font-bold text-white">
-                                                                   <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 text-lg" style={{ background: `${game.themeColor || '#00b9f0'}20` }}>
-                                                                       {game.themeEmoji || '🎮'}
-                                                                   </div>
-                                                                   {game.name}
-                                                              </td>
-                                                              <td className="p-4 text-sm font-mono text-emerald-400">${gTotal.toFixed(2)}</td>
-                                                              <td className="p-4 text-sm font-bold text-slate-300">{gUnique}</td>
-                                                         </tr>
-                                                     )
-                                                })}
-                                                {publishedGames.length === 0 && (
-                                                     <tr>
-                                                          <td colSpan={3} className="p-8 text-center text-slate-500 text-sm">No games published yet.</td>
-                                                     </tr>
-                                                )}
-                                           </tbody>
-                                      </table>
-                                 </div>
                             </div>
                         </motion.div>
                     ) : activeTab === 'games' ? (
@@ -722,13 +865,9 @@ export default function CreatorStudioPage() {
                                                         <button
                                                             onClick={() => {
                                                                 if (confirm('Delete this game?')) {
-                                                                    const data = localStorage.getItem('custom_published_games');
-                                                                    if (data) {
-                                                                        const allGames = JSON.parse(data);
-                                                                        const filtered = allGames.filter((g: any) => g.id !== game.id);
-                                                                        localStorage.setItem('custom_published_games', JSON.stringify(filtered));
+                                                                    void deletePublishedGameById(game.id).then(() => {
                                                                         window.dispatchEvent(new Event('storage'));
-                                                                    }
+                                                                    });
                                                                 }
                                                             }}
                                                             className="text-slate-600 hover:text-red-400 transition-colors p-1.5 rounded hover:bg-red-500/10"

@@ -4,34 +4,27 @@ import { Star, ShieldCheck, Zap, Info } from "lucide-react";
 import GameCard from "@/components/GameCard";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
+import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
+import { ORIGINALS_MARKETING_RTP_BANNER } from "@/constants/originalsRtp";
 import PlinkoModal from "@/components/PlinkoModal";
 import MinesModal from "@/components/MinesModal";
 import SlotsModal from "@/components/SlotsModal";
 import RouletteModal from "@/components/RouletteModal";
 import CrashModal from "@/components/CrashModal";
 import SneakModal from "@/components/SneakModal";
-import DartWheelModal from "@/components/DartWheelModal";
-import AviatorModal from "@/components/AviatorModal";
 import InfluencerModal from "@/components/InfluencerModal";
 import WantedModal from "@/components/WantedModal";
-import TomatoesModal from "@/components/TomatoesModal";
-import FootballModal from "@/components/FootballModal";
-import GlassBridgeModal from "@/components/GlassBridgeModal";
+import HeistModal from "@/components/HeistModal";
+import EscapeModal from "@/components/EscapeModal";
+import BombModal from "@/components/BombModal";
+import BlackjackModal from "@/components/BlackjackModal";
 
 export default function OriginalsPage() {
-    const originalGames = [
-        { name: "Crash", image: "/images/game-crash.png", rtp: "99.0%", provider: "PlayForges", badge: "Live" },
-        { name: "Plinko", image: "/images/game-plinko.png", rtp: "99.0%", provider: "PlayForges", badge: "Live" },
-        { name: "Mines", image: "/images/game-mines.png", rtp: "99.0%", provider: "PlayForges", badge: "Live" },
-        { name: 'Secret Sneak', image: '/images/game-secret-sneak.png', rtp: "99.0%", provider: "PlayForges", badge: "Live" },
-        { name: 'Dart Wheel', image: '/images/game-dart-wheel.png', rtp: "99.0%", provider: "PlayForges", badge: "Live" },
-        { name: 'Aviator', image: '/images/game-aviator.png', rtp: "99.0%", provider: "PlayForges", badge: "Live" },
-        { name: "Influencer", image: "/images/game-influencer-v2.png", rtp: "97.8%", provider: "PlayForges", badge: "Live" },
-        { name: "Wanted", image: "/images/game-influencer-run.png", rtp: "98.1%", provider: "PlayForges", badge: "Live" },
-        { name: "Tomatoes", image: "/images/game-tomatoes.png", rtp: "98.0%", provider: "PlayForges", badge: "Live" },
-        { name: "Penalty", image: "/images/game-football.png", rtp: "97.5%", provider: "PlayForges", badge: "Live" },
-        { name: "Glass Bridge", image: "/images/game-glass-bridge.png", rtp: "96.5%", provider: "PlayForges", badge: "Live" },
-    ];
+    const originalGames = FEATURED_GAMES.map((game) => ({
+        ...game,
+        badge: "Live",
+        image: getGameCoverImage(game.name),
+    }));
 
     const [isPlinkoOpen, setIsPlinkoOpen] = useState(false);
     const [isMinesOpen, setIsMinesOpen] = useState(false);
@@ -39,13 +32,12 @@ export default function OriginalsPage() {
     const [isRouletteOpen, setIsRouletteOpen] = useState(false);
     const [isCrashOpen, setIsCrashOpen] = useState(false);
     const [isSneakOpen, setIsSneakOpen] = useState(false);
-    const [isDartOpen, setIsDartOpen] = useState(false);
-    const [isAviatorOpen, setIsAviatorOpen] = useState(false);
+    const [isHeistOpen, setIsHeistOpen] = useState(false);
     const [isInfluencerOpen, setIsInfluencerOpen] = useState(false);
     const [isWantedOpen, setIsWantedOpen] = useState(false);
-    const [isTomatoesOpen, setIsTomatoesOpen] = useState(false);
-    const [isFootballOpen, setIsFootballOpen] = useState(false);
-    const [isBridgeOpen, setIsBridgeOpen] = useState(false);
+    const [isEscapeOpen, setIsEscapeOpen] = useState(false);
+    const [isBombOpen, setIsBombOpen] = useState(false);
+    const [isBlackjackOpen, setIsBlackjackOpen] = useState(false);
 
     const [diamonds, setDiamonds] = useState(0);
     const [forgesCoins, setForgesCoins] = useState(0);
@@ -75,13 +67,12 @@ export default function OriginalsPage() {
             else if (label === 'Roulette') setIsRouletteOpen(true);
             else if (label === 'Crash') setIsCrashOpen(true);
             else if (label === 'Secret Sneak') setIsSneakOpen(true);
-            else if (label === 'Dart Wheel') setIsDartOpen(true);
-            else if (label === 'Aviator') setIsAviatorOpen(true);
+            else if (label === 'Heist') setIsHeistOpen(true);
             else if (label === 'Influencer') setIsInfluencerOpen(true);
             else if (label === 'Wanted') setIsWantedOpen(true);
-            else if (label === 'Tomatoes') setIsTomatoesOpen(true);
-            else if (label === 'Penalty') setIsFootballOpen(true);
-            else if (label === 'Glass Bridge') setIsBridgeOpen(true);
+            else if (label === 'Escape') setIsEscapeOpen(true);
+            else if (label === 'Bomb Defuse') setIsBombOpen(true);
+            else if (label === 'Blackjack') setIsBlackjackOpen(true);
         }) as EventListener;
 
         window.addEventListener('open_game', handleOpenGame);
@@ -128,7 +119,7 @@ export default function OriginalsPage() {
                     transition={{ delay: 0.2 }}
                     className="text-slate-400 text-lg md:text-xl max-w-2xl font-medium"
                 >
-                    Exclusive, in-house developed games featuring industry-leading 99% RTP, instant payouts, and verifiable fairness.
+                    {ORIGINALS_MARKETING_RTP_BANNER} In-house originals with instant payouts and verifiable fairness.
                 </motion.p>
             </div>
 
@@ -145,8 +136,8 @@ export default function OriginalsPage() {
                             <Zap size={24} className="text-amber-400" />
                         </div>
                         <div>
-                            <h3 className="text-white font-bold text-lg">Unbeatable Returns</h3>
-                            <p className="text-slate-400 text-sm">Every Original guarantees a 99% Return To Player.</p>
+                            <h3 className="text-white font-bold text-lg">House-friendly math</h3>
+                            <p className="text-slate-400 text-sm">RTP on each card is indicative; edge favors the house while rare big hits stay in the mix.</p>
                         </div>
                     </div>
                     <button className="flex items-center gap-2 text-amber-400 hover:text-amber-300 font-bold bg-amber-500/10 hover:bg-amber-500/20 px-4 py-2 rounded-xl transition-colors border border-amber-500/20 shrink-0">
@@ -177,13 +168,12 @@ export default function OriginalsPage() {
                             if (game.name === 'Roulette') setIsRouletteOpen(true);
                             if (game.name === 'Crash') setIsCrashOpen(true);
                             if (game.name === 'Secret Sneak') setIsSneakOpen(true);
-                            if (game.name === 'Dart Wheel') setIsDartOpen(true);
-                            if (game.name === 'Aviator') setIsAviatorOpen(true);
+                            if (game.name === 'Heist') setIsHeistOpen(true);
                             if (game.name === 'Influencer') setIsInfluencerOpen(true);
                             if (game.name === 'Wanted') setIsWantedOpen(true);
-                            if (game.name === 'Tomatoes') setIsTomatoesOpen(true);
-                            if (game.name === 'Penalty') setIsFootballOpen(true);
-                            if (game.name === 'Glass Bridge') setIsBridgeOpen(true);
+                            if (game.name === 'Escape') setIsEscapeOpen(true);
+                            if (game.name === 'Bomb Defuse') setIsBombOpen(true);
+                            if (game.name === 'Blackjack') setIsBlackjackOpen(true);
                         }}>
                             {/* Glow effect behind card for Originals */}
                             <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition duration-500 z-[-1]"></div>
@@ -223,13 +213,12 @@ export default function OriginalsPage() {
             <RouletteModal isOpen={isRouletteOpen} onClose={() => setIsRouletteOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
             <CrashModal isOpen={isCrashOpen} onClose={() => setIsCrashOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
             <SneakModal isOpen={isSneakOpen} onClose={() => setIsSneakOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-            <DartWheelModal isOpen={isDartOpen} onClose={() => setIsDartOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-            <AviatorModal isOpen={isAviatorOpen} onClose={() => setIsAviatorOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <HeistModal isOpen={isHeistOpen} onClose={() => setIsHeistOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
             <InfluencerModal isOpen={isInfluencerOpen} onClose={() => setIsInfluencerOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
             <WantedModal isOpen={isWantedOpen} onClose={() => setIsWantedOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-            <TomatoesModal isOpen={isTomatoesOpen} onClose={() => setIsTomatoesOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-            <FootballModal isOpen={isFootballOpen} onClose={() => setIsFootballOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
-            <GlassBridgeModal isOpen={isBridgeOpen} onClose={() => setIsBridgeOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <EscapeModal isOpen={isEscapeOpen} onClose={() => setIsEscapeOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <BombModal isOpen={isBombOpen} onClose={() => setIsBombOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
+            <BlackjackModal isOpen={isBlackjackOpen} onClose={() => setIsBlackjackOpen(false)} diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins} />
 
         </div>
     );

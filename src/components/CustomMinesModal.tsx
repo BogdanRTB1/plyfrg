@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Bomb, Gem, Target, Minus, Plus, MoreHorizontal, Zap } from "lucide-react";
+import { X, Trophy, Bomb, Gem, Target, MoreHorizontal, Zap } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
 import FavoriteToggle from "./FavoriteToggle";
-import MobileGameHudBar from "./MobileGameHudBar";
+import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import type { MinesConfig, MinesGridSize } from "@/types/minesConfig";
-import { DEFAULT_MINES_CONFIG, GRID_SIZE_PRESETS as MINES_GRID_PRESETS } from "@/types/minesConfig";
+import { DEFAULT_MINES_CONFIG, GRID_SIZE_PRESETS as MINES_GRID_PRESETS, GRID_DEFAULT_MINE_COUNT } from "@/types/minesConfig";
 
 // ─── Progressive Suspense Audio Engine ──────────────────────────────────────
 const playSuspenseTone = (revealedCount: number) => {
@@ -93,7 +93,6 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
     const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
     const balance = currencyType === 'GC' ? diamonds : forgesCoins;
     const [betAmount, setBetAmount] = useState(10);
-    const [mineCount, setMineCount] = useState(3);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
 
     // Session Tracking
@@ -122,6 +121,8 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
     const [flippingCells, setFlippingCells] = useState<Set<number>>(new Set());
 
     const maxMines = totalCells - 1;
+    const gridSizeKey = (config.gridSize ?? "5x5") as MinesGridSize;
+    const mineCount = Math.min(GRID_DEFAULT_MINE_COUNT[gridSizeKey], maxMines);
 
     const startGame = () => {
         if (!gameData || balance < betAmount || betAmount <= 0) return;
@@ -143,8 +144,7 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
         // Generate new grid
         const newGrid = Array(totalCells).fill(null).map(() => ({ isMine: false, revealed: false }));
         let minesPlaced = 0;
-        const effectiveMineCount = Math.min(mineCount, maxMines);
-        while (minesPlaced < effectiveMineCount) {
+        while (minesPlaced < mineCount) {
             const idx = Math.floor(Math.random() * totalCells);
             if (!newGrid[idx].isMine) {
                 newGrid[idx] = { isMine: true, revealed: false };
@@ -156,11 +156,21 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
     };
 
     const updateMultipliers = (revealedSafe: number) => {
-        const base = 1 - (Math.min(mineCount, maxMines) / totalCells);
-        const currMult = revealedSafe === 0 ? 1 : Math.pow(1 / base, revealedSafe) * 0.99;
-        const nextMult = Math.pow(1 / base, revealedSafe + 1) * 0.99;
-        setMultiplier(currMult);
-        setNextMultiplier(nextMult);
+        const safeTiles = totalCells - mineCount;
+        // House-favored multiplier: fair odds * discount factor
+        // Progressive tax increases with depth so the house edge grows as risk decreases
+        const calcMult = (revealed: number) => {
+            if (revealed === 0) return 1;
+            let fairMult = 1;
+            for (let i = 0; i < revealed; i++) {
+                fairMult *= (totalCells - i) / (safeTiles - i);
+            }
+            // Stronger house cut + progressive tax per safe reveal (template favors site)
+            const houseDiscount = 0.88 - (revealed * 0.009);
+            return Number((fairMult * Math.max(houseDiscount, 0.73)).toFixed(1));
+        };
+        setMultiplier(calcMult(revealedSafe));
+        setNextMultiplier(calcMult(revealedSafe + 1));
     };
 
     const triggerBustEffects = () => {
@@ -232,7 +242,7 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
             updateMultipliers(revealedCount);
 
             // Auto win if all safe cells revealed
-            if (revealedCount === totalCells - Math.min(mineCount, maxMines)) {
+            if (revealedCount === totalCells - mineCount) {
                 cashOut(curr => curr);
             }
         }
@@ -279,7 +289,9 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
                         gameImage: gameData?.coverImage || "/images/game-placeholder.png", 
                         wagered: sessionWagered, 
                         payout: sessionPayout, 
-                        currency: currencyType 
+                        currency: currencyType,
+                        creatorId: gameData?.creatorId,
+                        gameId: gameData?.id,
                     }
                 }));
                 // Reset session
@@ -319,21 +331,20 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
                     style={{ backgroundColor: bgColor + "F0" }}
                     className="border-white/10 backdrop-blur-md"
                     left={
-                        <>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-black/30 px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-black/30 px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
-                            <div className="flex min-w-0 max-w-[6rem] items-center overflow-hidden rounded-lg border border-white/10 bg-black/40">
-                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
-                                <span className="min-w-0 truncate px-0.5 text-center text-xs font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
-                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
-                            </div>
-                        </>
+                        <MobileHudBetRow
+                            betAmount={betAmount}
+                            balance={balance}
+                            onBetChange={handleBetChange}
+                            disabled={gameState === "PLAYING"}
+                            quickBtnClassName="shrink-0 rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40 min-h-[40px] min-w-[34px]"
+                            inputClassName="min-h-[40px] min-w-[3rem] flex-1 basis-0 max-w-[6.75rem] rounded-lg border border-white/10 bg-black/40 px-1 py-1 text-center text-[12px] font-mono font-bold text-white outline-none focus:opacity-100 disabled:opacity-40"
+                        />
                     }
                     center={
                         gameState === "PLAYING" ? (
                             <button type="button" onClick={() => cashOut()} className="flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full bg-green-500 text-[10px] font-black uppercase leading-tight text-black shadow-[0_0_20px_rgba(34,197,94,0.45)] active:scale-95">
                                 <Trophy className="mb-0.5 h-5 w-5" />
-                                <span className="text-[10px]">{(betAmount * multiplier).toFixed(0)}</span>
+                                <span className="text-[10px]">{(betAmount * multiplier).toFixed(1)}</span>
                             </button>
                         ) : (
                             <button
@@ -362,7 +373,11 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
                             >
                                 MAX
                             </button>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <MobileHudCurrencyToggle
+                                isGC={currencyType === "GC"}
+                                disabled={gameState === "PLAYING"}
+                                onToggle={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))}
+                            />
                             <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-black/30 p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
                         </>
                     }
@@ -385,8 +400,8 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
                     </div>
 
                     <div className="bg-black/30 p-1 rounded-xl flex border border-white/5">
-                        <button onClick={() => setCurrencyType('GC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> Diamonds</button>
-                        <button onClick={() => setCurrencyType('FC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> Coins</button>
+                        <button onClick={() => setCurrencyType('GC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> GC</button>
+                        <button onClick={() => setCurrencyType('FC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> FC</button>
                     </div>
 
                     <div className="space-y-2 mt-2">
@@ -415,19 +430,9 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
                                 style={{ color: accentColor, borderColor: accentColor + '30' }}>MAX</button>
                         </div>
 
-                        <div className="flex justify-between items-end">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Mines (1-{maxMines})</label>
-                        </div>
-                        <select
-                            value={mineCount}
-                            onChange={(e) => setMineCount(Number(e.target.value))}
-                            disabled={gameState === 'PLAYING'}
-                            className="w-full bg-black/30 border border-white/10 rounded-xl py-3 px-4 text-white font-bold outline-none appearance-none"
-                        >
-                            {Array.from({ length: maxMines }, (_, i) => i + 1).map(num => (
-                                <option key={num} value={num}>{num}</option>
-                            ))}
-                        </select>
+                        <p className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[11px] text-slate-400">
+                            <span className="font-bold text-slate-200">{mineCount}</span> mines on {MINES_GRID_PRESETS[gridSizeKey].label} — fixed difficulty.
+                        </p>
                     </div>
 
                     <div className="mt-2 bg-black/30 border border-white/10 rounded-xl p-3 flex items-center justify-between">
@@ -458,7 +463,7 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
                         ) : (
                             <button onClick={() => cashOut(m => m)} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white h-14 rounded-xl font-black text-lg uppercase shadow-[0_0_30px_rgba(34,197,94,0.5)] animate-pulse hover:scale-[1.02] flex flex-col items-center justify-center">
                                 <span>CASHOUT</span>
-                                <span className="text-[10px] text-green-200 mt-[-2px]">Take {(betAmount * multiplier).toFixed(2)}</span>
+                                <span className="text-[10px] text-green-200 mt-[-2px]">Take {(betAmount * multiplier).toFixed(1)}</span>
                             </button>
                         )}
                     </div>
@@ -488,12 +493,12 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
                     <div className="absolute inset-x-0 top-0 p-4 sm:p-6 flex justify-between items-center z-10 w-full max-w-[500px] mx-auto">
                         <div className="bg-black/60 border border-white/5 rounded-xl px-4 py-2 flex items-center gap-3 shadow-lg backdrop-blur-sm">
                             <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Multiplier</span>
-                            <span className="font-mono font-black text-xl" style={{ color: accentColor }}>{multiplier.toFixed(2)}x</span>
+                            <span className="font-mono font-black text-xl" style={{ color: accentColor }}>{multiplier.toFixed(1)}x</span>
                         </div>
                         {gameState === 'PLAYING' && (
                             <div className="bg-black/60 border border-white/5 rounded-xl px-4 py-2 flex items-center gap-3 shadow-lg backdrop-blur-sm">
                                 <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Next</span>
-                                <span className="text-green-400 font-mono font-black text-xl">{nextMultiplier.toFixed(2)}x</span>
+                                <span className="text-green-400 font-mono font-black text-xl">{nextMultiplier.toFixed(1)}x</span>
                             </div>
                         )}
                     </div>
@@ -631,19 +636,9 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
                                 <span className="truncate text-xs font-bold uppercase tracking-wider text-slate-500">{config.theme.gameName}</span>
                                 <FavoriteToggle gameName={gameData?.name || "Mines"} />
                             </div>
-                            <p className="mb-2 text-[10px] font-bold uppercase text-slate-500">Mines (1-{maxMines})</p>
-                            <select
-                                value={mineCount}
-                                onChange={(e) => setMineCount(Number(e.target.value))}
-                                disabled={gameState === "PLAYING"}
-                                className="mb-4 w-full appearance-none rounded-xl border border-white/10 bg-black/30 py-3 px-4 font-bold text-white outline-none disabled:opacity-40"
-                            >
-                                {Array.from({ length: maxMines }, (_, i) => i + 1).map((num) => (
-                                    <option key={num} value={num}>
-                                        {num}
-                                    </option>
-                                ))}
-                            </select>
+                            <p className="mb-4 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[11px] text-slate-400">
+                                {mineCount} mines · {MINES_GRID_PRESETS[gridSizeKey].label} (fixed)
+                            </p>
                             <div className="mb-4 flex items-center justify-between rounded-xl border border-white/10 bg-black/30 p-3">
                                 <span className="text-[10px] font-bold uppercase text-slate-400">Last win</span>
                                 {lastWin ? (

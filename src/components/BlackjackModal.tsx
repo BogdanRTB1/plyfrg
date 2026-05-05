@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Spade, Club, Heart, Diamond, Minus, Plus, MoreHorizontal, Zap } from "lucide-react";
+import { X, Trophy, Spade, Club, Heart, Diamond, MoreHorizontal, Zap } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
-import MobileGameHudBar from "./MobileGameHudBar";
+import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import confetti from "canvas-confetti";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
@@ -199,7 +199,11 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
     };
 
     const payOut = (multiplier: number) => {
-        const winAmount = betAmount * multiplier;
+        let winAmount = betAmount * multiplier;
+        if (multiplier > 1) {
+            const profit = winAmount - betAmount;
+            winAmount = betAmount + profit * 0.89;
+        }
         setLastWin({ amount: winAmount, currency: currencyType });
 
         if (currencyType === 'GC') {
@@ -317,15 +321,12 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
                 <MobileGameHudBar
                     className={BLACKJACK_CONFIG.theme.panelBg}
                     left={
-                        <>
-                            <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
-                            <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
-                            <div className="flex min-w-0 max-w-[6rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
-                                <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
-                                <span className="min-w-0 truncate px-0.5 text-center text-xs font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
-                                <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
-                            </div>
-                        </>
+                        <MobileHudBetRow
+                            betAmount={betAmount}
+                            balance={balance}
+                            onBetChange={handleBetChange}
+                            disabled={bettingLocked}
+                        />
                     }
                     center={
                         gameState === "PLAYING" ? (
@@ -349,7 +350,11 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
                             ) : (
                                 <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(balance)} className="shrink-0 rounded-lg border border-[#00b9f0]/30 bg-[#1a2c38] px-3 py-3 text-xs font-black text-[#00b9f0] active:scale-95 disabled:opacity-40">MAX</button>
                             )}
-                            <button type="button" disabled={bettingLocked} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <MobileHudCurrencyToggle
+                                isGC={currencyType === "GC"}
+                                disabled={bettingLocked}
+                                onToggle={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))}
+                            />
                             <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
                         </>
                     }
@@ -366,8 +371,8 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
                     </div>
 
                     <div className="bg-[#0f171c] p-1 rounded-xl flex border border-white/5">
-                        <button onClick={() => setCurrencyType('GC')} disabled={gameState === 'PLAYING' || gameState === 'DEALER_TURN'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> Diamonds</button>
-                        <button onClick={() => setCurrencyType('FC')} disabled={gameState === 'PLAYING' || gameState === 'DEALER_TURN'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> Coins</button>
+                        <button onClick={() => setCurrencyType('GC')} disabled={gameState === 'PLAYING' || gameState === 'DEALER_TURN'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> GC</button>
+                        <button onClick={() => setCurrencyType('FC')} disabled={gameState === 'PLAYING' || gameState === 'DEALER_TURN'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> FC</button>
                     </div>
 
                     <div className="space-y-2 mt-2">

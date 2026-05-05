@@ -6,6 +6,7 @@ import { Flame, TrendingUp, Sparkles, Users, Calendar, Clock } from "lucide-reac
 import GameCard from "@/components/GameCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
+import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
 
 interface GameStat {
     name: string;
@@ -18,18 +19,12 @@ interface GameStat {
 }
 
 const baseGames = [
-    { name: "Crash", image: "/images/game-crash.png", rtp: "98.5%", provider: "InfluenBet" },
-    { name: "Plinko", image: "/images/game-plinko.png", rtp: "99.0%", provider: "InfluenBet" },
-    { name: "Mines", image: "/images/game-mines.png", rtp: "98.5%", provider: "InfluenBet" },
-    { name: "Slots", image: "/images/game-slots.png", rtp: "96.5%", provider: "InfluenBet" },
-    { name: "Blackjack", image: "/images/game-blackjack.png", rtp: "99.5%", provider: "InfluenBet" },
-    { name: "Roulette", image: "/images/game-roulette.png", rtp: "97.3%", provider: "InfluenBet" },
-    { name: "Aviator", image: "/images/game-aviator.png", rtp: "97.0%", provider: "InfluenBet" },
-    { name: "Dart Wheel", image: "/images/game-darts.png", rtp: "98.0%", provider: "InfluenBet" },
-    { name: "Penalty", image: "/images/game-penalty.png", rtp: "96.0%", provider: "InfluenBet" },
-    { name: "Glass Bridge", image: "/images/game-bridge.png", rtp: "95.5%", provider: "InfluenBet" },
-    { name: "Wanted", image: "/images/game-wanted.png", rtp: "96.8%", provider: "InfluenBet" },
-    { name: "Escape", image: "/images/game-escape.png", rtp: "97.5%", provider: "InfluenBet" },
+    ...FEATURED_GAMES.map((game) => ({
+        name: game.name,
+        image: getGameCoverImage(game.name),
+        rtp: game.rtp,
+        provider: game.provider,
+    })),
 ];
 
 export default function TrendingPage() {
@@ -107,9 +102,9 @@ export default function TrendingPage() {
     }));
 
     const creatorPicks = [
-        { name: "Plinko", picker: "@Ninja", badge: "Live", image: "/images/game-plinko.png" },
-        { name: "Wanted", picker: "@TechnoKing", badge: "Record", image: "/images/game-wanted.png" },
-        { name: "Blackjack", picker: "@RetroGamer", badge: "Stakes", image: "/images/game-blackjack.png" },
+        { name: "Plinko", picker: "@Ninja", badge: "Live", image: getGameCoverImage("Plinko") },
+        { name: "Wanted", picker: "@TechnoKing", badge: "Record", image: getGameCoverImage("Wanted") },
+        { name: "Blackjack", picker: "@RetroGamer", badge: "Stakes", image: getGameCoverImage("Blackjack") },
     ];
 
     const gridClass =

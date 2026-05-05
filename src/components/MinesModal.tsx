@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Bomb, Gem, Target, Minus, Plus, MoreHorizontal, Zap } from "lucide-react";
+import { X, Trophy, Bomb, Gem, Target, MoreHorizontal, Zap } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
 import Image from "next/image";
 import FavoriteToggle from "./FavoriteToggle";
-import MobileGameHudBar from "./MobileGameHudBar";
+import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
+
+/** Fixed mine count for lobby Mines (5×5) — not player-selectable; matches house template. */
+const LOBBY_MINES_COUNT = 7;
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
 export const MINES_CONFIG = {
@@ -40,7 +43,6 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
     const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
     const balance = currencyType === 'GC' ? diamonds : forgesCoins;
     const [betAmount, setBetAmount] = useState(10);
-    const [mineCount, setMineCount] = useState(3);
     const [lastWin, setLastWin] = useState<{ amount: number, currency: 'GC' | 'FC' } | null>(null);
 
     // Session tracking locally for consolidation
@@ -54,11 +56,21 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
     const [grid, setGrid] = useState<{ isMine: boolean, revealed: boolean }[]>([]);
 
     const updateMultipliers = (revealedSafe: number) => {
-        const base = 1 - (mineCount / 25);
-        const currMult = revealedSafe === 0 ? 1 : Math.pow(1 / base, revealedSafe) * 0.99;
-        const nextMult = Math.pow(1 / base, revealedSafe + 1) * 0.99;
-        setMultiplier(currMult);
-        setNextMultiplier(nextMult);
+        const totalTiles = 25;
+        const safeTiles = totalTiles - LOBBY_MINES_COUNT;
+        // House-favored multiplier: fair odds * discount factor
+        // Progressive tax increases with depth so the house edge grows as risk decreases
+        const calcMult = (revealed: number) => {
+            if (revealed === 0) return 1;
+            let fairMult = 1;
+            for (let i = 0; i < revealed; i++) {
+                fairMult *= (totalTiles - i) / (safeTiles - i);
+            }
+            const houseDiscount = 0.88 - (revealed * 0.009);
+            return Number((fairMult * Math.max(houseDiscount, 0.73)).toFixed(1));
+        };
+        setMultiplier(calcMult(revealedSafe));
+        setNextMultiplier(calcMult(revealedSafe + 1));
     };
 
     const startGame = () => {
@@ -78,7 +90,7 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
 
         const newGrid = Array(25).fill({ isMine: false, revealed: false });
         let minesPlaced = 0;
-        while (minesPlaced < mineCount) {
+        while (minesPlaced < LOBBY_MINES_COUNT) {
             const idx = Math.floor(Math.random() * 25);
             if (!newGrid[idx].isMine) {
                 newGrid[idx] = { isMine: true, revealed: false };
@@ -93,17 +105,7 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
         if (gameState !== 'PLAYING') return;
         if (grid[index].revealed) return;
 
-        let newGrid = [...grid];
-        
-        // Rigged logic: 30% chance to force a mine if it wasn't one already, offering more loss
-        if (!newGrid[index].isMine && Math.random() < 0.30) {
-             const unrevealedMineIdx = newGrid.findIndex(c => c.isMine && !c.revealed);
-             if (unrevealedMineIdx !== -1) {
-                 newGrid[unrevealedMineIdx] = { ...newGrid[unrevealedMineIdx], isMine: false };
-                 newGrid[index] = { ...newGrid[index], isMine: true };
-             }
-        }
-
+        const newGrid = [...grid];
         newGrid[index] = { ...newGrid[index], revealed: true };
         setGrid(newGrid);
 
@@ -114,7 +116,7 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
         } else {
             const revealedSafe = newGrid.filter(c => c.revealed && !c.isMine).length;
             updateMultipliers(revealedSafe);
-            if (revealedSafe === (25 - mineCount)) {
+            if (revealedSafe === (25 - LOBBY_MINES_COUNT)) {
                 cashout();
             }
         }
@@ -185,21 +187,18 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
                 <MobileGameHudBar
                     className={MINES_CONFIG.theme.panelBg}
                     left={
-                        <>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
-                            <div className="flex min-w-0 max-w-[6rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
-                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
-                                <span className="min-w-0 truncate px-0.5 text-center text-xs font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
-                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
-                            </div>
-                        </>
+                        <MobileHudBetRow
+                            betAmount={betAmount}
+                            balance={balance}
+                            onBetChange={handleBetChange}
+                            disabled={gameState === "PLAYING"}
+                        />
                     }
                     center={
                         gameState === "PLAYING" ? (
                             <button type="button" onClick={cashout} className="flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full bg-green-500 text-[9px] font-black uppercase leading-tight text-black shadow-[0_0_20px_rgba(34,197,94,0.45)] active:scale-95">
                                 <Trophy className="mb-0.5 h-4 w-4" />
-                                <span className="text-[10px]">{(betAmount * multiplier).toFixed(0)}</span>
+                                <span className="text-[10px]">{(betAmount * multiplier).toFixed(1)}</span>
                             </button>
                         ) : (
                             <button type="button" onClick={startGame} disabled={balance < betAmount || betAmount <= 0} className={`flex h-[68px] w-[68px] items-center justify-center rounded-full ${MINES_CONFIG.theme.buttonAccent} text-black shadow-[0_0_22px_rgba(0,185,240,0.35)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45`} aria-label="Start round">
@@ -210,7 +209,11 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
                     right={
                         <>
                             <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(balance)} className={`shrink-0 rounded-lg border border-[#00b9f0]/30 bg-[#1a2c38] px-3 py-3 text-xs font-black ${MINES_CONFIG.theme.accent} active:scale-95 disabled:opacity-40`}>MAX</button>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <MobileHudCurrencyToggle
+                                isGC={currencyType === "GC"}
+                                disabled={gameState === "PLAYING"}
+                                onToggle={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))}
+                            />
                             <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
                         </>
                     }
@@ -261,20 +264,6 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Mines Count</label>
-                            <div className="grid grid-cols-4 gap-2">
-                                {[1, 3, 5, 24].map((count) => (
-                                    <button
-                                        key={count}
-                                        onClick={() => gameState !== 'PLAYING' && setMineCount(count)}
-                                        className={`py-2 rounded-xl text-xs font-bold border transition-all ${mineCount === count ? 'bg-[#00b9f0] border-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.3)]' : 'bg-[#1a2c38] border-white/5 text-slate-400 hover:border-white/20'}`}
-                                    >
-                                        {count}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
                     </div>
 
                     <div className="pt-4 mt-auto">
@@ -286,7 +275,7 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
                                 <span className="text-xs opacity-70 group-hover:scale-110 transition-transform">Cashout</span>
                                 <div className="flex items-center gap-1">
                                     <Trophy size={16} />
-                                    <span>{(betAmount * multiplier).toFixed(2)}</span>
+                                    <span>{(betAmount * multiplier).toFixed(1)}</span>
                                 </div>
                             </button>
                         ) : (
@@ -358,12 +347,9 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
                                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Mines</span>
                                 <FavoriteToggle gameName={MINES_CONFIG.names.title} />
                             </div>
-                            <p className="mb-2 text-[10px] font-bold uppercase text-slate-500">Mines on field</p>
-                            <div className="mb-4 grid grid-cols-4 gap-2">
-                                {[1, 3, 5, 24].map((count) => (
-                                    <button key={count} type="button" disabled={gameState === "PLAYING"} onClick={() => setMineCount(count)} className={`rounded-xl border py-2 text-xs font-bold transition-all ${mineCount === count ? "border-[#00b9f0] bg-[#00b9f0] text-[#0f212e]" : "border-white/5 bg-[#1a2c38] text-slate-400"} disabled:opacity-40`}>{count}</button>
-                                ))}
-                            </div>
+                            <p className="mb-4 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[11px] text-slate-400">
+                                Difficulty fixed: <span className="font-bold text-slate-200">{LOBBY_MINES_COUNT} mines</span> on 5×5.
+                            </p>
                             <div className="mb-4 flex items-center justify-between rounded-xl border border-green-500/20 bg-[#0a1114]/50 p-3">
                                 <span className="text-[10px] font-bold uppercase text-slate-400">Last win</span>
                                 {lastWin ? <span className="flex items-center gap-1 text-sm font-black text-green-400">+{lastWin.amount.toFixed(2)} {lastWin.currency === "GC" ? <DiamondIcon className="h-3 w-3" /> : <ForgesCoinIcon className="h-3 w-3" />}</span> : <span className="font-mono text-xs text-slate-600">—</span>}

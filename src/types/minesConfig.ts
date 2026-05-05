@@ -60,6 +60,13 @@ export const GRID_SIZE_PRESETS: Record<MinesGridSize, { rows: number; cols: numb
   '7x7': { rows: 7, cols: 7, total: 49, label: '7×7', description: 'Extended — 49 tiles' },
 };
 
+/** Default mine count per grid size (fixed for players — matches house templates). */
+export const GRID_DEFAULT_MINE_COUNT: Record<MinesGridSize, number> = {
+  '3x3': 4,
+  '5x5': 7,
+  '7x7': 14,
+};
+
 // ─── Bust Animation Presets ──────────────────────────────────────────────────
 export const BUST_ANIMATION_PRESETS = [
   { id: 'explosion', emoji: '💥', label: 'Explosion', description: 'Classic bomb explosion effect' },

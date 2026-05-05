@@ -9,6 +9,7 @@ import { User as UserIcon, Calendar, Trophy, Medal, Star, Shield, Lock, Activity
 import Image from "next/image";
 import { motion } from "framer-motion";
 import AIGameModal from "@/components/AIGameModal";
+import { loadPublishedGames } from "@/utils/publishedGamesStorage";
 
 export default function CreatorProfilePage() {
     const params = useParams();
@@ -87,43 +88,39 @@ export default function CreatorProfilePage() {
                     if (followState) setIsFollowing(true);
                 }
                 
+                // Record profile view in Supabase
                 try {
-                    const views = JSON.parse(localStorage.getItem('creator_profile_views') || '[]');
-                    let pid = localStorage.getItem('temp_player_id');
-                    if (!pid) { pid = 'user_' + Math.random().toString(36).substring(2,11); localStorage.setItem('temp_player_id', pid); }
-                    views.push({
-                        creatorId: dbCreator.id,
-                        creatorName: dbCreator.display_name,
-                        viewerId: pid,
-                        date: new Date().toISOString()
-                    });
-                    localStorage.setItem('creator_profile_views', JSON.stringify(views));
-                } catch (e) {}
+                    const { data: { user: viewerUser } } = await supabase.auth.getUser();
+                    const { error: viewErr } = await supabase.from('creator_profile_views').insert([{
+                        creator_id: dbCreator.id,
+                        viewer_id: viewerUser?.id || null,
+                        created_at: new Date().toISOString(),
+                    }]);
+                    if (viewErr) console.error('[Profile View] Insert failed:', viewErr.message);
+                } catch (e) {
+                    console.error('[Profile View] Exception:', e);
+                }
 
-                // Load unique players matching this creator
+                // Load unique players from Supabase
                 try {
-                    const plays = JSON.parse(localStorage.getItem('creator_game_plays') || '[]');
-                    const creatorPlays = plays.filter((p: any) => p.creatorId === dbCreator.id || p.creatorName === dbCreator.display_name);
-                    const uniqueIds = new Set(creatorPlays.map((p: any) => p.playerId));
+                    const { data: playsData, error: playsErr } = await supabase
+                        .from('creator_game_plays')
+                        .select('player_id')
+                        .eq('creator_id', dbCreator.id);
+                    if (playsErr) console.error('[Profile] Plays load error:', playsErr.message);
+                    const uniqueIds = new Set((playsData || []).map((p: any) => p.player_id).filter(Boolean));
                     setUniquePlayers(uniqueIds.size);
                 } catch (e) {
                     setUniquePlayers(0);
                 }
 
                 // Load custom created games
-                const aiGamesStr = localStorage.getItem('custom_published_games');
-                if (aiGamesStr) {
-                    try {
-                        const parsed = JSON.parse(aiGamesStr);
-                        const filtered = parsed.filter((g: any) => 
-                            g.creatorName?.toLowerCase() === username.toLowerCase() || 
-                            g.creatorName?.toLowerCase() === dbCreator.display_name?.toLowerCase()
-                        );
-                        setCreatorGames(filtered);
-                    } catch (e) {
-                        console.error(e);
-                    }
-                }
+                const parsed = await loadPublishedGames();
+                const filtered = (parsed || []).filter((g: any) =>
+                    g.creatorName?.toLowerCase() === username.toLowerCase() ||
+                    g.creatorName?.toLowerCase() === dbCreator.display_name?.toLowerCase()
+                );
+                setCreatorGames(filtered);
             } catch (err: any) {
                 console.error("Creator Profile load error:", err);
                 setError("Could not load creator profile.");

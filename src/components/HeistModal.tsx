@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Lock, Unlock, Zap, Trophy, Goal, Crosshair, Minus, Plus, MoreHorizontal } from "lucide-react";
+import { X, Lock, Unlock, Zap, Trophy, Goal, Crosshair, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
-import MobileGameHudBar from "./MobileGameHudBar";
+import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import confetti from "canvas-confetti";
 
 const HEIST_CONFIG = {
@@ -45,8 +45,8 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
         setGameState('PLAYING');
         setMultiplier(1.00);
 
-        const e = 2 ** (Math.random() * 4);
-        crashPointRef.current = Math.max(1.00, e * 0.9);
+        const e = 2 ** (Math.random() * 3.05);
+        crashPointRef.current = Math.max(1.00, e * 0.56);
 
         if (timerRef.current) clearInterval(timerRef.current);
 
@@ -69,7 +69,7 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
         if (timerRef.current) clearInterval(timerRef.current);
 
         setGameState('WON');
-        const winAmount = betAmount * multiplier;
+        const winAmount = betAmount * multiplier * 0.92;
         setCashOutValue(winAmount);
         setLastWin({ amount: winAmount, currency: currencyType });
 
@@ -130,15 +130,12 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
                 <MobileGameHudBar
                     className="bg-[#121c22]"
                     left={
-                        <>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
-                            <div className="flex min-w-0 max-w-[6rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
-                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
-                                <span className="min-w-0 truncate px-0.5 text-center text-xs font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
-                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
-                            </div>
-                        </>
+                        <MobileHudBetRow
+                            betAmount={betAmount}
+                            balance={balance}
+                            onBetChange={handleBetChange}
+                            disabled={gameState === "PLAYING"}
+                        />
                     }
                     center={
                         gameState === "PLAYING" ? (
@@ -155,7 +152,11 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
                     right={
                         <>
                             <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(balance)} className="shrink-0 rounded-lg border border-yellow-500/30 bg-[#1a2c38] px-3 py-3 text-xs font-black text-yellow-400 active:scale-95 disabled:opacity-40">MAX</button>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <MobileHudCurrencyToggle
+                                isGC={currencyType === "GC"}
+                                disabled={gameState === "PLAYING"}
+                                onToggle={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))}
+                            />
                             <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
                         </>
                     }
@@ -173,8 +174,8 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
                     </div>
 
                     <div className="bg-[#0f171c] p-1 rounded-xl flex border border-white/5">
-                        <button onClick={() => setCurrencyType('GC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> Diamonds</button>
-                        <button onClick={() => setCurrencyType('FC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> Coins</button>
+                        <button onClick={() => setCurrencyType('GC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> GC</button>
+                        <button onClick={() => setCurrencyType('FC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> FC</button>
                     </div>
 
                     <div className="space-y-2 mt-2">

@@ -24,6 +24,8 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import GameCard from "./GameCard";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
+import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
+import { loadPublishedGames } from "@/utils/publishedGamesStorage";
 
 export default function HomeContent() {
     const [isRandomizing, setIsRandomizing] = useState(false);
@@ -34,20 +36,19 @@ export default function HomeContent() {
 
 
     useEffect(() => {
-        const fetchCustomGames = () => {
-            const data = localStorage.getItem('custom_published_games');
-            if (data) {
-                try {
-                    setCustomGames(JSON.parse(data));
-                } catch (e) {
-                    console.error(e);
-                }
+        const fetchCustomGames = async () => {
+            try {
+                const games = await loadPublishedGames();
+                setCustomGames(games || []);
+            } catch (e) {
+                console.error(e);
             }
         };
 
-        fetchCustomGames();
-        window.addEventListener('storage', fetchCustomGames);
-        return () => window.removeEventListener('storage', fetchCustomGames);
+        void fetchCustomGames();
+        const handleStorage = () => { void fetchCustomGames(); };
+        window.addEventListener('storage', handleStorage);
+        return () => window.removeEventListener('storage', handleStorage);
     }, []);
 
     useEffect(() => {
@@ -109,20 +110,10 @@ export default function HomeContent() {
         window.location.href = `/creators/${encodeURIComponent(creatorName)}`;
     };
 
-    const originals = [
-        { name: "Plinko", image: "/images/game-plinko.png", rtp: "99.0%" },
-        { name: "Heist", image: "/images/game-heist-v2.png", rtp: "98.5%" },
-        { name: "Influencer", image: "/images/game-influencer-v2.png", rtp: "97.8%" },
-        { name: "Wanted", image: "/images/game-influencer-run.png", rtp: "98.1%" },
-        { name: "Escape", image: "/images/game-escape-v3.png", rtp: "98.2%" },
-        { name: "Bomb Defuse", image: "/images/game-bomb-v2.png", rtp: "99.1%" },
-        { name: "Crash", image: "/images/game-crash.png", rtp: "99.0%" },
-        { name: "Mines", image: "/images/game-mines.png", rtp: "99.0%" },
-        { name: "Slots", image: "/images/game-slots.png", rtp: "99.0%" },
-        { name: "Blackjack", image: "/images/game-blackjack.png", rtp: "99.5%" },
-        { name: "Roulette", image: "/images/game-roulette.png", rtp: "97.3%" },
-        { name: "Secret Sneak", image: "/images/game-secret-sneak.png", rtp: "98.5%" },
-    ];
+    const originals = FEATURED_GAMES.map((game) => ({
+        ...game,
+        image: getGameCoverImage(game.name),
+    }));
 
     const activeOriginals = originals.slice(0, 12);
 
@@ -141,7 +132,10 @@ export default function HomeContent() {
             const allGames = [...originals, ...customGames];
             if (allGames.length === 0) return;
             const randomPick = allGames[Math.floor(Math.random() * allGames.length)];
-            window.dispatchEvent(new CustomEvent('open_game', { detail: randomPick }));
+            const payload = typeof randomPick === "object" && randomPick !== null && "type" in randomPick
+                ? randomPick
+                : randomPick.name;
+            window.dispatchEvent(new CustomEvent('open_game', { detail: payload }));
         }, 2200);
     };
 

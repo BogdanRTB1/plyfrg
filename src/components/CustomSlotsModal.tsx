@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Coins, Repeat, Minus, Plus, MoreHorizontal } from "lucide-react";
+import { X, Trophy, Coins, Repeat, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
 import FavoriteToggle from "./FavoriteToggle";
-import MobileGameHudBar from "./MobileGameHudBar";
+import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
+import { playSlotSpinSound } from "@/utils/slotSpinSound";
 
 export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, setDiamonds, forgesCoins, setForgesCoins }: any) {
     const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
@@ -48,6 +49,7 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
         setGameState('SPINNING');
         setWinMultiplier(0);
         setSpinningReels([true, true, true]);
+        playSlotSpinSound(0.3);
 
         const newReels = [
             Math.floor(Math.random() * SYMBOLS.length),
@@ -110,7 +112,9 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
                         gameImage: gameData?.coverImage || "/images/game-placeholder.png", 
                         wagered: sessionWagered, 
                         payout: sessionPayout, 
-                        currency: currencyType 
+                        currency: currencyType,
+                        creatorId: gameData?.creatorId,
+                        gameId: gameData?.id,
                     }
                 }));
                 // Reset session
@@ -137,15 +141,14 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
                 <MobileGameHudBar
                     className="bg-[#121c22]"
                     left={
-                        <>
-                            <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
-                            <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
-                            <div className="flex min-w-0 max-w-[5.5rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
-                                <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-4 w-4" /></button>
-                                <span className="min-w-0 truncate px-0.5 text-center text-[11px] font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
-                                <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-4 w-4" /></button>
-                            </div>
-                        </>
+                        <MobileHudBetRow
+                            betAmount={betAmount}
+                            balance={balance}
+                            onBetChange={handleBetChange}
+                            disabled={gameState === 'SPINNING'}
+                            quickBtnClassName="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2 py-2 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40 min-h-[40px] min-w-[34px]"
+                            inputClassName="min-h-[40px] min-w-[3rem] flex-1 basis-0 max-w-[6.75rem] rounded-lg border border-white/10 bg-[#0a1114] px-1 py-1 text-center text-[11px] font-mono font-bold text-white outline-none focus:border-purple-400/40 disabled:opacity-40"
+                        />
                     }
                     center={
                         <button
@@ -161,7 +164,12 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
                     right={
                         <>
                             <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(balance)} className="shrink-0 rounded-lg border border-purple-500/30 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-purple-400 active:scale-95 disabled:opacity-40">MAX</button>
-                            <button type="button" disabled={gameState === 'SPINNING'} onClick={() => setCurrencyType((c) => (c === 'GC' ? 'FC' : 'GC'))} className={`shrink-0 rounded-lg border border-white/10 px-2.5 py-2.5 text-[11px] font-black uppercase ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e]' : 'bg-amber-500 text-black'} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <MobileHudCurrencyToggle
+                                isGC={currencyType === 'GC'}
+                                disabled={gameState === 'SPINNING'}
+                                onToggle={() => setCurrencyType((c) => (c === 'GC' ? 'FC' : 'GC'))}
+                                className="h-10 w-10 rounded-lg"
+                            />
                             <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] p-2 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-4 w-4" /></button>
                         </>
                     }
@@ -181,8 +189,8 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
                     </div>
 
                     <div className="bg-[#0f171c] p-1 rounded-xl flex border border-white/5 mt-2">
-                        <button onClick={() => setCurrencyType('GC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> Diamonds</button>
-                        <button onClick={() => setCurrencyType('FC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> Coins</button>
+                        <button onClick={() => setCurrencyType('GC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> GC</button>
+                        <button onClick={() => setCurrencyType('FC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> FC</button>
                     </div>
 
                     <div className="space-y-2 mt-2">

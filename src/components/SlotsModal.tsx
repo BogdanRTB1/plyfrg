@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Coins, Repeat, Minus, Plus, MoreHorizontal } from "lucide-react";
+import { X, Trophy, Coins, Repeat, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
 import FavoriteToggle from "./FavoriteToggle";
-import MobileGameHudBar from "./MobileGameHudBar";
+import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
 export const SLOTS_CONFIG = {
@@ -63,11 +63,25 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
         setWinMultiplier(0);
         setSpinningReels([true, true, true]);
 
-        const newReels = [
-            Math.floor(Math.random() * SLOTS_CONFIG.symbols.length),
-            Math.floor(Math.random() * SLOTS_CONFIG.symbols.length),
-            Math.floor(Math.random() * SLOTS_CONFIG.symbols.length)
-        ];
+        const symCount = SLOTS_CONFIG.symbols.length;
+        const pickNonTriple = (): number[] => {
+            for (let k = 0; k < 40; k++) {
+                const a = Math.floor(Math.random() * symCount);
+                const b = Math.floor(Math.random() * symCount);
+                const c = Math.floor(Math.random() * symCount);
+                if (!(a === b && b === c)) return [a, b, c];
+            }
+            return [0, 1, 2];
+        };
+        const r0 = Math.random();
+        let newReels: number[];
+        if (r0 < 0.7265) newReels = pickNonTriple();
+        else if (r0 < 0.9015) newReels = [0, 0, 0];
+        else if (r0 < 0.9615) newReels = [1, 1, 1];
+        else if (r0 < 0.9865) newReels = [2, 2, 2];
+        else if (r0 < 0.9965) newReels = [3, 3, 3];
+        else if (r0 < 0.9995) newReels = [4, 4, 4];
+        else newReels = [5, 5, 5];
 
         // Stop reels one by one
         setTimeout(() => {
@@ -154,15 +168,14 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
                 <MobileGameHudBar
                     className={SLOTS_CONFIG.theme.panelBg}
                     left={
-                        <>
-                            <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
-                            <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
-                            <div className="flex min-w-0 max-w-[5.5rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
-                                <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-4 w-4" /></button>
-                                <span className="min-w-0 truncate px-0.5 text-center text-[11px] font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
-                                <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-4 w-4" /></button>
-                            </div>
-                        </>
+                        <MobileHudBetRow
+                            betAmount={betAmount}
+                            balance={balance}
+                            onBetChange={handleBetChange}
+                            disabled={gameState === 'SPINNING'}
+                            quickBtnClassName="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2 py-2 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40 min-h-[40px] min-w-[34px]"
+                            inputClassName="min-h-[40px] min-w-[3rem] flex-1 basis-0 max-w-[6.75rem] rounded-lg border border-white/10 bg-[#0a1114] px-1 py-1 text-center text-[11px] font-mono font-bold text-white outline-none focus:border-[#00b9f0]/45 disabled:opacity-40"
+                        />
                     }
                     center={
                         <button
@@ -178,7 +191,12 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
                     right={
                         <>
                             <button type="button" disabled={gameState === 'SPINNING'} onClick={() => handleBetChange(balance)} className={`shrink-0 rounded-lg border border-[#00b9f0]/30 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black ${SLOTS_CONFIG.theme.accent} active:scale-95 disabled:opacity-40`}>MAX</button>
-                            <button type="button" disabled={gameState === 'SPINNING'} onClick={() => setCurrencyType((c) => (c === 'GC' ? 'FC' : 'GC'))} className={`shrink-0 rounded-lg border border-white/10 px-2.5 py-2.5 text-[11px] font-black uppercase ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e]' : 'bg-amber-500 text-black'} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <MobileHudCurrencyToggle
+                                isGC={currencyType === 'GC'}
+                                disabled={gameState === 'SPINNING'}
+                                onToggle={() => setCurrencyType((c) => (c === 'GC' ? 'FC' : 'GC'))}
+                                className="h-10 w-10 rounded-lg"
+                            />
                             <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] p-2 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-4 w-4" /></button>
                         </>
                     }
@@ -196,8 +214,8 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
                     </div>
 
                     <div className="bg-[#0f171c] p-1 rounded-xl flex border border-white/5">
-                        <button onClick={() => setCurrencyType('GC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> Diamonds</button>
-                        <button onClick={() => setCurrencyType('FC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> Coins</button>
+                        <button onClick={() => setCurrencyType('GC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> GC</button>
+                        <button onClick={() => setCurrencyType('FC')} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> FC</button>
                     </div>
 
                     <div className="space-y-2 mt-2">
@@ -355,8 +373,8 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
                                 <FavoriteToggle gameName={SLOTS_CONFIG.names.title} />
                             </div>
                             <div className="mb-4 bg-[#0f171c] p-1 rounded-xl flex border border-white/5">
-                                <button type="button" onClick={() => setCurrencyType('GC')} disabled={gameState === 'SPINNING'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'} disabled:opacity-40`}><DiamondIcon className="w-4 h-4" /> Diamonds</button>
-                                <button type="button" onClick={() => setCurrencyType('FC')} disabled={gameState === 'SPINNING'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'} disabled:opacity-40`}><ForgesCoinIcon className="w-4 h-4" /> Coins</button>
+                                <button type="button" onClick={() => setCurrencyType('GC')} disabled={gameState === 'SPINNING'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'} disabled:opacity-40`}><DiamondIcon className="w-4 h-4" /> GC</button>
+                                <button type="button" onClick={() => setCurrencyType('FC')} disabled={gameState === 'SPINNING'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'} disabled:opacity-40`}><ForgesCoinIcon className="w-4 h-4" /> FC</button>
                             </div>
                             <p className="mb-2 text-[10px] font-bold uppercase text-slate-500">Bet amount</p>
                             <div className="relative mb-2">

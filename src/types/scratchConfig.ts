@@ -51,19 +51,19 @@ export const BRUSH_SHAPE_PRESETS = [
 ];
 
 export const WIN_PROBABILITY_PRESETS = [
-  { id: 'rare', value: 0.15, label: '15% Win Rate', description: 'Rare wins — higher payouts feel rewarding' },
-  { id: 'balanced', value: 0.30, label: '30% Win Rate', description: 'Balanced — good mix of wins and losses' },
-  { id: 'generous', value: 0.45, label: '45% Win Rate', description: 'Generous — frequent small wins' },
+  { id: 'rare', value: 0.12, label: '12% Win Rate', description: 'Tight — house-favored scratch experience' },
+  { id: 'balanced', value: 0.22, label: '22% Win Rate', description: 'Moderate hits — still favors the house' },
+  { id: 'generous', value: 0.30, label: '30% Win Rate', description: 'Frequent small wins — max capped when publishing' },
 ];
 
 /** Default symbols for quick start */
 export const DEFAULT_SCRATCH_SYMBOLS: ScratchSymbol[] = [
-  { id: 'sc_1', name: 'Cherry', image: '🍒', payout: 2 },
-  { id: 'sc_2', name: 'Lemon', image: '🍋', payout: 3 },
-  { id: 'sc_3', name: 'Star', image: '⭐', payout: 5 },
-  { id: 'sc_4', name: 'Diamond', image: '💎', payout: 10 },
-  { id: 'sc_5', name: 'Crown', image: '👑', payout: 25 },
-  { id: 'sc_6', name: '7', image: '7️⃣', payout: 50 },
+  { id: 'sc_1', name: 'Cherry', image: '🍒', payout: 1.8 },
+  { id: 'sc_2', name: 'Lemon', image: '🍋', payout: 2.5 },
+  { id: 'sc_3', name: 'Star', image: '⭐', payout: 4 },
+  { id: 'sc_4', name: 'Diamond', image: '💎', payout: 6 },
+  { id: 'sc_5', name: 'Crown', image: '👑', payout: 12 },
+  { id: 'sc_6', name: '7', image: '7️⃣', payout: 24 },
 ];
 
 export const DEFAULT_SCRATCH_CONFIG: ScratchConfig = {
@@ -74,7 +74,7 @@ export const DEFAULT_SCRATCH_CONFIG: ScratchConfig = {
   coverImage: null,
   brushShape: 'circle',
   brushSize: 40,
-  winProbability: 0.30,
+  winProbability: 0.22,
   theme: {
     gameName: 'My Scratch Card',
     gameDescription: 'Scratch to reveal and win!',

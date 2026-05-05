@@ -4,26 +4,14 @@ import { Dices, Search, Filter, Sparkles } from "lucide-react";
 import GameCard from "@/components/GameCard";
 import { motion } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
+import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
+import { loadPublishedGames } from "@/utils/publishedGamesStorage";
 
 export default function CasinoPage() {
-    const allGames = [
-        { name: "Crash", image: "/images/game-crash.png", rtp: "98.5%", provider: "InfluenBet", badge: "Hot" },
-        { name: "Plinko", image: "/images/game-plinko.png", rtp: "99.0%", provider: "InfluenBet" },
-        { name: "Mines", image: "/images/game-mines.png", rtp: "98.5%", provider: "InfluenBet" },
-        { name: "Slots", image: "/images/game-slots.png", rtp: "96.5%", provider: "InfluenBet" },
-        { name: "Blackjack", image: "/images/game-blackjack.png", rtp: "99.5%", provider: "InfluenBet" },
-        { name: "Roulette", image: "/images/game-roulette.png", rtp: "97.3%", provider: "InfluenBet" },
-        { name: "Aviator", image: "/images/game-aviator.png", rtp: "97.0%", provider: "InfluenBet" },
-        { name: "Dart Wheel", image: "/images/game-darts.png", rtp: "98.0%", provider: "InfluenBet" },
-        { name: "Penalty", image: "/images/game-penalty.png", rtp: "96.0%", provider: "InfluenBet" },
-        { name: "Glass Bridge", image: "/images/game-bridge.png", rtp: "95.5%", provider: "InfluenBet", badge: "New" },
-        { name: "Wanted", image: "/images/game-wanted.png", rtp: "96.8%", provider: "InfluenBet" },
-        { name: "Escape", image: "/images/game-escape.png", rtp: "97.5%", provider: "InfluenBet" },
-        { name: "Secret Sneak", image: "/images/game-secret-sneak.png", rtp: "97.5%", provider: "InfluenBet" },
-        { name: "Bomb Defuse", image: null, rtp: "95.5%", provider: "InfluenBet" },
-        { name: "Tomatoes", image: null, rtp: "98.5%", provider: "InfluenBet" },
-        { name: "Heist", image: null, rtp: "98.1%", provider: "InfluenBet" },
-    ];
+    const allGames = FEATURED_GAMES.map((game) => ({
+        ...game,
+        image: getGameCoverImage(game.name),
+    }));
 
     const categories = ["All Games", "Trending", "New Releases", "Table Games", "Instant Win"] as const;
     type Category = (typeof categories)[number];
@@ -54,19 +42,18 @@ export default function CasinoPage() {
 
     // Load custom published games from localStorage
     useEffect(() => {
-        const fetchCustomGames = () => {
-            const data = localStorage.getItem('custom_published_games');
-            if (data) {
-                try {
-                    setCustomGames(JSON.parse(data));
-                } catch (e) {
-                    console.error(e);
-                }
+        const fetchCustomGames = async () => {
+            try {
+                const games = await loadPublishedGames();
+                setCustomGames(games || []);
+            } catch (e) {
+                console.error(e);
             }
         };
-        fetchCustomGames();
-        window.addEventListener('storage', fetchCustomGames);
-        return () => window.removeEventListener('storage', fetchCustomGames);
+        void fetchCustomGames();
+        const handleStorage = () => { void fetchCustomGames(); };
+        window.addEventListener('storage', handleStorage);
+        return () => window.removeEventListener('storage', handleStorage);
     }, []);
 
     const playNow = (game: any) => {
@@ -251,7 +238,7 @@ export default function CasinoPage() {
                                     <GameCard
                                         name={game.name}
                                         image={game.coverImage || ""}
-                                        rtp="99.0%"
+                                        rtp="88.0%"
                                         provider={game.creatorName ? `@${game.creatorName}` : undefined}
                                     />
                                     <div className="absolute top-2 left-2 z-20">

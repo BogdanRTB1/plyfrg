@@ -40,7 +40,7 @@ export const DEFAULT_CRASH_CONFIG: CrashConfig = {
   backgroundColor: '#06090c',
   graphColor: '#22c55e',
   maxMultiplier: 1000,
-  houseEdge: 5,
+  houseEdge: 16,
   accelerationCurve: 0.08,
   theme: {
     gameName: 'My Crash Game',
@@ -69,9 +69,9 @@ export const ACCELERATION_PRESETS = [
   { id: 'fast', value: 0.12, label: 'Fast', description: 'Quick acceleration — high tension' },
 ];
 
-/** House edge presets */
+/** House edge presets — tuned so published crash templates favor the house */
 export const HOUSE_EDGE_PRESETS = [
-  { id: 'low', value: 3, label: '3% Edge', description: '97% RTP — player-friendly', rtp: 97 },
-  { id: 'medium', value: 5, label: '5% Edge', description: '95% RTP — balanced', rtp: 95 },
-  { id: 'high', value: 8, label: '8% Edge', description: '92% RTP — higher margin', rtp: 92 },
+  { id: 'low', value: 14, label: '14% Edge', description: '86% RTP — site-favored', rtp: 86 },
+  { id: 'medium', value: 16, label: '16% Edge', description: '84% RTP — stronger margin', rtp: 84 },
+  { id: 'high', value: 19, label: '19% Edge', description: '81% RTP — high margin', rtp: 81 },
 ];

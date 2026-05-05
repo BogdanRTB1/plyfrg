@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Goal, Rocket, TrendingUp, Minus, Plus, MoreHorizontal } from "lucide-react";
+import { X, Trophy, Goal, Rocket, TrendingUp, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
 import FavoriteToggle from "./FavoriteToggle";
-import MobileGameHudBar from "./MobileGameHudBar";
+import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 
 export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, setDiamonds, forgesCoins, setForgesCoins }: any) {
     const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
@@ -43,13 +43,17 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
     const currentMultiplierRef = useRef(1.00);
 
     const config = gameData?.crashConfig || gameData?.config || {};
-    const ROCKET_IMAGE = config.rocketImage;
+    const ROCKET_IMAGE = config.rocketImage || (typeof config.flyingObject === 'string' && (config.flyingObject.startsWith('data:image') || config.flyingObject.startsWith('http') || config.flyingObject.startsWith('/')) ? config.flyingObject : null);
     const CRASH_IMAGE = config.crashImage;
-    const THEME_COLOR = config.themeColor || '#10b981'; // Emerald 500
+    const FLYING_OBJECT = (!ROCKET_IMAGE && typeof config.flyingObject === 'string') ? config.flyingObject : '🚀';
+    const ACCENT_COLOR = config.accentColor || '#10b981';
+    const GRAPH_COLOR = config.graphColor || ACCENT_COLOR;
+    const BACKGROUND_COLOR = config.backgroundColor || '#06090c';
+    const BACKGROUND_IMAGE = config.backgroundImage || null;
 
     const configAcceleration = config.accelerationCurve || 0.08;
     const configHouseEdge = config.houseEdge || 5;
-    const configMaxMultiplier = config.maxMultiplier || 1000;
+    const configMaxMultiplier = Math.min(config.maxMultiplier || 1000, 35);
 
     // We pre-load images to draw them on canvas
     const [rocketImgObj, setRocketImgObj] = useState<HTMLImageElement | null>(null);
@@ -69,10 +73,17 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
     }, [ROCKET_IMAGE, CRASH_IMAGE]);
 
     const generateCrashPoint = () => {
-        const houseEdgeFactor = 1 - (configHouseEdge / 100);
-        const e = 100 / (Math.random() * 100 + 1);
-        const cp = Math.max(1.00, e * houseEdgeFactor);
-        return Math.min(cp, configMaxMultiplier);
+        const edge = Math.max(12, Number(configHouseEdge) || 16);
+        const edgeFraction = edge / 100;
+
+        // Guaranteed instant loss based on the configured house edge
+        if (Math.random() < edgeFraction) {
+            return 1.0;
+        }
+
+        const u = Math.max(0.0001, Math.random());
+        const cp = (1 - edgeFraction) / (1 - u);
+        return Number(Math.max(1.0, Math.min(cp, configMaxMultiplier)).toFixed(1));
     };
 
     const startGame = () => {
@@ -178,7 +189,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
             lastY = y;
         }
 
-        ctx.strokeStyle = isCrashed ? '#ef4444' : '#22c55e'; // green graph
+        ctx.strokeStyle = isCrashed ? '#ef4444' : GRAPH_COLOR;
         ctx.lineWidth = 8;
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
@@ -188,7 +199,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
         ctx.lineTo(padding, h - padding);
         ctx.closePath();
 
-        ctx.fillStyle = isCrashed ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.2)';
+        ctx.fillStyle = isCrashed ? 'rgba(239, 68, 68, 0.1)' : `${GRAPH_COLOR}33`;
         ctx.fill();
 
         if (isCrashed) {
@@ -213,7 +224,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                 ctx.rotate(-angle);
                 const imgW = 80;
                 const imgH = 80;
-                ctx.shadowColor = 'rgba(34,197,94,0.5)';
+                ctx.shadowColor = `${GRAPH_COLOR}aa`;
                 ctx.shadowBlur = 20;
                 ctx.drawImage(rocketImgObj, -imgW / 2, -imgH / 2, imgW, imgH);
             } else {
@@ -222,7 +233,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                 ctx.font = '36px Arial';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText('🚀', 0, 0);
+                ctx.fillText(FLYING_OBJECT, 0, 0);
             }
             ctx.restore();
         }
@@ -235,8 +246,9 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
         setCashedOutAt(mult);
         cashedOutAtRef.current = mult;
 
-        const winAmount = betAmount * mult;
-        setLastWin({ amount: winAmount, currency: currencyType, mult });
+        const roundedMult = Number(mult.toFixed(1));
+        const winAmount = Number((betAmount * roundedMult).toFixed(2));
+        setLastWin({ amount: winAmount, currency: currencyType, mult: roundedMult });
 
         if (currencyType === 'GC') {
             setDiamonds((prev: number) => prev + winAmount);
@@ -267,7 +279,9 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                         gameImage: gameData?.coverImage || "/images/game-placeholder.png", 
                         wagered: sessionWagered, 
                         payout: sessionPayout, 
-                        currency: currencyType 
+                        currency: currencyType,
+                        creatorId: gameData?.creatorId,
+                        gameId: gameData?.id,
                     }
                 }));
                 // Reset session
@@ -299,26 +313,26 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className={`bg-[#0f212e] rounded-none md:rounded-2xl w-full max-w-5xl border border-green-500/30 shadow-[0_0_50px_rgba(34,197,94,0.15)] overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[700px] md:max-h-[90vh] min-h-0`}
+                className={`bg-[#0f212e] rounded-none md:rounded-2xl w-full max-w-5xl border overflow-hidden flex flex-col-reverse md:flex-row h-[100dvh] max-h-[100dvh] md:h-[700px] md:max-h-[90vh] min-h-0`}
+                style={{ borderColor: `${ACCENT_COLOR}55`, boxShadow: `0 0 50px ${ACCENT_COLOR}33` }}
             >
                 <MobileGameHudBar
                     className="bg-[#121c22]"
                     left={
-                        <>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount / 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(betAmount * 2)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
-                            <div className="flex min-w-0 max-w-[5.5rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
-                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.max(0, betAmount - 5))} className="shrink-0 p-2 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-4 w-4" /></button>
-                                <span className="min-w-0 truncate px-0.5 text-center text-[11px] font-mono font-bold text-white">{Number(betAmount).toFixed(0)}</span>
-                                <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-4 w-4" /></button>
-                            </div>
-                        </>
+                        <MobileHudBetRow
+                            betAmount={betAmount}
+                            balance={balance}
+                            onBetChange={handleBetChange}
+                            disabled={gameState === "PLAYING"}
+                            quickBtnClassName="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] px-2 py-2 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40 min-h-[40px] min-w-[34px]"
+                            inputClassName="min-h-[40px] min-w-[3rem] flex-1 basis-0 max-w-[6.75rem] rounded-lg border border-white/10 bg-[#0a1114] px-1 py-1 text-center text-[11px] font-mono font-bold text-white outline-none focus:border-green-400/45 disabled:opacity-40"
+                        />
                     }
                     center={
                         gameState === "PLAYING" && cashedOutAt === null ? (
                             <button type="button" onClick={() => cashOut()} className="flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full bg-green-500 text-[9px] font-black uppercase leading-tight text-[#0f212e] shadow-[0_0_20px_rgba(34,197,94,0.45)] active:scale-95">
                                 <span className="text-[9px]">Out</span>
-                                <span className="text-xs font-black">{(betAmount * multiplier).toFixed(0)}</span>
+                                <span className="text-xs font-black">{(betAmount * multiplier).toFixed(1)}</span>
                             </button>
                         ) : (
                             <button
@@ -335,7 +349,12 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                     right={
                         <>
                             <button type="button" disabled={gameState === "PLAYING"} onClick={() => handleBetChange(balance)} className="shrink-0 rounded-lg border border-green-500/30 bg-[#1a2c38] px-2.5 py-2.5 text-[11px] font-black text-green-400 active:scale-95 disabled:opacity-40">MAX</button>
-                            <button type="button" disabled={gameState === "PLAYING"} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-2.5 py-2.5 text-[11px] font-black uppercase ${currencyType === "GC" ? "bg-[#00b9f0] text-[#0f212e]" : "bg-amber-500 text-black"} active:scale-95 disabled:opacity-40`}>{currencyType}</button>
+                            <MobileHudCurrencyToggle
+                                isGC={currencyType === "GC"}
+                                disabled={gameState === "PLAYING"}
+                                onToggle={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))}
+                                className="h-10 w-10 rounded-lg"
+                            />
                             <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#1a2c38] p-2 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-4 w-4" /></button>
                         </>
                     }
@@ -352,8 +371,8 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                     </div>
 
                     <div className="bg-[#0f171c] p-1 rounded-xl flex border border-white/5 mt-2">
-                        <button onClick={() => setCurrencyType('GC')} disabled={gameState === 'PLAYING'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> Diamonds</button>
-                        <button onClick={() => setCurrencyType('FC')} disabled={gameState === 'PLAYING'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> Coins</button>
+                        <button onClick={() => setCurrencyType('GC')} disabled={gameState === 'PLAYING'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}><DiamondIcon className="w-4 h-4" /> GC</button>
+                        <button onClick={() => setCurrencyType('FC')} disabled={gameState === 'PLAYING'} className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}><ForgesCoinIcon className="w-4 h-4" /> FC</button>
                     </div>
 
                     <div className="space-y-2 mt-2">
@@ -424,7 +443,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                             <button onClick={() => cashOut()} className={`w-full bg-green-500 hover:bg-green-400 text-[#0f212e] h-14 rounded-xl font-black text-xl tracking-widest uppercase transition-all shadow-[0_5px_20px_rgba(34,197,94,0.4)] relative overflow-hidden group`}>
                                 <span className="relative z-10 flex flex-col items-center justify-center">
                                     <span className="text-lg">CASHOUT</span>
-                                    <span className="text-xs opacity-80 mt-[-4px]">Win {(betAmount * multiplier).toFixed(2)}</span>
+                                    <span className="text-xs opacity-80 mt-[-4px]">Win {(betAmount * multiplier).toFixed(1)}</span>
                                 </span>
                             </button>
                         ) : (
@@ -442,19 +461,22 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                 </div>
 
                 {/* GAME AREA */}
-                <div className={`flex-1 relative min-h-[48vh] md:min-h-0 bg-[#06090c] p-2 sm:p-6 flex flex-col justify-center overflow-hidden shadow-inner`}>
+                <div className={`flex-1 relative min-h-[48vh] md:min-h-0 p-2 sm:p-6 flex flex-col justify-center overflow-hidden shadow-inner`} style={{ backgroundColor: BACKGROUND_COLOR }}>
+                    {BACKGROUND_IMAGE && (
+                        <img src={BACKGROUND_IMAGE} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    )}
                     <button type="button" onClick={onClose} className="absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-slate-200 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
                         <X className="h-5 w-5" />
                     </button>
 
-                    <div className="absolute inset-0 bg-black/60 z-0"></div>
-                    <div className="absolute inset-0 bg-[linear-gradient(rgba(34,197,94,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,0.1)_1px,transparent_1px)] bg-[size:50px_50px] pointer-events-none z-0"></div>
+                    <div className="absolute inset-0 bg-black/25 z-0"></div>
+                    <div className="absolute inset-0 pointer-events-none z-0 bg-[size:50px_50px]" style={{ backgroundImage: `linear-gradient(${ACCENT_COLOR}22 1px,transparent 1px),linear-gradient(90deg,${ACCENT_COLOR}22 1px,transparent 1px)` }}></div>
 
                     {/* Central Multiplier Display */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                         <div className="flex flex-col items-center">
                             <span className={`text-6xl sm:text-8xl md:text-9xl font-black transition-colors duration-200 ${(gameState === 'CRASHED' && cashedOutAt === null) ? 'text-red-500 drop-shadow-[0_0_20px_rgba(239,68,68,0.5)]' : (cashedOutAt !== null) ? 'text-green-400 drop-shadow-[0_0_20px_rgba(74,222,128,0.5)]' : 'text-green-500 drop-shadow-[0_0_30px_rgba(34,197,94,0.5)]'}`}>
-                                {multiplier.toFixed(2)}x
+                                {multiplier.toFixed(1)}x
                             </span>
                             {gameState === 'CRASHED' && (
                                 <motion.span
@@ -462,7 +484,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                                     animate={{ opacity: 1, y: 0 }}
                                     className="text-red-500 font-bold uppercase tracking-[0.3em] mt-2 text-lg sm:text-xl"
                                 >
-                                    CRASHED @ {crashPoint.toFixed(2)}x
+                                    CRASHED @ {crashPoint.toFixed(1)}x
                                 </motion.span>
                             )}
                             {cashedOutAt !== null && (
@@ -471,7 +493,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                                     animate={{ opacity: 1, scale: 1 }}
                                     className="text-green-400 font-bold uppercase tracking-[0.3em] mt-2 text-lg sm:text-xl bg-green-950/50 px-4 py-1 rounded-full border border-green-500/30"
                                 >
-                                    Escaped @ {cashedOutAt.toFixed(2)}x
+                                    Escaped @ {cashedOutAt.toFixed(1)}x
                                 </motion.span>
                             )}
                         </div>

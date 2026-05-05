@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Zap, Sparkles, Play, Loader2, Minus, Plus, MoreHorizontal } from "lucide-react";
+import { X, Trophy, Zap, Sparkles, Play, Loader2, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import confetti from "canvas-confetti";
 import FavoriteToggle from "./FavoriteToggle";
-import MobileGameHudBar from "./MobileGameHudBar";
+import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { recordGameSession } from "@/utils/gameBridge";
+import { playSlotReelTickSound, playSlotSpinSound } from "@/utils/slotSpinSound";
 
 interface AIGameModalProps {
     isOpen: boolean;
@@ -34,9 +35,11 @@ interface AIGameModalProps {
 const playSynthSound = (type: string) => {
     try {
         if (type === 'spin') {
-            const audio = new Audio('/game sounds/slots.mp3');
-            audio.volume = 0.5;
-            audio.play().catch(() => { });
+            playSlotSpinSound(0.34);
+            return;
+        }
+        if (type === 'reel_tick') {
+            playSlotReelTickSound(0.26);
             return;
         }
         if (type === 'tumble') {
@@ -141,8 +144,9 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                 setGameState('RESULT');
                 let winAmount = 0;
                 if (data.win && data.multiplier > 0) {
-                    winAmount = betAmount * data.multiplier;
-                    setLastWin({ amount: winAmount, currency: currencyType, multiplier: data.multiplier });
+                    const roundedMultiplier = Number(Number(data.multiplier).toFixed(1));
+                    winAmount = Number((betAmount * roundedMultiplier).toFixed(2));
+                    setLastWin({ amount: winAmount, currency: currencyType, multiplier: roundedMultiplier });
                     if (currencyType === 'GC') {
                         setDiamonds((prev: number) => prev + winAmount);
                     } else {
@@ -156,6 +160,8 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                             audio.volume = 0.5;
                             audio.play().catch(e => console.error("Win sound failed:", e));
                         } catch (e) { }
+                    } else {
+                        playSynthSound('win');
                     }
 
                     const effect = gameDataObj.winEffect || 'confetti';
@@ -182,43 +188,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                     setLastWin(null);
                 }
 
-                // --- CREATOR EARNINGS LOGIC ---
-                const netLoss = betAmount - winAmount;
-                if (netLoss > 0 && gameData.creatorId && currencyType === 'FC') {
-                    try {
-                        const earnings = JSON.parse(localStorage.getItem('creator_earnings') || '[]');
-                        earnings.push({
-                            id: Math.random().toString(36).substring(2, 11),
-                            creatorId: gameData.creatorId,
-                            creatorName: gameData.creatorName,
-                            gameId: gameData.id,
-                            gameName: gameData.name,
-                            amount: netLoss * 0.5,
-                            currency: currencyType,
-                            usdValue: (netLoss * 0.5) * 0.90,
-                            date: new Date().toISOString()
-                        });
-                        localStorage.setItem('creator_earnings', JSON.stringify(earnings));
-                    } catch (e) {
-                        console.error('Error saving creator earnings:', e);
-                    }
-                }
-
-                // --- ACTIVE PLAYERS TRACKING ---
-                if (gameData.creatorId) {
-                    try {
-                        const plays = JSON.parse(localStorage.getItem('creator_game_plays') || '[]');
-                        let pid = localStorage.getItem('temp_player_id');
-                        if (!pid) { pid = 'user_' + Math.random().toString(36).substring(2,11); localStorage.setItem('temp_player_id', pid); }
-                        plays.push({
-                            creatorId: gameData.creatorId,
-                            gameId: gameData.id,
-                            playerId: pid,
-                            date: new Date().toISOString()
-                        });
-                        localStorage.setItem('creator_game_plays', JSON.stringify(plays));
-                    } catch (e) {}
-                }
+                // Creator analytics are now handled by gameBridge via the game_session_complete event
 
                 // --- SESSION TRACKING ---
                 setSessionWagered(prev => prev + betAmount);
@@ -244,7 +214,9 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                         gameImage: (gameData as any)?.coverImage || "/images/game-placeholder.png", 
                         wagered: sessionWagered, 
                         payout: sessionPayout, 
-                        currency: currencyType 
+                        currency: currencyType,
+                        creatorId: gameData?.creatorId,
+                        gameId: gameData?.id,
                     }
                 }));
                 setSessionWagered(0);
@@ -355,15 +327,15 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                     style={{ backgroundColor: "#121c22" }}
                     className="border-white/10"
                     left={
-                        <>
-                            <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(Math.max(1, betAmount / 2))} className="shrink-0 rounded-lg border border-white/10 bg-[#0a1114] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">½</button>
-                            <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(Math.min(balance, betAmount * 2))} className="shrink-0 rounded-lg border border-white/10 bg-[#0a1114] px-3 py-3 text-xs font-black text-slate-200 active:scale-95 disabled:opacity-40">2×</button>
-                            <div className="flex min-w-0 max-w-[6.5rem] items-center overflow-hidden rounded-lg border border-white/10 bg-[#0a1114]">
-                                <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(Math.max(1, betAmount - 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Decrease bet"><Minus className="h-5 w-5" /></button>
-                                <span className="min-w-0 truncate px-0.5 text-center text-[11px] font-mono font-bold text-white">{Number(betAmount).toFixed(currencyType === "GC" ? 0 : 2)}</span>
-                                <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(Math.min(balance, betAmount + 5))} className="shrink-0 p-2.5 text-slate-400 active:bg-white/10 disabled:opacity-40" aria-label="Increase bet"><Plus className="h-5 w-5" /></button>
-                            </div>
-                        </>
+                        <MobileHudBetRow
+                            betAmount={betAmount}
+                            balance={balance}
+                            onBetChange={handleBetChange}
+                            disabled={bettingLocked}
+                            clampMin={1}
+                            quickBtnClassName="shrink-0 rounded-lg border border-white/10 bg-[#0a1114] px-2 py-2 text-[11px] font-black text-slate-200 active:scale-95 disabled:opacity-40 min-h-[40px] min-w-[34px]"
+                            inputClassName="min-h-[40px] min-w-[3rem] flex-1 basis-0 max-w-[6.75rem] rounded-lg border border-white/10 bg-[#0a1114] px-1 py-1 text-center text-[11px] font-mono font-bold text-white outline-none focus:border-[#00b9f0]/45 disabled:opacity-40"
+                        />
                     }
                     center={
                         <button
@@ -384,7 +356,11 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                     right={
                         <>
                             <button type="button" disabled={bettingLocked} onClick={() => handleBetChange(balance)} className="shrink-0 rounded-lg border px-3 py-3 text-xs font-black active:scale-95 disabled:opacity-40" style={{ color: accentColor, borderColor: `${accentColor}50`, background: "#0a1114" }}>MAX</button>
-                            <button type="button" disabled={bettingLocked} onClick={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))} className={`shrink-0 rounded-lg border border-white/10 px-3 py-3 text-xs font-black uppercase active:scale-95 disabled:opacity-40 ${currencyType === "GC" ? "bg-[#00b9f0]/30 text-cyan-200" : "bg-amber-500/30 text-amber-200"}`}>{currencyType}</button>
+                            <MobileHudCurrencyToggle
+                                isGC={currencyType === "GC"}
+                                disabled={bettingLocked}
+                                onToggle={() => setCurrencyType((c) => (c === "GC" ? "FC" : "GC"))}
+                            />
                             <button type="button" onClick={() => setMobileMoreOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-[#0a1114] p-2.5 text-slate-300 active:bg-white/10" aria-label="More options"><MoreHorizontal className="h-5 w-5" /></button>
                         </>
                     }
@@ -418,14 +394,14 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                             disabled={gameState === 'PLAYING'}
                             className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'GC' ? 'bg-[#00b9f0] text-[#0f212e] shadow-[0_0_15px_rgba(0,185,240,0.5)]' : 'text-slate-400 hover:text-white'}`}
                         >
-                            <DiamondIcon className="w-4 h-4" /> Diamonds
+                            <DiamondIcon className="w-4 h-4" /> GC
                         </button>
                         <button
                             onClick={() => setCurrencyType('FC')}
                             disabled={gameState === 'PLAYING'}
                             className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${currencyType === 'FC' ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white'}`}
                         >
-                            <ForgesCoinIcon className="w-4 h-4" /> Coins
+                            <ForgesCoinIcon className="w-4 h-4" /> FC
                         </button>
                     </div>
 
@@ -463,7 +439,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                         {lastWin ? (
                             <span className="text-sm font-black text-green-400 font-mono flex items-center gap-1">
                                 +{lastWin.amount.toFixed(2)} {lastWin.currency === 'GC' ? <DiamondIcon className="w-3 h-3" /> : <ForgesCoinIcon className="w-3 h-3" />}
-                                <span className="text-[10px] text-green-500/60 ml-1">({lastWin.multiplier.toFixed(2)}x)</span>
+                                <span className="text-[10px] text-green-500/60 ml-1">({lastWin.multiplier.toFixed(1)}x)</span>
                             </span>
                         ) : (
                             <span className="text-xs font-mono text-slate-600">---</span>
@@ -623,7 +599,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                                     {lastWin ? (
                                         <span className="flex items-center gap-1 font-mono text-sm font-black text-green-400">
                                             +{lastWin.amount.toFixed(2)} {lastWin.currency === "GC" ? <DiamondIcon className="h-3 w-3" /> : <ForgesCoinIcon className="h-3 w-3" />}
-                                            <span className="text-[10px] text-green-500/60">({lastWin.multiplier.toFixed(2)}x)</span>
+                                            <span className="text-[10px] text-green-500/60">({lastWin.multiplier.toFixed(1)}x)</span>
                                         </span>
                                     ) : (
                                         <span className="font-mono text-xs text-slate-600">—</span>

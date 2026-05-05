@@ -112,10 +112,13 @@ export default function BecomeCreatorContent() {
                                     <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
                                 </button>
                             </div>
-                            <button className="flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 px-8 py-4 rounded-xl font-bold text-lg transition-all backdrop-blur-sm">
+                            <Link
+                                href="/docs/creator-program"
+                                className="flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 px-8 py-4 rounded-xl font-bold text-lg transition-all backdrop-blur-sm"
+                            >
                                 <Code size={20} />
                                 <span>Read Docs</span>
-                            </button>
+                            </Link>
                         </motion.div>
                     </motion.div>
 

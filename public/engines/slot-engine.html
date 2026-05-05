@@ -32,7 +32,7 @@
   }
   .bg-image::after {
     content: ''; position: absolute; inset: 0;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0.6));
+    background: linear-gradient(to bottom, rgba(0,0,0,0.12), rgba(0,0,0,0.25));
   }
   
   /* Slot Frame */
@@ -91,11 +91,11 @@
   }
   .reel::before {
     top: 0;
-    background: linear-gradient(to bottom, rgba(6,9,12,0.85), transparent);
+    background: linear-gradient(to bottom, rgba(6,9,12,0.45), transparent);
   }
   .reel::after {
     bottom: 0;
-    background: linear-gradient(to top, rgba(6,9,12,0.85), transparent);
+    background: linear-gradient(to top, rgba(6,9,12,0.45), transparent);
   }
   
   .reel-strip {
@@ -622,10 +622,12 @@
         strip.style.transform = `translateY(${endY}px)`;
       }, 20);
       
-      // When this reel finishes
+      setTimeout(() => {
+        playSound('reel_tick');
+      }, duration + 55);
+
       setTimeout(() => {
         if (c === COLS - 1) {
-          // All reels stopped
           onSpinComplete(serverResult);
         }
       }, duration + 80);
@@ -638,10 +640,10 @@
     
     if (result.win && result.multiplier > 0) {
       // --- WIN ---
-      statusText.textContent = `WIN ${result.multiplier.toFixed(2)}x`;
+      statusText.textContent = `WIN ${result.multiplier.toFixed(1)}x`;
       statusText.style.color = accent;
       
-      winAmountEl.textContent = result.multiplier.toFixed(2) + 'x';
+      winAmountEl.textContent = result.multiplier.toFixed(1) + 'x';
       resultBanner.classList.add('show');
       
       // Highlight winning cells
