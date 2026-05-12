@@ -290,7 +290,7 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
                 </div>
 
                 <div className="relative flex min-h-[48vh] flex-1 flex-col items-center justify-center bg-[#0a1114] p-4 sm:p-8 md:min-h-0">
-                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-slate-300 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
+                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-[80] flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-slate-300 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
                         <X className="h-5 w-5" />
                     </button>
                     <div className="grid grid-cols-5 gap-2 sm:gap-3 bg-[#121c22]/50 p-3 sm:p-4 rounded-3xl border border-white/5">

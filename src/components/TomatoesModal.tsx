@@ -194,6 +194,9 @@ export default function TomatoesModal({ isOpen, onClose, diamonds, setDiamonds, 
 
                 {/* GAME AREA */}
                 <div className={`flex-1 relative ${TOMATOES_CONFIG.theme.gameBg} bg-cover bg-center p-2 sm:p-6 flex flex-col justify-center items-center overflow-hidden shadow-inner`}>
+                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-[80] flex h-10 w-10 items-center justify-center rounded-xl border border-red-500/20 bg-black/50 text-red-100 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
+                        <X className="h-5 w-5" />
+                    </button>
 
                     <div className="absolute inset-0 bg-black/60 z-0 backdrop-blur-[2px]"></div>
 

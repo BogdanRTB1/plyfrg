@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Camera, AlertCircle, UploadCloud } from "lucide-react";
+import { Camera, AlertCircle } from "lucide-react";
 
 interface KYCVerificationProps {
     onSuccess: () => void;
@@ -147,15 +147,6 @@ export default function KYCVerification({ onSuccess, onCancel, onUnderage }: KYC
                         Return
                     </button>
                 )}
-
-                {/* DEV ONLY SKIP BUTTON */}
-                <button
-                    onClick={onSuccess}
-                    disabled={status === 'processing'}
-                    className="text-xs font-bold text-yellow-500 hover:text-yellow-400 transition-colors border border-yellow-500/30 bg-yellow-500/10 px-4 py-1.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 flex items-center gap-2"
-                >
-                    Skip Verification (Test Only)
-                </button>
             </div>
         </div>
     );

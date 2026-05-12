@@ -465,7 +465,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                     {BACKGROUND_IMAGE && (
                         <img src={BACKGROUND_IMAGE} alt="" className="absolute inset-0 w-full h-full object-cover" />
                     )}
-                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-slate-200 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
+                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-[80] flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-slate-200 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
                         <X className="h-5 w-5" />
                     </button>
 

@@ -12,6 +12,7 @@ import {
     History,
     Settings,
     ShieldCheck,
+    Users,
     X,
 } from "lucide-react";
 import Image from "next/image";
@@ -97,6 +98,7 @@ export default function Sidebar() {
         { icon: <Dices size={20} />, label: "Casino", href: "/casino" },
         { icon: <Star size={20} />, label: "Originals", href: "/originals" },
         { icon: <Headphones size={20} />, label: "Live Support", href: "/support" },
+        ...(isAdmin ? [{ icon: <Users size={20} />, label: "Admin Users", href: "/admin/users" }] : []),
         ...(isAdmin ? [{ icon: <ShieldCheck size={20} />, label: "Admin Redeems", href: "/admin/redeems" }] : []),
         { icon: <History size={20} />, label: "History", href: "/history" },
         ...(user ? [{ icon: <Settings size={20} />, label: "Settings", href: "/settings" }] : []),

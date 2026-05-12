@@ -265,7 +265,7 @@ export default function BombModal({ isOpen, onClose, diamonds, setDiamonds, forg
                 </div>
 
                 <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-[#06090c] p-4">
-                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-slate-300 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
+                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-[80] flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-slate-300 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
                         <X className="h-5 w-5" />
                     </button>
                     <div className="absolute inset-0 opacity-10 bg-[url('/images/game-bomb-v2.png')] bg-cover bg-center"></div>

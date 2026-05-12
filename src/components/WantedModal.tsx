@@ -70,11 +70,11 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
     const roundIdRef = useRef(0);
     const playerLaneRef = useRef<Lane>(1);
 
-    const SAFE_WINDOW_MS = 1400;
+    const SAFE_WINDOW_MS = 800;
     const TICK_MS = 50;
     const PLAYER_X = 16;
-    const COLLISION_MIN_X = 10;
-    const COLLISION_MAX_X = 24;
+    const COLLISION_MIN_X = 8;
+    const COLLISION_MAX_X = 27;
 
     const clearAllTimers = () => {
         if (intervalRef.current !== null) {
@@ -99,22 +99,32 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
     const computeMultiplier = (elapsed: number) => {
         const seconds = elapsed / 1000;
-        const raw = 1 + (seconds * 0.11) + Math.pow(seconds, 1.4) * 0.02;
+        const raw = 1 + (seconds * 0.14) + Math.pow(seconds, 1.48) * 0.026;
         return Number(raw.toFixed(2));
     };
 
     const spawnObstacle = (state: RuntimeState): RuntimeState => {
         const lane = Math.floor(Math.random() * 3) as Lane;
+        const doubleSpawnChance = Math.min(0.55, Math.max(0, state.multiplier - 1.18) * 0.42);
+        const shouldDoubleSpawn = Math.random() < doubleSpawnChance;
+        const extraObstacle = shouldDoubleSpawn
+            ? [{
+                id: state.obstacleId + 1,
+                lane: ([0, 1, 2] as Lane[]).filter((candidate) => candidate !== lane)[Math.floor(Math.random() * 2)],
+                x: 110,
+            }]
+            : [];
+
         return {
             ...state,
-            obstacleId: state.obstacleId + 1,
-            obstacles: [...state.obstacles, { id: state.obstacleId, lane, x: 110 }],
+            obstacleId: state.obstacleId + 1 + extraObstacle.length,
+            obstacles: [...state.obstacles, { id: state.obstacleId, lane, x: 110 }, ...extraObstacle],
         };
     };
 
     const advanceObstacles = (state: RuntimeState): RuntimeState => {
         const difficulty = Math.max(0, state.multiplier - 1);
-        const speed = 1.8 + difficulty * 0.55;
+        const speed = 2.45 + difficulty * 0.95;
         const moved = state.obstacles
             .map((obstacle) => ({ ...obstacle, x: obstacle.x - speed }))
             .filter((obstacle) => obstacle.x > -12);
@@ -179,7 +189,7 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
         runtimeRef.current = {
             elapsedMs: 0,
             multiplier: 1,
-            nextSpawnInMs: 1000,
+            nextSpawnInMs: 650,
             obstacleId: 1,
             obstacles: [],
         };
@@ -207,8 +217,8 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
                         next.nextSpawnInMs -= TICK_MS;
                         if (next.nextSpawnInMs <= 0) {
                             next = spawnObstacle(next);
-                            const baseCooldown = Math.max(330, 1100 - difficulty * 180);
-                            next.nextSpawnInMs = baseCooldown + Math.floor(Math.random() * 220);
+                            const baseCooldown = Math.max(220, 760 - difficulty * 240);
+                            next.nextSpawnInMs = baseCooldown + Math.floor(Math.random() * 120);
                         }
 
                         const nearMiss = next.obstacles.some((obstacle) => (
@@ -450,7 +460,7 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
                 </div>
 
                 <div className={`relative flex flex-1 flex-col overflow-hidden ${WANTED_CONFIG.theme.gameBg} shadow-inner`}>
-                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-[70] flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-slate-200 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
+                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-[80] flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-slate-200 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
                         <X className="h-5 w-5" />
                     </button>
                     <div className="absolute inset-0 bg-gradient-to-b from-[#0b1325] via-[#060b16] to-[#030406]" />

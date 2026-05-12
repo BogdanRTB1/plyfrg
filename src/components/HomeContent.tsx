@@ -347,9 +347,9 @@ export default function HomeContent() {
                     <div>
                         <h4 className="font-bold text-white mb-4 uppercase tracking-wider text-xs">Legal</h4>
                         <ul className="space-y-2">
-                            <li><a href="#" className="hover:text-[#00b9f0] transition-colors">Terms of Service</a></li>
-                            <li><a href="#" className="hover:text-[#00b9f0] transition-colors">Privacy Policy</a></li>
-                            <li><a href="#" className="hover:text-[#00b9f0] transition-colors">AML Policy</a></li>
+                            <li><Link href="/terms" className="hover:text-[#00b9f0] transition-colors">Terms of Service</Link></li>
+                            <li><Link href="/privacy" className="hover:text-[#00b9f0] transition-colors">Privacy Policy</Link></li>
+                            <li><Link href="/aml-policy" className="hover:text-[#00b9f0] transition-colors">AML Policy</Link></li>
                         </ul>
                     </div>
                 </div>

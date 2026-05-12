@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { X, Mail, Lock, User, Eye, EyeOff, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
+import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -430,7 +431,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                                             </div>
                                         ) : (
                                             <p className="text-xs text-slate-500 text-center">
-                                                By joining, you agree to our <a href="#" className="text-[#00b9f0] hover:underline transition-colors">Terms of Service</a> and <a href="#" className="text-[#00b9f0] hover:underline transition-colors">Privacy Policy</a>.
+                                                By joining, you agree to our{" "}
+                                                <Link href="/terms" onClick={onClose} className="text-[#00b9f0] hover:underline transition-colors">
+                                                    Terms of Service
+                                                </Link>{" "}
+                                                and{" "}
+                                                <Link href="/privacy" onClick={onClose} className="text-[#00b9f0] hover:underline transition-colors">
+                                                    Privacy Policy
+                                                </Link>.
                                             </p>
                                         )}
 

@@ -450,7 +450,7 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
                     <button
                         type="button"
                         onClick={onClose}
-                        className="absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-slate-300 backdrop-blur-sm md:hidden active:bg-white/10"
+                        className="absolute right-2 top-2 z-[80] flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-slate-300 backdrop-blur-sm md:hidden active:bg-white/10"
                         aria-label="Close game"
                     >
                         <X className="h-5 w-5" />

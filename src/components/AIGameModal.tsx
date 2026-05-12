@@ -481,7 +481,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                     <button
                         type="button"
                         onClick={onClose}
-                        className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-slate-300 backdrop-blur-sm active:bg-white/10 md:hidden"
+                        className="absolute right-3 top-3 z-[80] flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-slate-300 backdrop-blur-sm active:bg-white/10 md:hidden"
                         aria-label="Close game"
                     >
                         <X className="h-5 w-5" />

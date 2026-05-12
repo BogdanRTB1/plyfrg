@@ -48,6 +48,14 @@ export function MobileHudBetRow({
 }) {
     const [draft, setDraft] = useState(() => (integerOnly ? String(Math.round(betAmount)) : String(betAmount)));
 
+    const compactBalance = (() => {
+        if (!Number.isFinite(balance)) return "0";
+        if (balance >= 999999999) return "∞";
+        if (balance >= 1000000) return `${(balance / 1000000).toFixed(balance >= 10000000 ? 0 : 1)}M`;
+        if (balance >= 1000) return `${(balance / 1000).toFixed(balance >= 10000 ? 0 : 1)}K`;
+        return integerOnly ? String(Math.floor(balance)) : balance.toFixed(2);
+    })();
+
     useEffect(() => {
         setDraft(integerOnly ? String(Math.round(betAmount)) : String(betAmount));
     }, [betAmount, integerOnly]);
@@ -102,9 +110,12 @@ export function MobileHudBetRow({
             <button type="button" disabled={disabled} onClick={dbl} className={quickBtnClassName}>
                 2×
             </button>
-            <div className="flex max-w-[4.75rem] min-w-0 flex-1 flex-col gap-0.5 sm:max-w-[5.25rem]">
-                <span className="px-0.5 text-[8px] font-black uppercase tracking-wide text-slate-500">
-                    Bet
+            <div className="flex max-w-[5.75rem] min-w-0 flex-1 flex-col gap-0.5 sm:max-w-[6.25rem]">
+                <span className="flex items-center justify-between gap-1 px-0.5 text-[8px] font-black uppercase tracking-wide text-slate-500">
+                    <span>Bet</span>
+                    <span className="max-w-[3.5rem] truncate text-slate-300" title={`Balance: ${balance}`}>
+                        Bal {compactBalance}
+                    </span>
                 </span>
                 <input
                     type="text"

@@ -350,7 +350,7 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
                 {/* Game Board */}
                 <div className={`flex-1 relative min-h-[48vh] md:min-h-0 ${PLINKO_CONFIG.theme.gameBg} p-4 overflow-hidden flex flex-col shadow-inner`}>
-                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-slate-300 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
+                    <button type="button" onClick={onClose} className="absolute right-2 top-2 z-[80] flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-slate-300 backdrop-blur-sm md:hidden active:bg-white/10" aria-label="Close game">
                         <X className="h-5 w-5" />
                     </button>
                     <div className="hidden md:flex justify-between items-center mb-4">
