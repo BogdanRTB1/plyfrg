@@ -9,6 +9,7 @@ import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { generateSneakBustSeconds, getSneakMultiplierPerSecond, ORIGINALS_PAYOUT } from "@/utils/originalsMath";
 
 export const SNEAK_CONFIG = {
     theme: {
@@ -41,8 +42,6 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
     const timeStartRef = useRef<number>(0);
     const requestRef = useRef<number | null>(null);
 
-    const generateBustTimeSeconds = () => generateSneakBustSeconds();
-
     const startHolding = () => {
         if (gameState !== 'IDLE' && gameState !== 'CAUGHT' && gameState !== 'ESCAPED') return;
         if (balance < betAmount || betAmount <= 0) return;
@@ -56,7 +55,7 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
         setSessionWagered(prev => prev + betAmount);
         playGameSound('sneak', 'bet');
 
-        bustTimeRef.current = generateBustTimeSeconds();
+        bustTimeRef.current = generateSneakBustSeconds();
         timeStartRef.current = performance.now();
         setGameState('HOLDING');
         setMultiplier(1.00);
