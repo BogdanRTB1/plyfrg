@@ -7,7 +7,9 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { pickRouletteWinningNumber } from "@/utils/originalsMath";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
 export const ROULETTE_CONFIG = {
@@ -58,15 +60,12 @@ export default function RouletteModal({ isOpen, onClose, diamonds, setDiamonds, 
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('roulette', 'bet');
+        playGameSound('roulette', 'spin');
 
         setGameState('SPINNING');
 
-        let winningNumber = Math.floor(Math.random() * 37);
-        if (Math.random() < 0.38) {
-            while (ROULETTE_CONFIG.segments[winningNumber].color === targetChoice) {
-                winningNumber = Math.floor(Math.random() * 37);
-            }
-        }
+        const winningNumber = pickRouletteWinningNumber(ROULETTE_CONFIG.segments, targetChoice);
         const winningSegment = ROULETTE_CONFIG.segments[winningNumber];
 
         // Calculate rotation
@@ -97,9 +96,11 @@ export default function RouletteModal({ isOpen, onClose, diamonds, setDiamonds, 
                 }
 
                 setSessionPayout(prev => prev + winAmount);
+                playGameSound('roulette', 'win');
 
-                confetti({ particleCount: 150, spread: 80, origin: { y: 0.5 } });
+                fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.5 } });
             } else {
+                playGameSound('roulette', 'lose');
                 setGameState('LOST');
             }
         }, 4000); // 4s spin duration
@@ -111,6 +112,11 @@ export default function RouletteModal({ isOpen, onClose, diamonds, setDiamonds, 
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
     };
+
+    
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) {

@@ -7,19 +7,14 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { ORIGINALS_PAYOUT, getInfluencerGrowthStep, pickInfluencerTick } from "@/utils/originalsMath";
 
-const EVENTS = [
-    { text: "Viral dance video!", mult: 1.35, type: 'good' },
-    { text: "Signed brand deal!", mult: 1.22, type: 'good' },
-    { text: "MrBeast commented!", mult: 1.75, type: 'good' },
-    { text: "Trending #1!", mult: 1.15, type: 'good' },
-    { text: "Stadium collab announced!", mult: 4.2, type: 'good' },
-    { text: "Exposed drama...", mult: 0.55, type: 'bad' },
-    { text: "Canceled on Twitter!", mult: 0.35, type: 'bad' },
-    { text: "Shadowbanned...", mult: 0.72, type: 'bad' },
-    { text: "Fake apology video...", mult: 0.18, type: 'bad' }
-];
+const EVENT_LABELS = {
+    good: ["Viral dance video!", "Signed brand deal!", "Trending #1!", "Collab announced!"],
+    bad: ["Exposed drama...", "Canceled on Twitter!", "Shadowbanned...", "Fake apology video..."],
+};
 
 export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds, forgesCoins, setForgesCoins }: any) {
     const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
@@ -45,6 +40,7 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
         } else {
             setForgesCoins((prev: number) => prev - betAmount);
         }
+        playGameSound('influencer', 'bet');
 
         setGameState('PLAYING');
         setMultiplier(1.00);
@@ -55,27 +51,24 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
         if (timerRef.current) clearInterval(timerRef.current);
 
         timerRef.current = setInterval(() => {
-            if (Math.random() > 0.48) {
-                const goods = EVENTS.filter((e) => e.type === 'good');
-                const bads = EVENTS.filter((e) => e.type === 'bad');
-                const pickBad = Math.random() < 0.68;
-                const pool = pickBad ? bads : goods;
-                const randomEvent = pool[Math.floor(Math.random() * pool.length)];
-                setEventText(randomEvent.text);
-
+            const tick = pickInfluencerTick();
+            if (tick.kind === "growth") {
+                setMultiplier((prev) => prev + getInfluencerGrowthStep());
+                setEventText("Steady growth...");
+            } else {
+                const labels = tick.isBad ? EVENT_LABELS.bad : EVENT_LABELS.good;
+                setEventText(labels[Math.floor(Math.random() * labels.length)]);
                 setMultiplier((prev) => {
-                    const next = prev * randomEvent.mult;
+                    const next = prev * tick.mult;
                     if (next < 0.2) {
                         if (timerRef.current) clearInterval(timerRef.current);
+                        playGameSound('influencer', 'lose');
                         setGameState('BANNED');
                         setEventText("ACCOUNT BANNED");
                         return 0;
                     }
                     return next;
                 });
-            } else {
-                setMultiplier((prev) => prev + 0.07);
-                setEventText("Steady growth...");
             }
 
             setFloatingLikes(prev => {
@@ -99,7 +92,7 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
         if (timerRef.current) clearInterval(timerRef.current);
 
         setGameState('WON');
-        const winAmount = betAmount * multiplier * 0.9;
+        const winAmount = betAmount * multiplier * ORIGINALS_PAYOUT.influencer;
         setLastWin({ amount: winAmount, currency: currencyType });
 
         if (currencyType === 'GC') {
@@ -108,7 +101,8 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
             setForgesCoins((prev: number) => prev + winAmount);
         }
 
-        confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
+        playGameSound('influencer', 'win');
+        fireWinConfetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
     };
 
     const handleBetChange = (amount: number) => {
@@ -117,6 +111,11 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
     };
+
+    
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) {

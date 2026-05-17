@@ -5,7 +5,9 @@ import { useBoardFitScale } from "@/hooks/useBoardFitScale";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Play, RotateCw, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { ORIGINALS_PAYOUT, pickPlinkoBucketIndex } from "@/utils/originalsMath";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
@@ -106,6 +108,7 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('plinko', 'bet');
 
         setDropping(true);
         setBallPath([]); // Clear previous path immediately
@@ -142,25 +145,10 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
                 // Ensure path has data before accessing logic
                 if (path.length > 0) {
-                    // Weighted buckets: mostly modest hits; apex multipliers stay very rare (excitement)
-                    const r = Math.random();
-                    let randomBucketForDemo = 8;
-                    if (r < 0.00006) randomBucketForDemo = Math.random() < 0.5 ? 0 : 16;
-                    else if (r < 0.00026) randomBucketForDemo = Math.random() < 0.5 ? 1 : 15;
-                    else if (r < 0.00076) randomBucketForDemo = Math.random() < 0.5 ? 2 : 14;
-                    else if (r < 0.0032) randomBucketForDemo = Math.random() < 0.5 ? 3 : 13;
-                    else if (r < 0.012) randomBucketForDemo = Math.random() < 0.5 ? 4 : 12;
-                    else if (r < 0.041) randomBucketForDemo = Math.random() < 0.5 ? 5 : 11;
-                    else if (r < 0.14) randomBucketForDemo = Math.random() < 0.5 ? 6 : 10;
-                    else {
-                        const inner = Math.random();
-                        if (inner < 0.40) randomBucketForDemo = 7;
-                        else if (inner < 0.58) randomBucketForDemo = 8;
-                        else randomBucketForDemo = 9;
-                    }
+                    const randomBucketForDemo = pickPlinkoBucketIndex();
                     const multiplier = MULTIPLIERS[randomBucketForDemo];
 
-                    const winAmount = betAmount * multiplier * 0.94;
+                    const winAmount = betAmount * multiplier * ORIGINALS_PAYOUT.plinko;
                     setLastWin({ amount: winAmount, currency: currencyType });
 
                     if (currencyType === 'GC') {
@@ -173,8 +161,9 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
                     setHistory(prev => [multiplier, ...prev].slice(0, 5));
 
+                    if (multiplier >= 1) playGameSound('plinko', 'win');
                     if (multiplier >= 10) {
-                        confetti({
+                        fireWinConfetti({
                             particleCount: 100,
                             spread: 70,
                             origin: { y: 0.6 }
@@ -203,6 +192,11 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
     };
 
     // Handle closing via parent prop, ensure cleanup and session saving
+    
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
+
     useEffect(() => {
         if (!isOpen) {
             setMobileMoreOpen(false);

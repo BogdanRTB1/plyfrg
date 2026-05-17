@@ -7,7 +7,9 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { ORIGINALS_PAYOUT, pickTomatoTargetIndex } from "@/utils/originalsMath";
 
 export const TOMATOES_CONFIG = {
     theme: {
@@ -45,6 +47,10 @@ export default function TomatoesModal({ isOpen, onClose, diamonds, setDiamonds, 
 
     useBodyScrollLock(isOpen);
 
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
+
     const throwTomato = () => {
         if (balance < betAmount || betAmount <= 0) return;
         if (gameState === 'THROWING') return;
@@ -56,18 +62,12 @@ export default function TomatoesModal({ isOpen, onClose, diamonds, setDiamonds, 
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('tomatoes', 'bet');
 
         setGameState('THROWING');
         setResultTarget(null);
 
-        const r = Math.random();
-        let selectedIdx = 5; // Miss default
-        if (r < 0.1) selectedIdx = 0; // 10% head
-        else if (r < 0.3) selectedIdx = 1; // 20% body
-        else if (r < 0.5) selectedIdx = 2; // 20% L arm
-        else if (r < 0.7) selectedIdx = 3; // 20% R arm
-        else if (r < 0.85) selectedIdx = 4; // 15% leg
-        else selectedIdx = 5; // 15% miss
+        const selectedIdx = pickTomatoTargetIndex();
 
         setGameState('THROWING');
         setResultTarget(selectedIdx);
@@ -92,7 +92,7 @@ export default function TomatoesModal({ isOpen, onClose, diamonds, setDiamonds, 
 
     const handleWin = (idx: number) => {
         const target = TOMATOES_CONFIG.targets[idx];
-        const winAmount = betAmount * target.mult;
+        const winAmount = betAmount * target.mult * (target.mult > 0 ? ORIGINALS_PAYOUT.tomatoes : 1);
 
         setLastWin({ amount: winAmount, currency: currencyType, mult: target.mult });
 
@@ -104,10 +104,13 @@ export default function TomatoesModal({ isOpen, onClose, diamonds, setDiamonds, 
             }
 
         setSessionPayout(prev => prev + winAmount);
+            playGameSound('tomatoes', 'win');
 
             if (target.mult >= 1.5) {
-                confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+                fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
             }
+        } else {
+            playGameSound('tomatoes', 'lose');
         }
     };
 

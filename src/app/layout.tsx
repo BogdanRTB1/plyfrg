@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Outfit } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
@@ -10,6 +11,7 @@ import CookieConsent from "@/components/CookieConsent";
 import { MobileNavProvider } from "@/components/MobileNavProvider";
 import KYCEnforcer from "@/components/KYCEnforcer";
 import GlobalGameModals from "@/components/GlobalGameModals";
+import GameLaunchHandler from "@/components/GameLaunchHandler";
 
 
 const outfit = Outfit({
@@ -49,6 +51,9 @@ export default function RootLayout({
             </div>
           </main>
           <GlobalGameModals />
+          <Suspense fallback={null}>
+            <GameLaunchHandler />
+          </Suspense>
 
         </MobileNavProvider>
       </body>

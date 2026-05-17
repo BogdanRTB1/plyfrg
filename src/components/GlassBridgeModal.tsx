@@ -7,7 +7,9 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { ORIGINALS_PAYOUT, pickGlassBridgeStepHolds } from "@/utils/originalsMath";
 
 export const BRIDGE_CONFIG = {
     theme: {
@@ -48,6 +50,7 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('glassBridge', 'bet');
 
         // Calculate result
         setGameState('PLAYING');
@@ -58,12 +61,12 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
     const stepOnGlass = (side: 'left' | 'right') => {
         if (gameState !== 'PLAYING') return;
 
-        // 40% chance of success (60% breaks)
-        const holds = Math.random() < 0.4;
+        const holds = pickGlassBridgeStepHolds();
 
         setPath(prev => [...prev, side]);
 
         if (holds) {
+            playGameSound('glassBridge', 'reveal');
             const nextStep = currentStep + 1;
             if (nextStep >= BRIDGE_CONFIG.multipliers.length) {
                 // WON MAX!
@@ -73,6 +76,7 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
                 setCurrentStep(nextStep);
             }
         } else {
+            playGameSound('glassBridge', 'lose');
             // Breaks
             setGameState('CRACKED');
             setTimeout(() => {
@@ -89,7 +93,7 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
         if (step === 0) return;
 
         const mult = BRIDGE_CONFIG.multipliers[step - 1];
-        const winAmount = betAmount * mult;
+        const winAmount = betAmount * mult * ORIGINALS_PAYOUT.glassBridge;
 
         setLastWin({ amount: winAmount, currency: currencyType, mult });
 
@@ -100,8 +104,9 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
         }
 
         setSessionPayout(prev => prev + winAmount);
+        playGameSound('glassBridge', 'win');
 
-        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+        fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
 
         setGameState('IDLE');
         setCurrentStep(0);
@@ -114,6 +119,11 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
     };
+
+    
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) setMobileMoreOpen(false);

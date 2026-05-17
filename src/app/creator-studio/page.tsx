@@ -8,6 +8,7 @@ import CreatorGameStudio from '@/components/CreatorGameStudio';
 import StudioTemplateStylePicker from '@/components/StudioTemplateStylePicker';
 import { createClient } from '@/utils/supabase/client';
 import { deletePublishedGameById, loadPublishedGames, migratePublishedGamesAssetsToSupabase } from '@/utils/publishedGamesStorage';
+import { launchGame } from '@/utils/gameLaunch';
 import { toast } from 'sonner';
 
 export default function CreatorStudioPage() {
@@ -871,7 +872,7 @@ export default function CreatorStudioPage() {
                                                     </div>
                                                     <div className="flex items-center gap-1">
                                                         <button
-                                                            onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: game }))}
+                                                            onClick={() => launchGame(game)}
                                                             className="text-slate-600 hover:text-[#00b9f0] transition-colors p-1.5 rounded hover:bg-[#00b9f0]/10"
                                                             title="Play"
                                                         >

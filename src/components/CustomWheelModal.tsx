@@ -5,19 +5,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Zap, RotateCw, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import type { WheelConfig, WheelSegment } from "@/types/wheelConfig";
 import { DEFAULT_WHEEL_CONFIG } from "@/types/wheelConfig";
+import { getSharedAudioContext, resumeGameAudio } from "@/utils/gameAudioContext";
 
 // ─── Tick Sound Generator ──────────────────────────────────────────────────
 const playTick = (tickSound: string) => {
     try {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (!AudioContext) return;
-        const ctx = new AudioContext();
-        if (ctx.state === 'suspended') ctx.resume();
+        const ctx = getSharedAudioContext();
+        if (!ctx) return;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
 
@@ -70,7 +69,7 @@ const fireLogoConfetti = (logoSrc: string) => {
         sctx.drawImage(img, 0, 0, size, size);
 
         // Fall back to standard confetti with custom colors if shape API not available
-        confetti({
+        fireWinConfetti({
             particleCount: 120,
             spread: 90,
             origin: { y: 0.6 },
@@ -80,7 +79,7 @@ const fireLogoConfetti = (logoSrc: string) => {
         });
     };
     img.onerror = () => {
-        confetti({ particleCount: 120, spread: 90, origin: { y: 0.6 } });
+        fireWinConfetti({ particleCount: 120, spread: 90, origin: { y: 0.6 } });
     };
 };
 
@@ -324,6 +323,7 @@ export default function CustomWheelModal({ isOpen, onClose, gameData, diamonds, 
         }
         setRespinPending(false);
 
+        resumeGameAudio();
         setGameState('SPINNING');
         setResultSegment(null);
         lastTickSegRef.current = -1;
@@ -414,7 +414,7 @@ export default function CustomWheelModal({ isOpen, onClose, gameData, diamonds, 
                 if (config.confettiType === 'custom_logo' && config.confettiImage) {
                     fireLogoConfetti(config.confettiImage);
                 } else {
-                    confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+                    fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
                 }
             }
         }

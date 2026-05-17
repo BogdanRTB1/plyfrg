@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
 import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
 import { loadPublishedGames } from "@/utils/publishedGamesStorage";
+import { launchGame } from "@/utils/gameLaunch";
 
 export default function CasinoPage() {
     const allGames = FEATURED_GAMES.map((game) => ({
@@ -57,7 +58,7 @@ export default function CasinoPage() {
     }, []);
 
     const playNow = (game: any) => {
-        window.dispatchEvent(new CustomEvent('open_game', { detail: game }));
+        launchGame(game);
     };
 
     const filteredGames = useMemo(() => {

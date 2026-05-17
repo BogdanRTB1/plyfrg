@@ -8,8 +8,8 @@ import { createClient } from "@/utils/supabase/client";
 import { User as UserIcon, Calendar, Trophy, Medal, Star, Shield, Lock, Activity, Mail, GamepadIcon, Play, Twitch, Youtube, Twitter } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import AIGameModal from "@/components/AIGameModal";
 import { loadPublishedGames } from "@/utils/publishedGamesStorage";
+import { launchGame } from "@/utils/gameLaunch";
 
 export default function CreatorProfilePage() {
     const params = useParams();
@@ -27,28 +27,7 @@ export default function CreatorProfilePage() {
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [uniquePlayers, setUniquePlayers] = useState(0);
 
-    const [isAIGameOpen, setIsAIGameOpen] = useState(false);
-    const [activeCustomGame, setActiveCustomGame] = useState<any>(null);
-    const [diamonds, setDiamonds] = useState(0);
-    const [forgesCoins, setForgesCoins] = useState(0);
     const [playerUsername, setPlayerUsername] = useState<string | null>(null);
-
-    useEffect(() => {
-
-        const sync = () => {
-            const d = localStorage.getItem('user_diamonds');
-            const f = localStorage.getItem('user_forges_coins');
-            if (d) setDiamonds(parseInt(d));
-            if (f) setForgesCoins(parseFloat(f));
-        };
-        sync();
-        window.addEventListener('balance_updated', sync);
-        window.addEventListener('storage', sync);
-        return () => {
-            window.removeEventListener('balance_updated', sync);
-            window.removeEventListener('storage', sync);
-        };
-    }, []);
 
     useEffect(() => {
         const fetchCreator = async () => {
@@ -325,14 +304,7 @@ export default function CreatorProfilePage() {
                                             transition={{ delay: 0.1 * idx }}
                                             key={idx} 
                                             className="bg-[#0f212e] hover:bg-[#162c3d] cursor-pointer transition-all duration-300 border border-white/5 hover:border-[#00b9f0]/40 rounded-3xl overflow-hidden group hover:-translate-y-2 shadow-lg hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] flex flex-col"
-                                            onClick={() => {
-                                                if (game.isManualTemplate) {
-                                                    window.location.href = `/?play=${game.name}`;
-                                                } else {
-                                                    setActiveCustomGame(game);
-                                                    setIsAIGameOpen(true);
-                                                }
-                                            }}
+                                            onClick={() => launchGame(game)}
                                         >
                                             <div className="aspect-[16/10] bg-gradient-to-br from-[#0b1622] to-[#152a3a] relative flex items-center justify-center p-4 overflow-hidden">
                                                 {/* Background patterns */}
@@ -379,14 +351,6 @@ export default function CreatorProfilePage() {
                 </div>
             </div>
 
-            {activeCustomGame && (
-                <AIGameModal
-                    isOpen={isAIGameOpen}
-                    onClose={() => { setIsAIGameOpen(false); setActiveCustomGame(null); }}
-                    gameData={activeCustomGame}
-                    diamonds={diamonds} setDiamonds={setDiamonds} forgesCoins={forgesCoins} setForgesCoins={setForgesCoins}
-                />
-            )}
         </div>
     );
 }

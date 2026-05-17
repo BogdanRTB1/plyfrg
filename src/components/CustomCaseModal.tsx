@@ -5,19 +5,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Package, MoreHorizontal, Zap } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import type { CaseConfig, CaseItem, CaseRarity } from "@/types/caseConfig";
 import { DEFAULT_CASE_CONFIG, RARITY_CONFIG } from "@/types/caseConfig";
+import { getSharedAudioContext, resumeGameAudio } from "@/utils/gameAudioContext";
 
 // ─── Opening Sound Synthesizer ──────────────────────────────────────────────
 const playOpeningSound = (type: string) => {
     try {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (!AudioContext) return;
-        const ctx = new AudioContext();
-        if (ctx.state === 'suspended') ctx.resume();
+        const ctx = getSharedAudioContext();
+        if (!ctx) return;
 
         if (type === 'chains') {
             // Metallic chain-breaking sound
@@ -72,10 +71,8 @@ const playOpeningSound = (type: string) => {
 // ─── Rare Item Explosion Sound ──────────────────────────────────────────────
 const playRareExplosion = (rarity: CaseRarity) => {
     try {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (!AudioContext) return;
-        const ctx = new AudioContext();
-        if (ctx.state === 'suspended') ctx.resume();
+        const ctx = getSharedAudioContext();
+        if (!ctx) return;
 
         const intensity = rarity === 'legendary' ? 1.0 : rarity === 'epic' ? 0.7 : 0.4;
         const noteCount = rarity === 'legendary' ? 6 : rarity === 'epic' ? 4 : 2;
@@ -112,10 +109,8 @@ const playRareExplosion = (rarity: CaseRarity) => {
 // ─── Roulette Tick Sound ────────────────────────────────────────────────────
 const playTick = () => {
     try {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (!AudioContext) return;
-        const ctx = new AudioContext();
-        if (ctx.state === 'suspended') ctx.resume();
+        const ctx = getSharedAudioContext();
+        if (!ctx) return;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'triangle';
@@ -215,6 +210,7 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
             setForgesCoins((prev: number) => prev - betAmount);
         }
         setSessionWagered(prev => prev + betAmount);
+        resumeGameAudio();
 
         // Pick winner and build band
         const winner = pickWinner();
@@ -301,12 +297,12 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
 
             // Confetti for epic+ wins
             if (winner.rarity === 'legendary') {
-                confetti({ particleCount: 200, spread: 100, origin: { y: 0.5 }, colors: ['#f59e0b', '#fbbf24', '#fcd34d', '#ffffff'] });
-                setTimeout(() => confetti({ particleCount: 100, spread: 120, origin: { y: 0.4 } }), 300);
+                fireWinConfetti({ particleCount: 200, spread: 100, origin: { y: 0.5 }, colors: ['#f59e0b', '#fbbf24', '#fcd34d', '#ffffff'] });
+                setTimeout(() => fireWinConfetti({ particleCount: 100, spread: 120, origin: { y: 0.4 } }), 300);
             } else if (winner.rarity === 'epic') {
-                confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, colors: ['#a855f7', '#c084fc', '#e9d5ff'] });
+                fireWinConfetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, colors: ['#a855f7', '#c084fc', '#e9d5ff'] });
             } else if (winner.rarity === 'rare') {
-                confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
+                fireWinConfetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
             }
         }, 500);
     };

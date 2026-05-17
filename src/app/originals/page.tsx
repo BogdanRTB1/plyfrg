@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
 import { ORIGINALS_MARKETING_RTP_BANNER } from "@/constants/originalsRtp";
+import { setGameMenuOpen } from "@/utils/winConfetti";
 import PlinkoModal from "@/components/PlinkoModal";
 import MinesModal from "@/components/MinesModal";
 import SlotsModal from "@/components/SlotsModal";
@@ -57,6 +58,17 @@ export default function OriginalsPage() {
             window.removeEventListener('storage', sync);
         };
     }, []);
+
+    useEffect(() => {
+        const anyGameOpen =
+            isPlinkoOpen || isMinesOpen || isSlotsOpen || isRouletteOpen || isCrashOpen ||
+            isSneakOpen || isHeistOpen || isInfluencerOpen || isWantedOpen || isEscapeOpen ||
+            isBombOpen || isBlackjackOpen;
+        setGameMenuOpen(anyGameOpen);
+    }, [
+        isPlinkoOpen, isMinesOpen, isSlotsOpen, isRouletteOpen, isCrashOpen, isSneakOpen,
+        isHeistOpen, isInfluencerOpen, isWantedOpen, isEscapeOpen, isBombOpen, isBlackjackOpen,
+    ]);
 
     useEffect(() => {
         const handleOpenGame = ((e: CustomEvent) => {

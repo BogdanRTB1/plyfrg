@@ -7,7 +7,9 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { ORIGINALS_PAYOUT, generateCrashPoint } from "@/utils/originalsMath";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
 export const CRASH_CONFIG = {
@@ -64,13 +66,6 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
 
     const currentMultiplierRef = useRef(1.00);
 
-    const generateCrashPoint = () => {
-        const edge = 0.155;
-        if (Math.random() < edge) return 1.0;
-        const u = Math.max(0.0001, Math.random());
-        return Math.min(1000, Math.max(1.0, (1 - edge) / (1 - u)));
-    };
-
     const startGame = () => {
         if (balance < betAmount || betAmount <= 0) return;
 
@@ -81,6 +76,7 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('crash', 'bet');
 
         const cp = generateCrashPoint();
         crashPointRef.current = cp;
@@ -109,7 +105,8 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
             currentMultiplierRef.current = crashPointRef.current;
             setMultiplier(crashPointRef.current);
             setGameState('CRASHED');
-            
+            if (cashedOutAtRef.current === null) playGameSound('crash', 'crash');
+
             drawGraph(timeElapsedSec, crashPointRef.current, true);
             return;
         }
@@ -211,7 +208,7 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
         setCashedOutAt(mult);
         cashedOutAtRef.current = mult;
 
-        const winAmount = betAmount * mult * 0.97;
+        const winAmount = betAmount * mult * ORIGINALS_PAYOUT.crash;
         setLastWin({ amount: winAmount, currency: currencyType, mult });
 
         if (currencyType === 'GC') {
@@ -221,9 +218,10 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
         }
 
         setSessionPayout(prev => prev + winAmount);
-        
+        playGameSound('crash', 'win');
+
         setGameState('IDLE');
-        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+        fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
 
         // Note: Graph update continues normally loop logic. We do not restart timeStartRef.
     };
@@ -234,6 +232,10 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
     };
+
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) {

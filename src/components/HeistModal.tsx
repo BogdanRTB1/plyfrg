@@ -7,7 +7,9 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { ORIGINALS_PAYOUT, generateRampCrashPoint } from "@/utils/originalsMath";
 
 const HEIST_CONFIG = {
     names: { title: "Heist" },
@@ -41,12 +43,12 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('heist', 'bet');
 
         setGameState('PLAYING');
         setMultiplier(1.00);
 
-        const e = 2 ** (Math.random() * 3.05);
-        crashPointRef.current = Math.max(1.00, e * 0.56);
+        crashPointRef.current = generateRampCrashPoint();
 
         if (timerRef.current) clearInterval(timerRef.current);
 
@@ -57,6 +59,7 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
                 if (next >= crashPointRef.current) {
                     if (timerRef.current) clearInterval(timerRef.current);
                     setGameState('CRASHED');
+                    playGameSound('heist', 'crash');
                     return crashPointRef.current;
                 }
                 return next;
@@ -69,7 +72,7 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
         if (timerRef.current) clearInterval(timerRef.current);
 
         setGameState('WON');
-        const winAmount = betAmount * multiplier * 0.92;
+        const winAmount = betAmount * multiplier * ORIGINALS_PAYOUT.heist;
         setCashOutValue(winAmount);
         setLastWin({ amount: winAmount, currency: currencyType });
 
@@ -80,8 +83,9 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
         }
 
         setSessionPayout(prev => prev + winAmount);
+        playGameSound('heist', 'win');
 
-        confetti({ particleCount: 200, spread: 90, colors: ['#ffe000', '#ffcc00', '#ffb300', '#ffffff'], origin: { y: 0.6 } });
+        fireWinConfetti({ particleCount: 200, spread: 90, colors: ['#ffe000', '#ffcc00', '#ffb300', '#ffffff'], origin: { y: 0.6 } });
     };
 
     const handleBetChange = (amount: number) => {
@@ -90,6 +94,11 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
     };
+
+    
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) {

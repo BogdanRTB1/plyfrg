@@ -7,7 +7,9 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { ORIGINALS_PAYOUT } from "@/utils/originalsMath";
 
 export const WANTED_CONFIG = {
     theme: {
@@ -105,7 +107,7 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
     const spawnObstacle = (state: RuntimeState): RuntimeState => {
         const lane = Math.floor(Math.random() * 3) as Lane;
-        const doubleSpawnChance = Math.min(0.55, Math.max(0, state.multiplier - 1.18) * 0.42);
+        const doubleSpawnChance = Math.min(0.62, Math.max(0, state.multiplier - 1.08) * 0.48);
         const shouldDoubleSpawn = Math.random() < doubleSpawnChance;
         const extraObstacle = shouldDoubleSpawn
             ? [{
@@ -161,6 +163,7 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
     const endRoundAsBusted = (roundId: number) => {
         if (roundId !== roundIdRef.current) return;
         clearAllTimers();
+        playGameSound('wanted', 'crash');
         setGameState("BUSTED");
     };
 
@@ -177,6 +180,7 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('wanted', 'bet');
         setGameState("COUNTDOWN");
         setCountdown(3);
         setMultiplier(1);
@@ -252,7 +256,7 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
         if (gameState !== "PLAYING") return;
         clearAllTimers();
         setGameState("CASHED_OUT");
-        const winAmount = betAmount * multiplier * 0.91;
+        const winAmount = betAmount * multiplier * ORIGINALS_PAYOUT.wanted;
         setLastWin({ amount: winAmount, currency: currencyType, mult: multiplier });
 
         if (currencyType === 'GC') {
@@ -262,7 +266,8 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
         }
 
         setSessionPayout(prev => prev + winAmount);
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        playGameSound('wanted', 'win');
+        fireWinConfetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     };
 
     const handleBetChange = (amount: number) => {
@@ -271,6 +276,11 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
     };
+
+    
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) {
@@ -302,6 +312,11 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
             setNearMissFlash(false);
         }
     }, [isOpen, sessionWagered, sessionPayout, currencyType]);
+
+    
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) return;

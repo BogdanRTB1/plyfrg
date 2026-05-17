@@ -5,7 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Goal, Rocket, TrendingUp, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { resumeGameAudio } from "@/utils/gameAudioContext";
+import { playGameSound } from "@/utils/originalGameSounds";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 
@@ -101,6 +103,8 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
         crashPointRef.current = cp;
         setCrashPoint(cp);
 
+        resumeGameAudio();
+        playGameSound("crash", "bet");
         setGameState('PLAYING');
         setCashedOutAt(null);
         setMultiplier(1.00);
@@ -123,6 +127,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
             currentMultiplierRef.current = crashPointRef.current;
             setMultiplier(crashPointRef.current);
             setGameState('CRASHED');
+            if (cashedOutAtRef.current === null) playGameSound("crash", "crash");
             drawGraph(timeElapsedSec, crashPointRef.current, true);
             return;
         }
@@ -258,7 +263,8 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
 
         setSessionPayout(prev => prev + winAmount);
 
-        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+        playGameSound("crash", "win");
+        fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
     };
 
     const handleBetChange = (amount: number) => {

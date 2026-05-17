@@ -216,6 +216,10 @@
   const pCanvas = document.getElementById('particles');
   const pCtx = pCanvas.getContext('2d');
 
+  function playSound(type) {
+    try { parent.postMessage({ type: 'PLAY_SOUND', soundType: type }, '*'); } catch(e) {}
+  }
+
   function resizeParticles() {
     pCanvas.width = window.innerWidth;
     pCanvas.height = window.innerHeight;
@@ -394,6 +398,7 @@
     }
     ctx.globalCompositeOperation = 'source-over';
     moveCount++;
+    if (moveCount % 4 === 0) playSound('scratch');
     if (moveCount >= 5) { moveCount = 0; checkProgress(); }
   }
 
@@ -420,9 +425,11 @@
     if (isWin) {
       overlay.classList.add('win'); resultText.textContent = 'YOU WIN!';
       resultAmount.textContent = winAmount + 'x PAYOUT';
+      playSound('win');
       spawnWinParticles(); updateParticles();
     } else {
       overlay.classList.add('lose'); resultText.textContent = 'TRY AGAIN';
+      playSound('lose');
     }
     parent.postMessage({ type: 'SCRATCH_RESULT', win: isWin, multiplier: isWin ? Number(winAmount.toFixed(1)) : 0, winningSymbol: winningSymbolId }, '*');
   }

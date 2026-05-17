@@ -257,14 +257,26 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
         setLoading(true);
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        const bonusAmount = (Math.random() * 0.15 + 0.05).toFixed(2);
-        setForgesCoins(prev => prev + Number(bonusAmount));
+        const bonusAmount = Number((Math.random() * 0.15 + 0.05).toFixed(2));
+        const diamondBonus = Math.floor(Math.random() * (200 - 40 + 1)) + 40;
+
+        setForgesCoins(prev => {
+            const next = prev + bonusAmount;
+            localStorage.setItem('user_forges_coins', next.toString());
+            return next;
+        });
+        setDiamonds(prev => {
+            const next = prev + diamondBonus;
+            localStorage.setItem('user_diamonds', next.toString());
+            return next;
+        });
+        window.dispatchEvent(new Event('balance_updated'));
 
         // Add transaction
         const newTx: Transaction = {
             id: Math.random().toString(36).substr(2, 9),
             type: 'bonus',
-            amount: Number(bonusAmount),
+            amount: bonusAmount,
             date: new Date(),
             status: 'completed'
         };
@@ -274,7 +286,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
         setBonusClaimed(true);
         updateTimer(new Date());
 
-        toast.success(`You claimed your daily bonus: ${bonusAmount} Forges Coins`);
+        toast.success(`Daily bonus: ${bonusAmount} Forges Coins + ${diamondBonus.toLocaleString()} Diamonds`);
 
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -282,7 +294,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                 await supabase.from('notifications').insert({
                     user_id: user.id,
                     title: 'Daily Bonus Claimed',
-                    message: `You successfully claimed your daily bonus of ${bonusAmount} Forges Coins.`
+                    message: `You claimed ${bonusAmount} Forges Coins and ${diamondBonus.toLocaleString()} Diamonds.`
                 });
             }
         } catch (error) {
@@ -588,7 +600,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                         <div className="space-y-2">
                                             <h2 className="text-2xl font-black text-white uppercase italic tracking-wide">Daily Reward</h2>
                                             <p className="text-sm max-w-xs mx-auto text-amber-500/80 font-bold border border-amber-500/20 bg-amber-500/10 py-2 px-4 rounded-xl mt-4">
-                                                Come back every 24 hours to claim your free Forges Coins!
+                                                Come back every 24 hours for free Forges Coins and free Diamonds!
                                             </p>
                                         </div>
 

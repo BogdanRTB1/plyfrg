@@ -7,7 +7,9 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { ORIGINALS_PAYOUT, pickFootballOutcome } from "@/utils/originalsMath";
 
 export const FOOTBALL_CONFIG = {
     theme: {
@@ -39,6 +41,10 @@ export default function FootballModal({ isOpen, onClose, diamonds, setDiamonds, 
 
     useBodyScrollLock(isOpen);
 
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
+
     const shoot = () => {
         if (balance < betAmount || betAmount <= 0) return;
         if (gameState === 'SHOOTING') return;
@@ -50,14 +56,12 @@ export default function FootballModal({ isOpen, onClose, diamonds, setDiamonds, 
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('football', 'bet');
 
         setGameState('SHOOTING');
         setResult(null);
 
-        // 50% chance to score
-        const r = Math.random();
-        const scored = r > 0.4;
-        const multiplier = scored ? (Math.random() * 2 + 1.5) : 0; // between 1.5 and 3.5
+        const { scored, multiplier } = pickFootballOutcome();
 
         const newTargetX = scored ? (Math.random() > 0.5 ? 80 : -80) : (Math.random() > 0.5 ? 30 : -30);
         setBallTargetX(newTargetX);
@@ -73,7 +77,7 @@ export default function FootballModal({ isOpen, onClose, diamonds, setDiamonds, 
     };
 
     const handleWin = (multiplier: number) => {
-        const winAmount = betAmount * multiplier;
+        const winAmount = betAmount * multiplier * (multiplier > 0 ? ORIGINALS_PAYOUT.football : 1);
 
         setLastWin({ amount: winAmount, currency: currencyType, mult: multiplier });
 
@@ -85,10 +89,13 @@ export default function FootballModal({ isOpen, onClose, diamonds, setDiamonds, 
             }
 
         setSessionPayout(prev => prev + winAmount);
+            playGameSound('football', 'win');
 
             if (multiplier >= 1.5) {
-                confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+                fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
             }
+        } else {
+            playGameSound('football', 'lose');
         }
 
         // Auto restart

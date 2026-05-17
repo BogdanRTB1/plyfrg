@@ -7,7 +7,9 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { ORIGINALS_PAYOUT, generateCrashPoint } from "@/utils/originalsMath";
 
 // AVIATOR CUSTOMIZATION CONFIG
 export const AVIATOR_CONFIG = {
@@ -64,11 +66,6 @@ export default function AviatorModal({ isOpen, onClose, diamonds, setDiamonds, f
 
     const currentMultiplierRef = useRef(1.00);
 
-    const generateCrashPoint = () => {
-        const e = 100 / (Math.random() * 100 + 1);
-        return Math.max(1.00, e * 0.99);
-    };
-
     const startGame = () => {
         if (balance < betAmount || betAmount <= 0) return;
 
@@ -79,6 +76,7 @@ export default function AviatorModal({ isOpen, onClose, diamonds, setDiamonds, f
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('aviator', 'bet');
 
         const cp = generateCrashPoint();
         crashPointRef.current = cp;
@@ -106,6 +104,7 @@ export default function AviatorModal({ isOpen, onClose, diamonds, setDiamonds, f
             currentMultiplierRef.current = crashPointRef.current;
             setMultiplier(crashPointRef.current);
             setGameState('CRASHED');
+            if (cashedOutAtRef.current === null) playGameSound('aviator', 'crash');
             drawGraph(timeElapsedSec, crashPointRef.current, true);
             return;
         }
@@ -218,7 +217,7 @@ export default function AviatorModal({ isOpen, onClose, diamonds, setDiamonds, f
         setCashedOutAt(mult);
         cashedOutAtRef.current = mult;
 
-        const winAmount = betAmount * mult;
+        const winAmount = betAmount * mult * ORIGINALS_PAYOUT.aviator;
         setLastWin({ amount: winAmount, currency: currencyType, mult });
 
         if (currencyType === 'GC') {
@@ -228,8 +227,9 @@ export default function AviatorModal({ isOpen, onClose, diamonds, setDiamonds, f
         }
 
         setSessionPayout(prev => prev + winAmount);
+        playGameSound('aviator', 'win');
 
-        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+        fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
     };
 
     const handleBetChange = (amount: number) => {
@@ -238,6 +238,11 @@ export default function AviatorModal({ isOpen, onClose, diamonds, setDiamonds, f
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
     };
+
+    
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) {

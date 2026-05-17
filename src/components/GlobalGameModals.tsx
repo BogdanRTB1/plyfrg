@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { recordGameActivity, recordGameSession } from "@/utils/gameBridge";
+import { setGameMenuOpen } from "@/utils/winConfetti";
+import { clearGamePlayUrl } from "@/utils/gameLaunch";
 import { User } from "@supabase/supabase-js";
 import { usePathname } from "next/navigation";
 
@@ -226,6 +228,25 @@ export default function GlobalGameModals() {
         };
     }, [pathname]);
 
+
+    useEffect(() => {
+        const anyGameOpen =
+            isPlinkoOpen || isHeistOpen || isInfluencerOpen || isWantedOpen ||
+            isEscapeOpen || isBombOpen || isMinesOpen || isSlotsOpen ||
+            isBlackjackOpen || isRouletteOpen || isCrashOpen || isSneakOpen ||
+            isDartOpen || isAviatorOpen || isTomatoesOpen || isFootballOpen ||
+            isBridgeOpen || isCustomSlotsOpen || isCustomPlinkoOpen ||
+            isCustomMinesOpen || isCustomCrashOpen || isCustomScratchOpen ||
+            isCustomWheelOpen || isCustomCaseOpen || isCustomHiloOpen || isAIGameOpen;
+        setGameMenuOpen(anyGameOpen);
+        if (!anyGameOpen) clearGamePlayUrl();
+    }, [
+        isPlinkoOpen, isHeistOpen, isInfluencerOpen, isWantedOpen, isEscapeOpen, isBombOpen,
+        isMinesOpen, isSlotsOpen, isBlackjackOpen, isRouletteOpen, isCrashOpen, isSneakOpen,
+        isDartOpen, isAviatorOpen, isTomatoesOpen, isFootballOpen, isBridgeOpen,
+        isCustomSlotsOpen, isCustomPlinkoOpen, isCustomMinesOpen, isCustomCrashOpen,
+        isCustomScratchOpen, isCustomWheelOpen, isCustomCaseOpen, isCustomHiloOpen, isAIGameOpen,
+    ]);
 
     // Listen for balance updates from Header/Wallet
     useEffect(() => {

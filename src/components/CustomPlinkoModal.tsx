@@ -4,7 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Play, RotateCw, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { resumeGameAudio } from "@/utils/gameAudioContext";
+import { playGameSound } from "@/utils/originalGameSounds";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import FavoriteToggle from "./FavoriteToggle";
@@ -80,6 +82,8 @@ export default function CustomPlinkoModal({ isOpen, onClose, gameData, diamonds,
             setForgesCoins(prev => prev - betAmount);
         }
 
+        resumeGameAudio();
+        playGameSound("plinko", "bet");
         setDropping(true);
         setBallPath([]);
 
@@ -128,8 +132,11 @@ export default function CustomPlinkoModal({ isOpen, onClose, gameData, diamonds,
 
                     setHistory(prev => [multiplier, ...prev].slice(0, 5));
 
+                    if (multiplier >= 1) playGameSound("plinko", multiplier >= 2 ? "win" : "reveal");
+                    else playGameSound("plinko", "lose");
+
                     if (multiplier >= 10) {
-                        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+                        fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
                     }
                 }
 
@@ -139,6 +146,7 @@ export default function CustomPlinkoModal({ isOpen, onClose, gameData, diamonds,
                 const nextPoint = path[step];
                 if (nextPoint) {
                     setBallPath(prev => [...prev, nextPoint]);
+                    if (step > 0 && step % 3 === 0) playGameSound("plinko", "reveal", 0.05);
                 }
                 step++;
             }

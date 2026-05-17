@@ -1,14 +1,15 @@
 /**
  * Shared slot reel sounds for the HTML slot engine preview (Creator Studio),
- * AI / template slot modal, and any listener that forwards PLAY_SOUND.
+ * AI / template slot modal, lobby slots, and any listener that forwards PLAY_SOUND.
  */
 
+import { getSharedAudioContext } from "./gameAudioContext";
+
 export function playSlotSpinSound(volume = 0.34): void {
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
+
     try {
-        const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
-        if (!AC) return;
-        const ctx = new AC();
-        if (ctx.state === "suspended") void ctx.resume();
         const t0 = ctx.currentTime;
         const dur = 0.62;
         const n = ctx.createBufferSource();
@@ -66,11 +67,10 @@ export function playSlotSpinSound(volume = 0.34): void {
 }
 
 export function playSlotReelTickSound(volume = 0.28): void {
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
+
     try {
-        const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
-        if (!AC) return;
-        const ctx = new AC();
-        if (ctx.state === "suspended") void ctx.resume();
         const t0 = ctx.currentTime;
         const osc = ctx.createOscillator();
         const g = ctx.createGain();

@@ -7,7 +7,9 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { applyBlackjackPayout } from "@/utils/originalsMath";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
 export const BLACKJACK_CONFIG = {
@@ -121,6 +123,7 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('blackjack', 'bet');
 
         const pHand: Card[] = [drawCard(), drawCard()];
         const dHand: Card[] = [drawCard(), { ...drawCard(), hidden: true }];
@@ -144,6 +147,7 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
         setPlayerHand(pHand);
 
         if (calculateHand(pHand) > 21) {
+            playGameSound('blackjack', 'lose');
             setGameState('LOST');
             setDealerHand(dealerHand.map(c => ({ ...c, hidden: false })));
         } else if (calculateHand(pHand) === 21) {
@@ -191,6 +195,7 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
             setGameState('WON');
             payOut(2); // 1:1 payout + original bet returned
         } else if (pTotal < dTotal) {
+            playGameSound('blackjack', 'lose');
             setGameState('LOST');
         } else {
             setGameState('PUSH');
@@ -199,11 +204,7 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
     };
 
     const payOut = (multiplier: number) => {
-        let winAmount = betAmount * multiplier;
-        if (multiplier > 1) {
-            const profit = winAmount - betAmount;
-            winAmount = betAmount + profit * 0.89;
-        }
+        const winAmount = applyBlackjackPayout(betAmount, multiplier);
         setLastWin({ amount: winAmount, currency: currencyType });
 
         if (currencyType === 'GC') {
@@ -215,7 +216,8 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
         setSessionPayout(prev => prev + winAmount);
 
         if (multiplier > 1) {
-            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+            playGameSound('blackjack', 'win');
+            fireWinConfetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         }
     };
 
@@ -225,6 +227,11 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
     };
+
+    
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) {

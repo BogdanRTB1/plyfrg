@@ -7,7 +7,9 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { pickDartSegmentIndex } from "@/utils/originalsMath";
 
 export const DART_CONFIG = {
     theme: {
@@ -59,12 +61,14 @@ export default function DartWheelModal({ isOpen, onClose, diamonds, setDiamonds,
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('dart', 'bet');
+        playGameSound('dart', 'spin');
 
         setGameState('SPINNING');
         setResultSegment(null);
 
         // Pick random outcome
-        const selectedIdx = Math.floor(Math.random() * segmentsCount);
+        const selectedIdx = pickDartSegmentIndex(segmentsCount);
 
         // Calculate physics
         const spins = 5; // minimum spins
@@ -95,9 +99,10 @@ export default function DartWheelModal({ isOpen, onClose, diamonds, setDiamonds,
             }
 
         setSessionPayout(prev => prev + winAmount);
+            playGameSound('dart', 'win');
 
             if (seg.mult >= 1.5) {
-                confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+                fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
             }
         }
     };
@@ -108,6 +113,11 @@ export default function DartWheelModal({ isOpen, onClose, diamonds, setDiamonds,
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
     };
+
+    
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) setMobileMoreOpen(false);

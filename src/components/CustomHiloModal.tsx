@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Volume2, VolumeX, ArrowUp, ArrowDown, Target, MoreHorizontal, Zap, Trophy } from 'lucide-react';
 import { HiLoConfig, DEFAULT_HILO_CONFIG } from '@/types/hiloConfig';
-import confetti from 'canvas-confetti';
+import { fireWinConfetti } from "@/utils/winConfetti";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { createPortal } from "react-dom";
+import { getSharedAudioContext } from "@/utils/gameAudioContext";
 
 interface CustomHiloModalProps {
     isOpen: boolean;
@@ -80,17 +81,8 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
     const [sessionPayout, setSessionPayout] = useState(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
-    // Initialize Audio Context
     useEffect(() => {
-        if (isOpen && !audioCtxRef.current) {
-            audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        }
-        return () => {
-            if (audioCtxRef.current) {
-                audioCtxRef.current.close().catch(() => {});
-                audioCtxRef.current = null;
-            }
-        };
+        if (isOpen) audioCtxRef.current = getSharedAudioContext();
     }, [isOpen]);
 
     // Create a new deck
@@ -267,7 +259,7 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
             setStreak(prev => prev + 1);
             
             if (streak > 0 && streak % 5 === 0) {
-                confetti({
+                fireWinConfetti({
                     particleCount: 50,
                     spread: 60,
                     origin: { y: 0.6, x: 0.5 },
@@ -284,7 +276,7 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
 
     const handleCashout = () => {
         if (!isPlaying) return;
-        confetti({
+        fireWinConfetti({
             particleCount: 150,
             spread: 90,
             origin: { y: 0.5 },

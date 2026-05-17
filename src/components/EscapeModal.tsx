@@ -7,7 +7,9 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { ORIGINALS_PAYOUT, generateRampCrashPoint } from "@/utils/originalsMath";
 
 const ESCAPE_CONFIG = {
     names: { title: "Escape" },
@@ -43,14 +45,14 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('escape', 'bet');
 
         setGameState('PLAYING');
         setMultiplier(1.00);
         setCopProximity(0);
         setRunnerAngle(0);
 
-        const e = 2 ** (Math.random() * 3.2);
-        crashPointRef.current = Math.max(1.00, e * 0.56);
+        crashPointRef.current = generateRampCrashPoint();
 
         if (timerRef.current) clearInterval(timerRef.current);
 
@@ -63,6 +65,7 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
                 if (next >= crashPointRef.current) {
                     if (timerRef.current) clearInterval(timerRef.current);
+                    playGameSound('escape', 'crash');
                     setGameState('CAUGHT');
                     setCopProximity(100);
                     return crashPointRef.current;
@@ -81,7 +84,7 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
         if (timerRef.current) clearInterval(timerRef.current);
 
         setGameState('WON');
-        const winAmount = betAmount * multiplier * 0.92;
+        const winAmount = betAmount * multiplier * ORIGINALS_PAYOUT.escape;
         setLastWin({ amount: winAmount, currency: currencyType });
 
         if (currencyType === 'GC') {
@@ -91,8 +94,9 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
         }
 
         setSessionPayout(prev => prev + winAmount);
+        playGameSound('escape', 'win');
 
-        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+        fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
     };
 
     const handleBetChange = (amount: number) => {
@@ -101,6 +105,11 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
     };
+
+    
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) {

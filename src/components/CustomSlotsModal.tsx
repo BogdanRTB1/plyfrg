@@ -5,9 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Coins, Repeat, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
+import { resumeGameAudio } from "@/utils/gameAudioContext";
+import { playGameSound } from "@/utils/originalGameSounds";
 import { playSlotSpinSound } from "@/utils/slotSpinSound";
 
 export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, setDiamonds, forgesCoins, setForgesCoins }: any) {
@@ -46,6 +48,7 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
             return;
         }
 
+        resumeGameAudio();
         setGameState('SPINNING');
         setWinMultiplier(0);
         setSpinningReels([true, true, true]);
@@ -75,6 +78,7 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
                 const multi = SYMBOLS[newReels[0]].multiplier;
                 setWinMultiplier(multi);
                 setGameState('WON');
+                playGameSound("slots", "win");
 
                 const winAmount = betAmount * multi;
                 setLastWin({ amount: winAmount, currency: currencyType });
@@ -87,9 +91,10 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
 
         setSessionPayout(prev => prev + winAmount);
 
-                confetti({ particleCount: 150, spread: 80, origin: { y: 0.5 } });
+                fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.5 } });
             } else {
                 setGameState('LOST');
+                playGameSound("slots", "lose");
             }
         }, 2000);
     };

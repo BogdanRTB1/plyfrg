@@ -7,7 +7,8 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
 
 export const SNEAK_CONFIG = {
     theme: {
@@ -40,11 +41,7 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
     const timeStartRef = useRef<number>(0);
     const requestRef = useRef<number | null>(null);
 
-    const generateBustTimeSeconds = () => {
-        // Generates a random time in seconds before getting busted
-        // Skewed towards lower times
-        return -Math.log(Math.random()) * 2.15;
-    };
+    const generateBustTimeSeconds = () => generateSneakBustSeconds();
 
     const startHolding = () => {
         if (gameState !== 'IDLE' && gameState !== 'CAUGHT' && gameState !== 'ESCAPED') return;
@@ -57,6 +54,7 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('sneak', 'bet');
 
         bustTimeRef.current = generateBustTimeSeconds();
         timeStartRef.current = performance.now();
@@ -75,13 +73,14 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
             return;
         }
 
-        const currentMult = 1.00 + (timeElapsedSec * 0.32);
+        const currentMult = 1.00 + (timeElapsedSec * getSneakMultiplierPerSecond());
         setMultiplier(currentMult);
 
         requestRef.current = requestAnimationFrame(updateGame);
     };
 
     const triggerCaught = () => {
+        playGameSound('sneak', 'lose');
         setGameState('CAUGHT');
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
 
@@ -97,7 +96,7 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
         setGameState('ESCAPED');
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
 
-        const winAmount = betAmount * multiplier * 0.91;
+        const winAmount = betAmount * multiplier * ORIGINALS_PAYOUT.sneak;
         setLastWin({ amount: winAmount, currency: currencyType, mult: multiplier });
 
         if (currencyType === 'GC') {
@@ -107,8 +106,9 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
         }
 
         setSessionPayout(prev => prev + winAmount);
+        playGameSound('sneak', 'win');
 
-        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+        fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
     };
 
     const handleBetChange = (amount: number) => {
@@ -117,6 +117,11 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
     };
+
+    
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) {

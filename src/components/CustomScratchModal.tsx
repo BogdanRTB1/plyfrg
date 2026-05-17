@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Loader2, RotateCcw, Minus, Plus, MoreHorizontal, Zap } from 'lucide-react';
 import { DiamondIcon, ForgesCoinIcon } from './CurrencyIcons';
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from './MobileGameHudBar';
+import { resumeGameAudio } from '@/utils/gameAudioContext';
+import { playSynthSound } from '@/utils/playSynthSound';
 
 interface CustomScratchModalProps {
     isOpen: boolean;
@@ -59,6 +61,10 @@ export default function CustomScratchModal({
                 sendConfig();
             }
 
+            if (event.data.type === 'PLAY_SOUND' && event.data.soundType) {
+                playSynthSound(event.data.soundType);
+            }
+
             if (event.data.type === 'SCRATCH_RESULT') {
                 setIsPlaying(false);
                 if (event.data.win && event.data.multiplier > 0) {
@@ -95,6 +101,7 @@ export default function CustomScratchModal({
             setForgesCoins((prev: number) => prev - bet);
         }
 
+        resumeGameAudio();
         setIsPlaying(true);
         setLastWin(null);
 

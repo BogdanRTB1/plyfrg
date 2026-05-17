@@ -5,7 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Bomb, Gem, Target, MoreHorizontal, Zap } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { calcMinesLobbyMultiplier } from "@/utils/originalsMath";
 import Image from "next/image";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
@@ -56,21 +58,8 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
     const [grid, setGrid] = useState<{ isMine: boolean, revealed: boolean }[]>([]);
 
     const updateMultipliers = (revealedSafe: number) => {
-        const totalTiles = 25;
-        const safeTiles = totalTiles - LOBBY_MINES_COUNT;
-        // House-favored multiplier: fair odds * discount factor
-        // Progressive tax increases with depth so the house edge grows as risk decreases
-        const calcMult = (revealed: number) => {
-            if (revealed === 0) return 1;
-            let fairMult = 1;
-            for (let i = 0; i < revealed; i++) {
-                fairMult *= (totalTiles - i) / (safeTiles - i);
-            }
-            const houseDiscount = 0.88 - (revealed * 0.009);
-            return Number((fairMult * Math.max(houseDiscount, 0.73)).toFixed(1));
-        };
-        setMultiplier(calcMult(revealedSafe));
-        setNextMultiplier(calcMult(revealedSafe + 1));
+        setMultiplier(calcMinesLobbyMultiplier(revealedSafe));
+        setNextMultiplier(calcMinesLobbyMultiplier(revealedSafe + 1));
     };
 
     const startGame = () => {
@@ -84,6 +73,7 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
 
         // Track session wagered
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('mines', 'bet');
 
         setGameState('PLAYING');
         setMultiplier(1.00);
@@ -110,10 +100,12 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
         setGrid(newGrid);
 
         if (newGrid[index].isMine) {
+            playGameSound('mines', 'lose');
             setGameState('EXPLODED');
             const finalGrid = newGrid.map(cell => ({ ...cell, revealed: true }));
             setGrid(finalGrid);
         } else {
+            playGameSound('mines', 'reveal');
             const revealedSafe = newGrid.filter(c => c.revealed && !c.isMine).length;
             updateMultipliers(revealedSafe);
             if (revealedSafe === (25 - LOBBY_MINES_COUNT)) {
@@ -137,10 +129,11 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
 
         // Track session payout
         setSessionPayout(prev => prev + winAmount);
+        playGameSound('mines', 'win');
 
         const finalGrid = grid.map(cell => ({ ...cell, revealed: true }));
         setGrid(finalGrid);
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        fireWinConfetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     };
 
     const handleBetChange = (amount: number) => {
@@ -149,6 +142,10 @@ export default function MinesModal({ isOpen, onClose, diamonds, setDiamonds, for
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
     };
+
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) {

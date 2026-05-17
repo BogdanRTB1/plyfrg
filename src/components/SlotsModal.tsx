@@ -5,7 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Coins, Repeat, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
+import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
+import { pickSlotsReels } from "@/utils/originalsMath";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 
@@ -58,30 +60,26 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
         }
 
         setSessionWagered(prev => prev + betAmount);
+        playGameSound('slots', 'bet');
+        playGameSound('slots', 'spin');
 
         setGameState('SPINNING');
         setWinMultiplier(0);
         setSpinningReels([true, true, true]);
 
         const symCount = SLOTS_CONFIG.symbols.length;
-        const pickNonTriple = (): number[] => {
-            for (let k = 0; k < 40; k++) {
-                const a = Math.floor(Math.random() * symCount);
-                const b = Math.floor(Math.random() * symCount);
-                const c = Math.floor(Math.random() * symCount);
-                if (!(a === b && b === c)) return [a, b, c];
-            }
-            return [0, 1, 2];
-        };
-        const r0 = Math.random();
-        let newReels: number[];
-        if (r0 < 0.7265) newReels = pickNonTriple();
-        else if (r0 < 0.9015) newReels = [0, 0, 0];
-        else if (r0 < 0.9615) newReels = [1, 1, 1];
-        else if (r0 < 0.9865) newReels = [2, 2, 2];
-        else if (r0 < 0.9965) newReels = [3, 3, 3];
-        else if (r0 < 0.9995) newReels = [4, 4, 4];
-        else newReels = [5, 5, 5];
+        const tripleReels = pickSlotsReels(symCount);
+        const newReels =
+            tripleReels ??
+            (() => {
+                for (let k = 0; k < 40; k++) {
+                    const a = Math.floor(Math.random() * symCount);
+                    const b = Math.floor(Math.random() * symCount);
+                    const c = Math.floor(Math.random() * symCount);
+                    if (!(a === b && b === c)) return [a, b, c];
+                }
+                return [0, 1, 2];
+            })();
 
         // Stop reels one by one
         setTimeout(() => {
@@ -114,9 +112,11 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
                 }
 
                 setSessionPayout(prev => prev + winAmount);
+                playGameSound('slots', 'win');
 
-                confetti({ particleCount: 150, spread: 80, origin: { y: 0.5 } });
+                fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.5 } });
             } else {
+                playGameSound('slots', 'lose');
                 setGameState('LOST');
             }
         }, 2000); // Total 2s spin duration
@@ -128,6 +128,10 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
         if (newAmount > balance) newAmount = balance;
         setBetAmount(Number(newAmount.toFixed(2)));
     };
+
+    useEffect(() => {
+        if (isOpen) resumeOriginalGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) {

@@ -5,11 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Zap, Sparkles, Play, Loader2, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { recordGameSession } from "@/utils/gameBridge";
-import { playSlotReelTickSound, playSlotSpinSound } from "@/utils/slotSpinSound";
+import { resumeGameAudio } from "@/utils/gameAudioContext";
+import { playSynthSound } from "@/utils/playSynthSound";
 
 interface AIGameModalProps {
     isOpen: boolean;
@@ -31,67 +32,6 @@ interface AIGameModalProps {
     forgesCoins: number;
     setForgesCoins: (fn: (prev: number) => number) => void;
 }
-
-const playSynthSound = (type: string) => {
-    try {
-        if (type === 'spin') {
-            playSlotSpinSound(0.34);
-            return;
-        }
-        if (type === 'reel_tick') {
-            playSlotReelTickSound(0.26);
-            return;
-        }
-        if (type === 'tumble') {
-            const audio = new Audio('/game sounds/dice.mp3');
-            audio.volume = 0.5;
-            audio.play().catch(() => { });
-            return;
-        }
-
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (!AudioContext) return;
-        const ctx = new AudioContext();
-        if (ctx.state === 'suspended') ctx.resume();
-
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        if (type === 'rise') {
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(80, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 2.0);
-            gain.gain.setValueAtTime(0.1, ctx.currentTime);
-            gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 2.0);
-        } else if (type === 'blip') {
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(600, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.1, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-        } else if (type === 'boom') {
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(100, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.5);
-            gain.gain.setValueAtTime(0.3, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-        } else if (type === 'win') {
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(400, ctx.currentTime);
-            osc.frequency.setValueAtTime(600, ctx.currentTime + 0.1);
-            osc.frequency.setValueAtTime(800, ctx.currentTime + 0.2);
-            gain.gain.setValueAtTime(0.2, ctx.currentTime);
-            gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
-        } else {
-            return;
-        }
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 2.0);
-    } catch (e) { }
-};
 
 export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDiamonds, forgesCoins, setForgesCoins }: AIGameModalProps) {
     const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
@@ -166,7 +106,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
 
                     const effect = gameDataObj.winEffect || 'confetti';
                     if (effect === 'confetti') {
-                        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+                        fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
                     } else if (effect === 'fireworks') {
                         const duration = 2000;
                         const animationEnd = Date.now() + duration;
@@ -175,13 +115,13 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                             const timeLeft = animationEnd - Date.now();
                             if (timeLeft <= 0) return clearInterval(interval);
                             const particleCount = 50 * (timeLeft / duration);
-                            confetti({ startVelocity: 30, spread: 360, ticks: 60, zIndex: 100, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
-                            confetti({ startVelocity: 30, spread: 360, ticks: 60, zIndex: 100, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+                            fireWinConfetti({ startVelocity: 30, spread: 360, ticks: 60, zIndex: 100, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+                            fireWinConfetti({ startVelocity: 30, spread: 360, ticks: 60, zIndex: 100, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
                         }, 250);
                     } else if (effect === 'stars') {
-                        confetti({ particleCount: 100, spread: 100, origin: { y: 0.6 }, shapes: ['star'], colors: ['#FFE400', '#FFBD00', '#E89400', '#FFCA6C', '#FDFFB8'] });
+                        fireWinConfetti({ particleCount: 100, spread: 100, origin: { y: 0.6 }, shapes: ['star'], colors: ['#FFE400', '#FFBD00', '#E89400', '#FFCA6C', '#FDFFB8'] });
                     } else if (effect === 'coins') {
-                        confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, zIndex: 100, shapes: ['circle'], colors: ['#FFD700', '#FDB931', '#F5A623', '#F8E71C'] });
+                        fireWinConfetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, zIndex: 100, shapes: ['circle'], colors: ['#FFD700', '#FDB931', '#F5A623', '#F8E71C'] });
                     }
                 } else {
                     // Lost
@@ -202,6 +142,10 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, [handleMessage]);
+
+    useEffect(() => {
+        if (isOpen) resumeGameAudio();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) {
@@ -230,6 +174,8 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
 
     const startGame = async () => {
         if (balance < betAmount || betAmount <= 0 || !gameReady) return;
+
+        resumeGameAudio();
 
         // Deduct bet
         if (currencyType === 'GC') {

@@ -38,45 +38,7 @@ import CustomHiloModal from './CustomHiloModal';
 import StudioTemplateStylePicker from './StudioTemplateStylePicker';
 import { createClient } from '@/utils/supabase/client';
 import { deletePublishedGameById, loadPublishedGames, savePublishedGame } from '@/utils/publishedGamesStorage';
-import { playSlotReelTickSound, playSlotSpinSound } from '@/utils/slotSpinSound';
-
-// ─── Sound Helper ──────────────────────────────────────────────────────────
-const playSynthSound = (type: string) => {
-    try {
-        if (type === 'spin') {
-            playSlotSpinSound(0.34);
-            return;
-        }
-        if (type === 'reel_tick') {
-            playSlotReelTickSound(0.26);
-            return;
-        }
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (!AudioContext) return;
-        const ctx = new AudioContext();
-        if (ctx.state === 'suspended') ctx.resume();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        if (type === 'blip') {
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(600, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.1, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-        } else if (type === 'win') {
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(400, ctx.currentTime);
-            osc.frequency.setValueAtTime(600, ctx.currentTime + 0.1);
-            osc.frequency.setValueAtTime(800, ctx.currentTime + 0.2);
-            gain.gain.setValueAtTime(0.2, ctx.currentTime);
-            gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
-        } else { return; }
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 2.0);
-    } catch(e) {}
-};
+import { playSynthSound } from '@/utils/playSynthSound';
 
 // ─── Win Effects ───────────────────────────────────────────────────────────
 const WIN_EFFECTS = [

@@ -5,19 +5,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Bomb, Gem, Target, MoreHorizontal, Zap } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
-import confetti from "canvas-confetti";
+import { fireWinConfetti } from "@/utils/winConfetti";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import type { MinesConfig, MinesGridSize } from "@/types/minesConfig";
 import { DEFAULT_MINES_CONFIG, GRID_SIZE_PRESETS as MINES_GRID_PRESETS, GRID_DEFAULT_MINE_COUNT } from "@/types/minesConfig";
+import { getSharedAudioContext, resumeGameAudio } from "@/utils/gameAudioContext";
 
 // ─── Progressive Suspense Audio Engine ──────────────────────────────────────
 const playSuspenseTone = (revealedCount: number) => {
     try {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (!AudioContext) return;
-        const ctx = new AudioContext();
-        if (ctx.state === 'suspended') ctx.resume();
+        const ctx = getSharedAudioContext();
+        if (!ctx) return;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         
@@ -41,10 +40,8 @@ const playSuspenseTone = (revealedCount: number) => {
 // ─── Loss Sound Synthesizer ─────────────────────────────────────────────────
 const playLossSound = (type: string) => {
     try {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (!AudioContext) return;
-        const ctx = new AudioContext();
-        if (ctx.state === 'suspended') ctx.resume();
+        const ctx = getSharedAudioContext();
+        if (!ctx) return;
 
         if (type === 'sad_trombone') {
             // "Wah wah wah wahhh" — descending notes
@@ -135,6 +132,7 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
 
         setSessionWagered(prev => prev + betAmount);
 
+        resumeGameAudio();
         setGameState('PLAYING');
         setMultiplier(1.00);
         setShowBustOverlay(false);
@@ -268,7 +266,7 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
         const finalGrid = grid.map(cell => ({ ...cell, revealed: true }));
         setGrid(finalGrid);
 
-        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+        fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
     };
 
     const handleBetChange = (amount: number) => {
