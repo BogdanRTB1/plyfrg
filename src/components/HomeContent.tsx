@@ -355,7 +355,7 @@ export default function HomeContent() {
                 </div>
                 <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
                     <p>&copy; 2026 PlayForges. All rights reserved.</p>
-                    <span className="flex items-center gap-2"><div className="w-8 h-8 border-2 border-red-600 text-red-600 rounded-full flex items-center justify-center font-black text-[10px]">18+</div> Play Responsibly</span>
+                    <span className="flex items-center gap-2"><div className="w-8 h-8 border-2 border-red-600 text-red-600 rounded-full flex items-center justify-center font-black text-[10px]">21+</div> Play Responsibly</span>
                 </div>
             </motion.footer>
         </motion.div>

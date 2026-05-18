@@ -2,12 +2,35 @@
 
 import { useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { launchGameFromQueryParam } from "@/utils/gameLaunch";
+import { createClient } from "@/utils/supabase/client";
+import { launchGameFromQueryParam, resolveGameFromSlug, launchGame } from "@/utils/gameLaunch";
+import { consumeAuthReturnPath } from "@/utils/authReturn";
 
-/** Handles `/?play=GameName` deep links after navigation to home. */
+/** Handles `/?play=GameName` deep links and re-opens games after register/login. */
 export default function GameLaunchHandler() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
+
+    useEffect(() => {
+        const supabase = createClient();
+
+        const resumeGameAfterAuth = async () => {
+            const returnPath = consumeAuthReturnPath();
+            if (!returnPath?.startsWith("/play/")) return;
+
+            const slug = returnPath.replace(/^\/play\//, "");
+            const resolved = await resolveGameFromSlug(slug);
+            if (resolved) launchGame(resolved, { updateUrl: false });
+        };
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (session && event === "SIGNED_IN") {
+                void resumeGameAfterAuth();
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
 
     useEffect(() => {
         if (pathname !== "/") return;

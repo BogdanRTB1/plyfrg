@@ -11,6 +11,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
+import { navigateAfterAuth, peekAuthReturnPath } from "@/utils/authReturn";
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -98,8 +99,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
     };
 
     const refreshAfterLogin = () => {
+        if (navigateAfterAuth(router)) return;
         router.refresh();
-        // Force a full client reload so creator-dependent UI is recalculated everywhere.
         setTimeout(() => {
             window.location.reload();
         }, 120);
@@ -237,7 +238,9 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                 if (error) throw error;
                 toast.success("Account created successfully!");
                 handleClose();
-                router.refresh();
+                if (!navigateAfterAuth(router)) {
+                    router.refresh();
+                }
             }
         } catch (err: any) {
             setError(err.message);
@@ -250,10 +253,11 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
         // ... previous implementation ...
         try {
             setLoading(true);
+            const returnPath = peekAuthReturnPath() || "/";
             const { error } = await supabase.auth.signInWithOAuth({
                 provider,
                 options: {
-                    redirectTo: `${window.location.origin}/auth/callback`,
+                    redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnPath)}`,
                 },
             });
             if (error) throw error;

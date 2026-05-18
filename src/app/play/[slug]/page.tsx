@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { launchGame, resolveGameFromSlug } from "@/utils/gameLaunch";
+import { saveAuthReturnPath } from "@/utils/authReturn";
 
 export default function PlayGamePage() {
     const params = useParams();
@@ -24,6 +25,7 @@ export default function PlayGamePage() {
             if (cancelled) return;
 
             if (resolved) {
+                saveAuthReturnPath(`/play/${encodeURIComponent(slug)}`);
                 launchGame(resolved, { updateUrl: false });
                 router.replace("/");
                 return;

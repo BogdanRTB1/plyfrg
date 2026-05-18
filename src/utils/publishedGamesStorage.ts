@@ -137,29 +137,59 @@ const getLocalGames = () => {
     }
 };
 
-export const loadPublishedGames = async (): Promise<any[]> => {
+const fetchGamesFromDatabase = async (): Promise<any[]> => {
     const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-
-    // DB is source of truth only for authenticated users.
-    if (!session?.user) return getLocalGames();
-
     const { data, error } = await supabase
         .from(CREATOR_GAMES_TABLE)
         .select("game_data")
         .order("published_at", { ascending: false });
 
     if (error || !data) {
-        return getLocalGames();
+        if (error) console.warn("[publishedGames] DB load failed:", error.message);
+        return [];
     }
 
-    const dbGames = data
-        .map((row: any) => row.game_data)
-        .filter((game: any) => !!game);
+    return data.map((row: any) => row.game_data).filter((game: any) => !!game);
+};
 
-    // Do not emit "storage" here; callers often listen to it and would recurse.
-    setLocalGames(dbGames, false);
-    return dbGames;
+const mergePublishedGames = (dbGames: any[], localGames: any[]) => {
+    const dbIds = new Set(dbGames.map((g) => g?.id).filter(Boolean));
+    const localOnly = localGames.filter((g) => g?.id && !dbIds.has(g.id));
+    return [...dbGames, ...localOnly].slice(0, MAX_PUBLISHED_GAMES);
+};
+
+/** Load all published creator games (works for guests — public SELECT on creator_games). */
+export const loadPublishedGames = async (): Promise<any[]> => {
+    const localGames = getLocalGames();
+    const dbGames = await fetchGamesFromDatabase();
+
+    if (dbGames.length > 0) {
+        const merged = mergePublishedGames(dbGames, localGames);
+        setLocalGames(merged, false);
+        return merged;
+    }
+
+    return localGames;
+};
+
+/** Games for a specific creator profile (by auth user id). */
+export const loadPublishedGamesForCreator = async (creatorId: string): Promise<any[]> => {
+    if (!creatorId) return [];
+
+    const supabase = createClient();
+    const { data, error } = await supabase
+        .from(CREATOR_GAMES_TABLE)
+        .select("game_data")
+        .eq("creator_id", creatorId)
+        .order("published_at", { ascending: false });
+
+    if (error || !data) {
+        console.warn("[publishedGames] Creator games load failed:", error?.message);
+        const all = await loadPublishedGames();
+        return all.filter((g: any) => g?.creatorId === creatorId);
+    }
+
+    return data.map((row: any) => row.game_data).filter((game: any) => !!game);
 };
 
 export const savePublishedGame = async (game: any): Promise<{ ok: boolean; reason?: string }> => {

@@ -8,7 +8,7 @@ import { createClient } from "@/utils/supabase/client";
 import { User as UserIcon, Calendar, Trophy, Medal, Star, Shield, Lock, Activity, Mail, GamepadIcon, Play, Twitch, Youtube, Twitter } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { loadPublishedGames } from "@/utils/publishedGamesStorage";
+import { loadPublishedGamesForCreator } from "@/utils/publishedGamesStorage";
 import { launchGame } from "@/utils/gameLaunch";
 
 export default function CreatorProfilePage() {
@@ -93,13 +93,8 @@ export default function CreatorProfilePage() {
                     setUniquePlayers(0);
                 }
 
-                // Load custom created games
-                const parsed = await loadPublishedGames();
-                const filtered = (parsed || []).filter((g: any) =>
-                    g.creatorName?.toLowerCase() === username.toLowerCase() ||
-                    g.creatorName?.toLowerCase() === dbCreator.display_name?.toLowerCase()
-                );
-                setCreatorGames(filtered);
+                const games = await loadPublishedGamesForCreator(dbCreator.id);
+                setCreatorGames(games);
             } catch (err: any) {
                 console.error("Creator Profile load error:", err);
                 setError("Could not load creator profile.");
