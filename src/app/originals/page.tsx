@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
 import { ORIGINALS_MARKETING_RTP_BANNER } from "@/constants/originalsRtp";
+import { launchGame } from "@/utils/gameLaunch";
 import { setGameMenuOpen } from "@/utils/winConfetti";
 import PlinkoModal from "@/components/PlinkoModal";
 import MinesModal from "@/components/MinesModal";
@@ -173,20 +174,7 @@ export default function OriginalsPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 * index }}
                     >
-                        <div className="relative h-full group cursor-pointer" onClick={() => {
-                            if (game.name === 'Plinko') setIsPlinkoOpen(true);
-                            if (game.name === 'Mines') setIsMinesOpen(true);
-                            if (game.name === 'Slots') setIsSlotsOpen(true);
-                            if (game.name === 'Roulette') setIsRouletteOpen(true);
-                            if (game.name === 'Crash') setIsCrashOpen(true);
-                            if (game.name === 'Secret Sneak') setIsSneakOpen(true);
-                            if (game.name === 'Heist') setIsHeistOpen(true);
-                            if (game.name === 'Influencer') setIsInfluencerOpen(true);
-                            if (game.name === 'Wanted') setIsWantedOpen(true);
-                            if (game.name === 'Escape') setIsEscapeOpen(true);
-                            if (game.name === 'Bomb Defuse') setIsBombOpen(true);
-                            if (game.name === 'Blackjack') setIsBlackjackOpen(true);
-                        }}>
+                        <div className="relative h-full group cursor-pointer" onClick={() => void launchGame(game.name)}>
                             {/* Glow effect behind card for Originals */}
                             <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition duration-500 z-[-1]"></div>
 

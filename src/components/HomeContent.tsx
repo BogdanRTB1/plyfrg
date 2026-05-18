@@ -26,6 +26,7 @@ import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
 import { loadPublishedGames } from "@/utils/publishedGamesStorage";
+import { launchGame } from "@/utils/gameLaunch";
 
 export default function HomeContent() {
     const [isRandomizing, setIsRandomizing] = useState(false);
@@ -135,7 +136,7 @@ export default function HomeContent() {
             const payload = typeof randomPick === "object" && randomPick !== null && "type" in randomPick
                 ? randomPick
                 : randomPick.name;
-            window.dispatchEvent(new CustomEvent('open_game', { detail: payload }));
+            void launchGame(payload);
         }, 2200);
     };
 
@@ -198,7 +199,7 @@ export default function HomeContent() {
             <motion.div variants={item} className="mb-12">
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
                     {activeOriginals.map((game, index) => (
-                        <div key={index} className="cursor-pointer h-full" onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: game.name }))}>
+                        <div key={index} className="cursor-pointer h-full" onClick={() => void launchGame(game.name)}>
                             <GameCard name={game.name} image={game.image} rtp={game.rtp} />
                         </div>
                     ))}

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { launchGame, resolveGameFromSlug } from "@/utils/gameLaunch";
-import { saveAuthReturnPath } from "@/utils/authReturn";
 
 export default function PlayGamePage() {
     const params = useParams();
@@ -25,8 +24,7 @@ export default function PlayGamePage() {
             if (cancelled) return;
 
             if (resolved) {
-                saveAuthReturnPath(`/play/${encodeURIComponent(slug)}`);
-                launchGame(resolved, { updateUrl: false });
+                await launchGame(resolved, { updateUrl: false });
                 router.replace("/");
                 return;
             }
@@ -55,7 +53,7 @@ export default function PlayGamePage() {
             ) : (
                 <>
                     <Loader2 className="h-10 w-10 animate-spin text-[#00b9f0]" />
-                    <p className="text-slate-400 font-medium">Opening game…</p>
+                    <p className="text-slate-400 font-medium">Loading…</p>
                 </>
             )}
         </div>

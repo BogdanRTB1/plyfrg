@@ -5,8 +5,6 @@ import { createClient } from "@/utils/supabase/client";
 import { recordGameActivity, recordGameSession } from "@/utils/gameBridge";
 import { setGameMenuOpen } from "@/utils/winConfetti";
 import { clearGamePlayUrl } from "@/utils/gameLaunch";
-import type { GameLaunchPayload } from "@/utils/gameLaunch";
-import GameGuestAuthBar from "@/components/GameGuestAuthBar";
 import { User } from "@supabase/supabase-js";
 import { usePathname } from "next/navigation";
 
@@ -65,7 +63,6 @@ export default function GlobalGameModals() {
     const [isBridgeOpen, setIsBridgeOpen] = useState(false);
 
     const [activeCustomGame, setActiveCustomGame] = useState<any>(null);
-    const [lastOpenedGame, setLastOpenedGame] = useState<GameLaunchPayload | null>(null);
     const [isCustomSlotsOpen, setIsCustomSlotsOpen] = useState(false);
     const [isCustomPlinkoOpen, setIsCustomPlinkoOpen] = useState(false);
     const [isCustomMinesOpen, setIsCustomMinesOpen] = useState(false);
@@ -172,7 +169,6 @@ export default function GlobalGameModals() {
             
             if (typeof data === 'object' && data !== null) {
                 setActiveCustomGame(data);
-                setLastOpenedGame(data);
                 if (data.type === 'ai_generated' || data.type === 'manual_template' || data.type === 'slot_engine') setIsAIGameOpen(true);
                 else if (data.type === 'slots') setIsCustomSlotsOpen(true);
                 else if (data.type === 'plinko') setIsCustomPlinkoOpen(true);
@@ -188,7 +184,6 @@ export default function GlobalGameModals() {
             }
 
             recordGameActivity(label);
-            setLastOpenedGame(typeof data === 'string' ? data : label);
 
             if (label === 'Plinko') setIsPlinkoOpen(true);
             else if (label === 'Heist') setIsHeistOpen(true);
@@ -234,18 +229,20 @@ export default function GlobalGameModals() {
     }, [pathname]);
 
 
+    const anyGameOpen =
+        isPlinkoOpen || isHeistOpen || isInfluencerOpen || isWantedOpen ||
+        isEscapeOpen || isBombOpen || isMinesOpen || isSlotsOpen ||
+        isBlackjackOpen || isRouletteOpen || isCrashOpen || isSneakOpen ||
+        isDartOpen || isAviatorOpen || isTomatoesOpen || isFootballOpen ||
+        isBridgeOpen || isCustomSlotsOpen || isCustomPlinkoOpen ||
+        isCustomMinesOpen || isCustomCrashOpen || isCustomScratchOpen ||
+        isCustomWheelOpen || isCustomCaseOpen || isCustomHiloOpen || isAIGameOpen;
+
     useEffect(() => {
-        const anyGameOpen =
-            isPlinkoOpen || isHeistOpen || isInfluencerOpen || isWantedOpen ||
-            isEscapeOpen || isBombOpen || isMinesOpen || isSlotsOpen ||
-            isBlackjackOpen || isRouletteOpen || isCrashOpen || isSneakOpen ||
-            isDartOpen || isAviatorOpen || isTomatoesOpen || isFootballOpen ||
-            isBridgeOpen || isCustomSlotsOpen || isCustomPlinkoOpen ||
-            isCustomMinesOpen || isCustomCrashOpen || isCustomScratchOpen ||
-            isCustomWheelOpen || isCustomCaseOpen || isCustomHiloOpen || isAIGameOpen;
         setGameMenuOpen(anyGameOpen);
         if (!anyGameOpen) clearGamePlayUrl();
     }, [
+        anyGameOpen,
         isPlinkoOpen, isHeistOpen, isInfluencerOpen, isWantedOpen, isEscapeOpen, isBombOpen,
         isMinesOpen, isSlotsOpen, isBlackjackOpen, isRouletteOpen, isCrashOpen, isSneakOpen,
         isDartOpen, isAviatorOpen, isTomatoesOpen, isFootballOpen, isBridgeOpen,
@@ -299,20 +296,6 @@ export default function GlobalGameModals() {
             )}
 
             <CreatorApplicationModal isOpen={isCreatorAppOpen} onClose={() => setIsCreatorAppOpen(false)} />
-
-            <GameGuestAuthBar
-                game={lastOpenedGame ?? (activeCustomGame as GameLaunchPayload)}
-                visible={
-                    !sessionUser &&
-                    (isPlinkoOpen || isHeistOpen || isInfluencerOpen || isWantedOpen ||
-                        isEscapeOpen || isBombOpen || isMinesOpen || isSlotsOpen ||
-                        isBlackjackOpen || isRouletteOpen || isCrashOpen || isSneakOpen ||
-                        isDartOpen || isAviatorOpen || isTomatoesOpen || isFootballOpen ||
-                        isBridgeOpen || isCustomSlotsOpen || isCustomPlinkoOpen ||
-                        isCustomMinesOpen || isCustomCrashOpen || isCustomScratchOpen ||
-                        isCustomWheelOpen || isCustomCaseOpen || isCustomHiloOpen || isAIGameOpen)
-                }
-            />
         </>
     );
 }

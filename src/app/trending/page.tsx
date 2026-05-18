@@ -7,6 +7,7 @@ import GameCard from "@/components/GameCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/utils/supabase/client";
 import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
+import { launchGame } from "@/utils/gameLaunch";
 
 interface GameStat {
     name: string;
@@ -91,7 +92,7 @@ export default function TrendingPage() {
     }, []);
 
     const playNow = (gameName: string) => {
-        window.dispatchEvent(new CustomEvent("open_game", { detail: gameName }));
+        void launchGame(gameName);
     };
 
     const risingStars = trendingGames.slice(0, 3).map((g) => ({

@@ -2,6 +2,8 @@
 
 import { FEATURED_GAMES } from "@/constants/featuredGames";
 import { loadPublishedGames } from "@/utils/publishedGamesStorage";
+import { createClient } from "@/utils/supabase/client";
+import { saveAuthReturnPath } from "@/utils/authReturn";
 
 export type GameLaunchPayload = string | Record<string, unknown>;
 
@@ -14,8 +16,11 @@ function getSlugForPayload(game: GameLaunchPayload): string | null {
     return null;
 }
 
-/** Opens a game via GlobalGameModals and updates the URL for sharing. */
-export function launchGame(game: GameLaunchPayload, options?: { updateUrl?: boolean }) {
+function isPreviewGame(game: GameLaunchPayload): boolean {
+    return typeof game === "object" && game !== null && !!(game as { isPreview?: boolean }).isPreview;
+}
+
+function openGameModal(game: GameLaunchPayload, options?: { updateUrl?: boolean }) {
     window.dispatchEvent(new CustomEvent("open_game", { detail: game }));
 
     if (options?.updateUrl === false) return;
@@ -24,6 +29,34 @@ export function launchGame(game: GameLaunchPayload, options?: { updateUrl?: bool
     if (slug) {
         window.history.pushState(null, "", `/play/${slug}`);
     }
+}
+
+function promptAuthForGame(game: GameLaunchPayload, options?: { updateUrl?: boolean }) {
+    const slug = getSlugForPayload(game);
+    saveAuthReturnPath(slug ? `/play/${slug}` : "/casino");
+    window.dispatchEvent(new CustomEvent("open_auth_modal", { detail: "signup" }));
+
+    if (options?.updateUrl !== false && slug) {
+        window.history.pushState(null, "", `/play/${slug}`);
+    }
+}
+
+/** Opens a game when logged in; otherwise shows register/login and remembers the game for after auth. */
+export async function launchGame(game: GameLaunchPayload, options?: { updateUrl?: boolean }) {
+    if (isPreviewGame(game)) {
+        openGameModal(game, options);
+        return;
+    }
+
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+        promptAuthForGame(game, options);
+        return;
+    }
+
+    openGameModal(game, options);
 }
 
 export function clearGamePlayUrl() {
@@ -59,5 +92,5 @@ export async function resolveGameFromSlug(slug: string): Promise<GameLaunchPaylo
 /** Handle legacy `/?play=...` links from creator profiles. */
 export async function launchGameFromQueryParam(playParam: string) {
     const resolved = await resolveGameFromSlug(playParam);
-    launchGame(resolved ?? playParam, { updateUrl: true });
+    await launchGame(resolved ?? playParam, { updateUrl: true });
 }

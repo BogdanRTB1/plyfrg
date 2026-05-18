@@ -17,6 +17,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useMobileNav } from "@/components/MobileNavProvider";
 import { FEATURED_GAMES } from "@/constants/featuredGames";
 import { loadPublishedGames } from "@/utils/publishedGamesStorage";
+import { launchGame } from "@/utils/gameLaunch";
 
 function NotificationItem({ n, markOneAsRead, formatDate }: { n: any, markOneAsRead: (id: string) => void, formatDate: (d: string) => string }) {
     const ref = useRef<HTMLDivElement>(null);
@@ -297,7 +298,7 @@ export default function Header() {
     }, [normalizedQuery]);
 
     const openGameFromSearch = (gameName: string) => {
-        window.dispatchEvent(new CustomEvent("open_game", { detail: gameName }));
+        void launchGame(gameName);
         setSearchQuery("");
         setIsSearchOpen(false);
     };

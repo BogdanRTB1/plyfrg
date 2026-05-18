@@ -17,6 +17,8 @@ interface AuthModalProps {
     isOpen: boolean;
     onClose: () => void;
     initialMode?: 'login' | 'signup';
+    /** Blurred game visible behind — used when guest opens a game */
+    variant?: 'default' | 'game-overlay';
 }
 
 // Google Logo component
@@ -36,7 +38,8 @@ const DiscordLogo = () => (
     </svg>
 );
 
-export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, initialMode = 'login', variant = 'default' }: AuthModalProps) {
+    const isGameOverlay = variant === 'game-overlay';
     const router = useRouter();
     const supabase = createClient();
     const [isLogin, setIsLogin] = useState(initialMode === 'login');
@@ -273,14 +276,21 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
 
     return createPortal(
         <>
-            {/* Extended Background Overlay to block overscroll bounce, separated for perfect fade animation */}
-            <div className={`fixed inset-[-50vh] z-[50] bg-[#050505] md:bg-black/80 md:backdrop-blur-md pointer-events-none transition-opacity duration-300 ${show ? "opacity-100" : "opacity-0"}`} />
+            {!isGameOverlay && (
+                <div className={`fixed inset-[-50vh] z-[50] bg-[#050505] md:bg-black/80 md:backdrop-blur-md pointer-events-none transition-opacity duration-300 ${show ? "opacity-100" : "opacity-0"}`} />
+            )}
 
-            {/* Interactive Scrollable Container */}
-            <div className={`fixed inset-0 z-[60] overflow-y-auto overscroll-contain transition-all duration-300 ${show ? "opacity-100 visible" : "opacity-0 invisible"}`}>
+            {isGameOverlay && (
+                <div
+                    className={`fixed inset-0 z-[130] bg-black/45 backdrop-blur-xl transition-opacity duration-300 ${show ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                    aria-hidden
+                />
+            )}
+
+            <div className={`fixed inset-0 overflow-y-auto overscroll-contain transition-all duration-300 ${isGameOverlay ? "z-[131]" : "z-[60]"} ${show ? "opacity-100 visible" : "opacity-0 invisible"}`}>
                 <div className="min-h-full flex items-center justify-center p-4 relative z-10 w-full">
                     <div
-                        className={`bg-[#0f212e]/90 backdrop-blur-xl rounded-2xl w-full max-w-md p-8 relative shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-white/10 transform transition-all duration-300 ${show ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-4"}`}
+                        className={`bg-[#0f212e]/95 backdrop-blur-xl rounded-2xl w-full max-w-md p-8 relative shadow-[0_0_50px_rgba(0,0,0,0.5)] border transform transition-all duration-300 ${isGameOverlay ? "border-[#00b9f0]/35 shadow-[0_0_60px_rgba(0,185,240,0.2)]" : "border-white/10"} ${show ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-4"}`}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button onClick={handleClose} type="button" className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors hover:rotate-90 duration-300 z-50">
@@ -308,8 +318,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                                     : isForgotPassword
                                         ? "Enter your email to receive a reset link"
                                         : isLogin
-                                            ? "Login to access your account"
-                                            : "Create an account to start playing"}
+                                            ? (isGameOverlay ? "Log in to play this game" : "Login to access your account")
+                                            : (isGameOverlay ? "Sign up free to play this game" : "Create an account to start playing")}
                             </p>
                         </div>
 
