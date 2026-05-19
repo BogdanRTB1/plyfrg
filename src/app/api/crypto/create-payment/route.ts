@@ -3,7 +3,9 @@ import { createClient } from "@supabase/supabase-js";
 
 const NOWPAYMENTS_API_KEY = process.env.NOWPAYMENTS_API_KEY!;
 const NOWPAYMENTS_BASE = process.env.NOWPAYMENTS_API_URL || "https://api.nowpayments.io/v1";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://playforges.com";
+import { DEFAULT_APP_ORIGIN } from "@/utils/siteUrl";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_ORIGIN;
 
 const getSupabaseAdmin = () => createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

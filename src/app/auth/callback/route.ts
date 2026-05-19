@@ -1,11 +1,11 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
+import { buildAppUrl } from '@/utils/siteUrl'
 
 export async function GET(request: Request) {
-    const { searchParams, origin } = new URL(request.url)
+    const { searchParams } = new URL(request.url)
     const code = searchParams.get('code')
-    // if "next" is in param, use it as the redirect URL
     const next = searchParams.get('next') ?? '/'
 
     if (code) {
@@ -19,10 +19,9 @@ export async function GET(request: Request) {
                     data: { avatar_url: null }
                 });
             }
-            return NextResponse.redirect(`${origin}${next}`)
+            return NextResponse.redirect(buildAppUrl(next, request))
         }
     }
 
-    // return the user to an error page with instructions
-    return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+    return NextResponse.redirect(buildAppUrl('/auth/auth-code-error', request))
 }

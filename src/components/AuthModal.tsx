@@ -12,6 +12,7 @@ import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { navigateAfterAuth, peekAuthReturnPath } from "@/utils/authReturn";
+import { buildAppUrl } from "@/utils/siteUrl";
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -121,7 +122,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', vari
                 throw new Error("Please enter your email address.");
             }
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/reset-password`,
+                redirectTo: buildAppUrl("/reset-password"),
             });
             if (error) throw error;
 
@@ -260,7 +261,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', vari
             const { error } = await supabase.auth.signInWithOAuth({
                 provider,
                 options: {
-                    redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnPath)}`,
+                    redirectTo: `${buildAppUrl("/auth/callback")}?next=${encodeURIComponent(returnPath)}`,
                 },
             });
             if (error) throw error;
