@@ -62,13 +62,27 @@ export async function GET(req: NextRequest) {
 
     const profilesById = new Map((profiles || []).map((p) => [p.id, p]));
 
+    const authEmailByUserId = new Map<string, string>();
+    const needsAuthEmail = userIds.filter((id) => !profilesById.get(id)?.email);
+    await Promise.all(
+        needsAuthEmail.map(async (userId) => {
+            try {
+                const { data } = await admin.auth.admin.getUserById(userId);
+                if (data?.user?.email) authEmailByUserId.set(userId, data.user.email);
+            } catch {
+                /* ignore per-user lookup failures */
+            }
+        })
+    );
+
     const rows = paymentRows.map((payment) => {
         const profile = profilesById.get(payment.user_id);
+        const email = profile?.email || authEmailByUserId.get(payment.user_id) || null;
         return {
             id: payment.id,
             user_id: payment.user_id,
             username: profile?.username || null,
-            email: profile?.email || null,
+            email,
             nowpayments_id: payment.nowpayments_id,
             invoice_id: payment.invoice_id,
             order_id: payment.order_id,

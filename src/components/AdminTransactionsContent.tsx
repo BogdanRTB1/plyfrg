@@ -316,9 +316,9 @@ export default function AdminTransactionsContent() {
                                         via {row.pay_currency?.toUpperCase() || "—"}
                                     </span>
                                 </p>
-                                <p className="truncate text-sm text-slate-400">
-                                    {row.username || row.email || "Unknown"} · {row.email || row.user_id}
-                                </p>
+                                {row.username && (
+                                    <p className="text-sm font-medium text-slate-300">@{row.username}</p>
+                                )}
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 {statusBadge(row.payment_status, row.credited)}
@@ -366,6 +366,14 @@ export default function AdminTransactionsContent() {
                         </div>
 
                         <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-3 lg:grid-cols-4">
+                            <div className="md:col-span-2">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">User email</p>
+                                <p className="break-all">{row.email || "—"}</p>
+                            </div>
+                            <div className="md:col-span-2 lg:col-span-4">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">User ID</p>
+                                <p className="font-mono text-[11px] break-all text-slate-400">{row.user_id}</p>
+                            </div>
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Created</p>
                                 <p>{formatDate(row.created_at)}</p>
