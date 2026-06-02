@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/utils/requireAdmin";
 import { creditDepositIfEligible } from "@/utils/creditDeposit";
 import { isCompletedPaymentStatus } from "@/utils/nowpayments";
+import { syncNowPaymentRecord } from "@/utils/syncNowPaymentRecord";
 
 export async function GET(req: NextRequest) {
     const guard = await requireAdmin(req);
@@ -34,14 +35,34 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Failed to load transactions" }, { status: 500 });
     }
 
-    const userIds = [...new Set((payments || []).map((p) => p.user_id))];
+    const syncFromNp = req.nextUrl.searchParams.get("sync") !== "false";
+    let syncedFromApi = 0;
+    const paymentRows = [...(payments || [])];
+
+    if (syncFromNp && process.env.NOWPAYMENTS_API_KEY) {
+        for (const payment of paymentRows) {
+            const needsSync =
+                !payment.nowpayments_id ||
+                payment.payment_status === "waiting" ||
+                payment.payment_status === "confirming";
+            if (!needsSync) continue;
+
+            const result = await syncNowPaymentRecord(admin, payment);
+            if (result.synced && result.fields) {
+                Object.assign(payment, result.fields);
+                syncedFromApi += 1;
+            }
+        }
+    }
+
+    const userIds = [...new Set(paymentRows.map((p) => p.user_id))];
     const { data: profiles } = userIds.length
         ? await admin.from("profiles").select("id, username, email").in("id", userIds)
         : { data: [] };
 
     const profilesById = new Map((profiles || []).map((p) => [p.id, p]));
 
-    const rows = (payments || []).map((payment) => {
+    const rows = paymentRows.map((payment) => {
         const profile = profilesById.get(payment.user_id);
         return {
             id: payment.id,
@@ -76,10 +97,10 @@ export async function GET(req: NextRequest) {
         pending: rows.filter((r) => !isCompletedPaymentStatus(r.payment_status) && !["failed", "expired", "refunded"].includes(r.payment_status || "")).length,
     };
 
-    return NextResponse.json({ success: true, rows, stats });
+    return NextResponse.json({ success: true, rows, stats, syncedFromApi });
 }
 
-/** Manually credit a completed payment that was not credited (e.g. IPN failure). */
+/** Credit user and/or sync one row from NOWPayments API. */
 export async function POST(req: NextRequest) {
     const guard = await requireAdmin(req);
     if ("error" in guard) return guard.error;
@@ -87,6 +108,34 @@ export async function POST(req: NextRequest) {
     const { admin } = guard;
     const body = await req.json();
     const paymentId = body?.paymentId as string | undefined;
+    const action = body?.action as string | undefined;
+
+    if (action === "sync") {
+        if (!paymentId) {
+            return NextResponse.json({ error: "paymentId is required" }, { status: 400 });
+        }
+        const { data: payment, error: fetchError } = await admin
+            .from("crypto_payments")
+            .select("*")
+            .eq("id", paymentId)
+            .single();
+        if (fetchError || !payment) {
+            return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+        }
+        const result = await syncNowPaymentRecord(admin, payment);
+        if (!result.synced) {
+            return NextResponse.json(
+                { error: "No matching payment found on NOWPayments (check invoice/order id)" },
+                { status: 404 }
+            );
+        }
+        return NextResponse.json({
+            success: true,
+            message: "Synced from NOWPayments",
+            nowpayments_id: result.fields?.nowpayments_id,
+            payment_status: result.fields?.payment_status,
+        });
+    }
 
     if (!paymentId) {
         return NextResponse.json({ error: "paymentId is required" }, { status: 400 });

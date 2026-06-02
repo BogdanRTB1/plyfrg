@@ -97,6 +97,7 @@ export default function AdminTransactionsContent() {
     const [statusFilter, setStatusFilter] = useState("all");
     const [creditedFilter, setCreditedFilter] = useState("all");
     const [creditingId, setCreditingId] = useState<string | null>(null);
+    const [syncingId, setSyncingId] = useState<string | null>(null);
 
     const fetchRows = async () => {
         setLoading(true);
@@ -121,7 +122,7 @@ export default function AdminTransactionsContent() {
             return;
         }
 
-        const params = new URLSearchParams({ limit: String(limit) });
+        const params = new URLSearchParams({ limit: String(limit), sync: "true" });
         if (statusFilter !== "all") params.set("status", statusFilter);
         if (creditedFilter !== "all") params.set("credited", creditedFilter);
 
@@ -139,7 +140,36 @@ export default function AdminTransactionsContent() {
 
         setRows(payload.rows || []);
         setStats(payload.stats || null);
+        if (payload.syncedFromApi > 0) {
+            toast.success(`Synced ${payload.syncedFromApi} payment(s) from NOWPayments`);
+        }
         setLoading(false);
+    };
+
+    const syncFromNowPayments = async (rowId: string) => {
+        setSyncingId(rowId);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            setSyncingId(null);
+            return;
+        }
+
+        const res = await fetch("/api/admin/transactions", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ action: "sync", paymentId: rowId }),
+        });
+        const payload = await res.json();
+        if (!res.ok) {
+            toast.error(payload.error || "NOWPayments sync failed");
+        } else {
+            toast.success(`Payment ID: ${payload.nowpayments_id || "updated"}`);
+            await fetchRows();
+        }
+        setSyncingId(null);
     };
 
     useEffect(() => {
@@ -198,7 +228,7 @@ export default function AdminTransactionsContent() {
                 <div>
                     <h1 className="text-2xl font-black text-white">Purchases & Deposits</h1>
                     <p className="mt-1 text-sm text-slate-500">
-                        All NOWPayments crypto deposits — status, payment IDs, and manual credit.
+                        Deposits from NOWPayments — auto-syncs payment ID &amp; status from their API on load.
                     </p>
                 </div>
                 <button
@@ -292,6 +322,15 @@ export default function AdminTransactionsContent() {
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 {statusBadge(row.payment_status, row.credited)}
+                                <button
+                                    type="button"
+                                    disabled={syncingId === row.id}
+                                    onClick={() => syncFromNowPayments(row.id)}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:bg-white/5 disabled:opacity-50"
+                                >
+                                    <RefreshCw size={12} className={syncingId === row.id ? "animate-spin" : ""} />
+                                    Sync NP
+                                </button>
                                 {row.invoice_url && (
                                     <a
                                         href={row.invoice_url}
@@ -336,12 +375,30 @@ export default function AdminTransactionsContent() {
                                 <p>{formatDate(row.updated_at)}</p>
                             </div>
                             <div>
-                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">NOWPayments ID</p>
-                                <p className="font-mono text-xs break-all">{row.nowpayments_id ?? "—"}</p>
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">NOWPayments payment ID</p>
+                                <p className="font-mono text-xs break-all text-[#00b9f0]">
+                                    {row.nowpayments_id != null && row.nowpayments_id !== ""
+                                        ? String(row.nowpayments_id)
+                                        : "— (click Sync NP)"}
+                                </p>
                             </div>
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Invoice ID</p>
                                 <p className="font-mono text-xs break-all">{row.invoice_id ?? "—"}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">NP status</p>
+                                <p className="capitalize">{row.payment_status ?? "—"}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Paid (crypto)</p>
+                                <p>
+                                    {row.actually_paid != null
+                                        ? `${row.actually_paid} ${row.pay_currency?.toUpperCase() || ""}`
+                                        : row.pay_amount != null
+                                          ? `~${row.pay_amount} ${row.pay_currency?.toUpperCase() || ""}`
+                                          : "—"}
+                                </p>
                             </div>
                             <div className="md:col-span-2 lg:col-span-4">
                                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Order ID</p>

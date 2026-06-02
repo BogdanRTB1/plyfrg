@@ -58,13 +58,24 @@ export async function fetchNowPaymentById(paymentId: string | number) {
     }
 }
 
-/** List payments filtered by merchant order_id (invoice flow). */
-export async function fetchNowPaymentsByOrderId(orderId: string) {
-    if (!NOWPAYMENTS_API_KEY || !orderId) return [];
+function normalizePaymentsList(data: unknown): Record<string, unknown>[] {
+    if (Array.isArray(data)) return data as Record<string, unknown>[];
+    if (data && typeof data === "object") {
+        const obj = data as Record<string, unknown>;
+        if (Array.isArray(obj.data)) return obj.data as Record<string, unknown>[];
+        if (Array.isArray(obj.payments)) return obj.payments as Record<string, unknown>[];
+    }
+    return [];
+}
+
+async function fetchPaymentList(query: Record<string, string>): Promise<Record<string, unknown>[]> {
+    if (!NOWPAYMENTS_API_KEY) return [];
     try {
-        const url = new URL(`${NOWPAYMENTS_BASE}/payments`);
-        url.searchParams.set("orderId", orderId);
-        url.searchParams.set("limit", "10");
+        const url = new URL(`${NOWPAYMENTS_BASE}/payment/`);
+        for (const [key, value] of Object.entries(query)) {
+            url.searchParams.set(key, value);
+        }
+        url.searchParams.set("limit", "20");
         const res = await fetch(url.toString(), {
             headers: { "x-api-key": NOWPAYMENTS_API_KEY },
             cache: "no-store",
@@ -73,12 +84,49 @@ export async function fetchNowPaymentsByOrderId(orderId: string) {
             console.error("NOWPayments list payments failed:", res.status, await res.text());
             return [];
         }
-        const data = await res.json();
-        if (Array.isArray(data)) return data;
-        if (Array.isArray(data?.data)) return data.data;
-        return [];
+        return normalizePaymentsList(await res.json());
     } catch (err) {
         console.error("NOWPayments list payments error:", err);
         return [];
     }
+}
+
+/** List payments for a NOWPayments invoice id. */
+export async function fetchNowPaymentsByInvoiceId(invoiceId: string) {
+    if (!invoiceId) return [];
+    const lists = await Promise.all([
+        fetchPaymentList({ invoiceId }),
+        fetchPaymentList({ invoiceid: invoiceId }),
+    ]);
+    const seen = new Set<string>();
+    const merged: Record<string, unknown>[] = [];
+    for (const list of lists) {
+        for (const p of list) {
+            const id = String(p.payment_id ?? p.paymentId ?? "");
+            if (id && seen.has(id)) continue;
+            if (id) seen.add(id);
+            merged.push(p);
+        }
+    }
+    return merged;
+}
+
+/** List payments filtered by merchant order_id (invoice flow). */
+export async function fetchNowPaymentsByOrderId(orderId: string) {
+    if (!orderId) return [];
+    const lists = await Promise.all([
+        fetchPaymentList({ orderId }),
+        fetchPaymentList({ order_id: orderId }),
+    ]);
+    const seen = new Set<string>();
+    const merged: Record<string, unknown>[] = [];
+    for (const list of lists) {
+        for (const p of list) {
+            const id = String(p.payment_id ?? p.paymentId ?? "");
+            if (id && seen.has(id)) continue;
+            if (id) seen.add(id);
+            merged.push(p);
+        }
+    }
+    return merged;
 }
