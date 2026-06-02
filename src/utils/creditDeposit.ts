@@ -128,6 +128,16 @@ export async function findCryptoPayment(
             .limit(1)
             .maybeSingle();
         if (data) return data as CryptoPaymentRow;
+
+        const { data: allRecent } = await admin
+            .from("crypto_payments")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(50);
+        const match = (allRecent || []).find(
+            (row) => String(row.invoice_id ?? "") === invoiceId
+        );
+        if (match) return match as CryptoPaymentRow;
     }
 
     if (orderId) {

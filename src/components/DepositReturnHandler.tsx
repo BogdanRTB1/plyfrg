@@ -41,11 +41,27 @@ export default function DepositReturnHandler() {
                     return;
                 }
 
+                const pendingRaw = sessionStorage.getItem("pending_crypto_payment");
+                let pendingPayload: Record<string, string> = {};
+                if (pendingRaw) {
+                    try {
+                        pendingPayload = JSON.parse(pendingRaw);
+                    } catch {
+                        pendingPayload = {};
+                    }
+                }
+
                 const res = await fetch("/api/crypto/sync-deposit", {
                     method: "POST",
-                    headers: { Authorization: `Bearer ${session.access_token}` },
+                    headers: {
+                        Authorization: `Bearer ${session.access_token}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(pendingPayload),
                 });
                 const data = await res.json();
+
+                sessionStorage.removeItem("pending_crypto_payment");
 
                 if (!res.ok) {
                     toast.error(data.error || "Could not confirm deposit. Contact support if funds were charged.");
@@ -62,6 +78,10 @@ export default function DepositReturnHandler() {
                         localStorage.setItem("user_forges_coins", String(data.balance.forges_coins));
                     }
                     window.dispatchEvent(new Event("balance_updated"));
+                } else if ((data.updated ?? 0) > 0) {
+                    toast.info(
+                        "Payment recorded — waiting for blockchain confirmation. Balance updates when status is finished."
+                    );
                 } else {
                     toast.info(
                         "Payment received — your balance will update in a few minutes once confirmed on the network."

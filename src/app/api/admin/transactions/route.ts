@@ -3,6 +3,7 @@ import { requireAdmin } from "@/utils/requireAdmin";
 import { creditDepositIfEligible } from "@/utils/creditDeposit";
 import { isCompletedPaymentStatus } from "@/utils/nowpayments";
 import { syncNowPaymentRecord } from "@/utils/syncNowPaymentRecord";
+import { finalizePaymentFromNowPayments } from "@/utils/finalizePayment";
 
 export async function GET(req: NextRequest) {
     try {
@@ -157,11 +158,14 @@ export async function POST(req: NextRequest) {
                 invoice_id: payment.invoice_id,
             });
         }
+
+        const finalize = await finalizePaymentFromNowPayments(admin, result.remote as Record<string, unknown>);
         return NextResponse.json({
             success: true,
-            message: "Synced from NOWPayments",
+            message: finalize.credited ? "Synced and credited user" : "Synced from NOWPayments",
             nowpayments_id: result.fields?.nowpayments_id,
             payment_status: result.fields?.payment_status,
+            credited: finalize.credited,
         });
     }
 

@@ -151,6 +151,14 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
             // Open NOWPayments invoice in new tab
             setPendingInvoiceUrl(data.invoiceUrl);
+            sessionStorage.setItem(
+                "pending_crypto_payment",
+                JSON.stringify({
+                    paymentRowId: data.paymentRowId,
+                    invoiceId: data.invoiceId,
+                    orderId: data.orderId,
+                })
+            );
             window.open(data.invoiceUrl, '_blank');
 
             const newTx: Transaction = {

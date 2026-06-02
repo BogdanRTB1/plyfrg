@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
-    applyPaymentUpdate,
-    creditDepositIfEligible,
-    findCryptoPayment,
-} from "@/utils/creditDeposit";
-import { isCompletedPaymentStatus, verifyNowpaymentsSignature } from "@/utils/nowpayments";
+    extractIpnFields,
+    finalizePaymentFromNowPayments,
+    isTrustedNowPaymentsPayload,
+} from "@/utils/finalizePayment";
 
 const getSupabaseAdmin = () =>
     createClient(
@@ -18,8 +17,9 @@ export async function POST(req: NextRequest) {
         const body = (await req.json()) as Record<string, unknown>;
         const signature = req.headers.get("x-nowpayments-sig");
 
-        if (!verifyNowpaymentsSignature(body, signature)) {
-            console.error("IPN: Invalid or missing signature", {
+        const trusted = await isTrustedNowPaymentsPayload(body, signature);
+        if (!trusted) {
+            console.error("IPN: Untrusted payload", {
                 hasSig: !!signature,
                 payment_id: body.payment_id,
                 invoice_id: body.invoice_id,
@@ -27,72 +27,34 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
         }
 
-        const payment_id = body.payment_id;
-        const invoice_id = body.invoice_id;
-        const order_id = body.order_id as string | undefined;
-        const payment_status = String(body.payment_status || "");
-        const pay_amount = body.pay_amount;
-        const pay_currency = body.pay_currency;
-        const pay_address = body.pay_address;
-        const actually_paid = body.actually_paid;
-        const outcome_amount = body.outcome_amount;
-
+        const fields = extractIpnFields(body);
         console.log(
-            `IPN: payment_id=${payment_id}, invoice_id=${invoice_id}, order_id=${order_id}, status=${payment_status}`
+            `IPN: payment_id=${fields.payment_id}, invoice_id=${fields.invoice_id}, order_id=${fields.order_id}, status=${fields.payment_status}`
         );
 
         const admin = getSupabaseAdmin();
-        const payment = await findCryptoPayment(admin, {
-            payment_id: payment_id as string | number | null,
-            invoice_id: invoice_id as string | number | null,
-            order_id,
-        });
+        const result = await finalizePaymentFromNowPayments(admin, body);
 
-        if (!payment) {
-            console.error("IPN: Payment record not found", { invoice_id, order_id, payment_id });
-            return NextResponse.json({ ok: true });
+        if (!result.found) {
+            console.error("IPN: Payment record not found", fields);
+        } else if (result.credited) {
+            console.log(`IPN: Credited payment row ${result.paymentRowId}`);
         }
 
-        const npId = payment_id != null ? String(payment_id) : payment.nowpayments_id;
-
-        const { error: updateError } = await applyPaymentUpdate(admin, payment.id, {
-            nowpayments_id: npId,
-            payment_status,
-            pay_amount,
-            pay_currency,
-            pay_address,
-            actually_paid,
-            outcome_amount,
-        });
-
-        if (updateError) {
-            console.error("IPN: Failed to update payment:", updateError);
-        }
-
-        if (isCompletedPaymentStatus(payment_status)) {
-            const result = await creditDepositIfEligible(admin, payment, payment_status);
-            if (result.credited) {
-                console.log(
-                    `IPN: Credited user ${payment.user_id} (+${payment.bundle_diamonds} GC, +${payment.bundle_forges_coins} FC)`
-                );
-            } else {
-                console.log(`IPN: Credit skipped (${result.reason})`);
+        if (["failed", "expired", "refunded"].includes(fields.payment_status) && result.found) {
+            const payment = await admin
+                .from("crypto_payments")
+                .select("user_id, price_amount")
+                .eq("id", result.paymentRowId!)
+                .single();
+            if (payment.data) {
+                await admin.from("notifications").insert({
+                    user_id: payment.data.user_id,
+                    title: "❌ Crypto Payment " + fields.payment_status,
+                    message: `Your crypto payment of $${payment.data.price_amount} has ${fields.payment_status}. Please try again or contact support.`,
+                    is_read: false,
+                });
             }
-        }
-
-        if (["failed", "expired", "refunded"].includes(payment_status)) {
-            await admin.from("notifications").insert({
-                user_id: payment.user_id,
-                title:
-                    "❌ Crypto Payment " +
-                    (payment_status === "expired"
-                        ? "Expired"
-                        : payment_status === "refunded"
-                          ? "Refunded"
-                          : "Failed"),
-                message: `Your crypto payment of $${payment.price_amount} has ${payment_status}. Please try again or contact support.`,
-                is_read: false,
-            });
         }
 
         return NextResponse.json({ ok: true });

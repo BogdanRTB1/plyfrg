@@ -92,13 +92,28 @@ export async function POST(req: NextRequest) {
             bundle_forges_coins: bundle.forgesCoins,
         };
 
-        let { error: dbError } = await getSupabaseAdmin().from("crypto_payments").insert(insertPayload);
+        let dbError: { message?: string } | null = null;
+        let paymentRowId: string | null = null;
+
+        const insertResult = await getSupabaseAdmin()
+            .from("crypto_payments")
+            .insert(insertPayload)
+            .select("id")
+            .single();
+
+        dbError = insertResult.error;
+        paymentRowId = insertResult.data?.id ?? null;
 
         // Backward compatible if order_id column migration not applied yet
         if (dbError?.message?.includes("order_id")) {
             const { order_id: _removed, ...withoutOrderId } = insertPayload;
-            const retry = await getSupabaseAdmin().from("crypto_payments").insert(withoutOrderId);
+            const retry = await getSupabaseAdmin()
+                .from("crypto_payments")
+                .insert(withoutOrderId)
+                .select("id")
+                .single();
             dbError = retry.error;
+            paymentRowId = retry.data?.id ?? null;
         }
 
         if (dbError) {
@@ -113,6 +128,8 @@ export async function POST(req: NextRequest) {
             success: true,
             invoiceUrl: invoiceData.invoice_url,
             invoiceId: invoiceData.id,
+            orderId,
+            paymentRowId,
         });
     } catch (err) {
         console.error("Create payment error:", err);
