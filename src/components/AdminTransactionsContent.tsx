@@ -137,6 +137,7 @@ export default function AdminTransactionsContent() {
             syncedFromApi?: number;
             creditedFromApi?: number;
             npPaymentsFetched?: number;
+            syncAuthConfigured?: boolean;
             error?: string;
         };
         try {
@@ -174,7 +175,14 @@ export default function AdminTransactionsContent() {
             }
             toast.success(parts.join(" · ") || "Synced from NOWPayments");
         } else if (options?.syncNowPayments) {
-            toast.info("No new matches on NOWPayments Payments list", { duration: 6000 });
+            if (payload.syncAuthConfigured === false) {
+                toast.error(
+                    "NOWPayments sync needs NOWPAYMENTS_EMAIL and NOWPAYMENTS_PASSWORD in Vercel env (JWT required for Payments list).",
+                    { duration: 10000 }
+                );
+            } else {
+                toast.info("No new matches on NOWPayments Payments list", { duration: 6000 });
+            }
         }
         setLoading(false);
     };

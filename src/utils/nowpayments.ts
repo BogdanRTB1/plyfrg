@@ -3,6 +3,69 @@ import crypto from "crypto";
 const NOWPAYMENTS_API_KEY = process.env.NOWPAYMENTS_API_KEY!;
 const NOWPAYMENTS_BASE = process.env.NOWPAYMENTS_API_URL || "https://api.nowpayments.io/v1";
 const IPN_SECRET = process.env.NOWPAYMENTS_IPN_SECRET!;
+const NOWPAYMENTS_EMAIL = process.env.NOWPAYMENTS_EMAIL;
+const NOWPAYMENTS_PASSWORD = process.env.NOWPAYMENTS_PASSWORD;
+
+/** JWT from POST /auth — valid ~5 minutes; cached to avoid auth on every list page. */
+let cachedJwt: { token: string; expiresAt: number } | null = null;
+
+async function getNowPaymentsJwt(forceRefresh = false): Promise<string | null> {
+    if (!NOWPAYMENTS_API_KEY || !NOWPAYMENTS_EMAIL || !NOWPAYMENTS_PASSWORD) {
+        return null;
+    }
+
+    const now = Date.now();
+    if (!forceRefresh && cachedJwt && cachedJwt.expiresAt > now + 30_000) {
+        return cachedJwt.token;
+    }
+
+    try {
+        const res = await fetch(`${NOWPAYMENTS_BASE}/auth`, {
+            method: "POST",
+            headers: {
+                "x-api-key": NOWPAYMENTS_API_KEY,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                email: NOWPAYMENTS_EMAIL,
+                password: NOWPAYMENTS_PASSWORD,
+            }),
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            console.error("NOWPayments POST /auth failed:", res.status, await res.text());
+            return null;
+        }
+
+        const data = (await res.json()) as { token?: string };
+        if (!data.token) {
+            console.error("NOWPayments POST /auth: no token in response");
+            return null;
+        }
+
+        cachedJwt = { token: data.token, expiresAt: now + 4 * 60 * 1000 };
+        return data.token;
+    } catch (err) {
+        console.error("NOWPayments auth error:", err);
+        return null;
+    }
+}
+
+function npApiKeyHeaders(): HeadersInit {
+    return { "x-api-key": NOWPAYMENTS_API_KEY };
+}
+
+/** Headers for endpoints that require JWT (GET /payment/, etc.). */
+async function npAuthHeaders(forceRefresh = false): Promise<HeadersInit | null> {
+    if (!NOWPAYMENTS_API_KEY) return null;
+    const jwt = await getNowPaymentsJwt(forceRefresh);
+    if (!jwt) return null;
+    return {
+        "x-api-key": NOWPAYMENTS_API_KEY,
+        Authorization: `Bearer ${jwt}`,
+    };
+}
 
 /** Statuses that mean the customer paid and we should credit the bundle. */
 export const COMPLETED_PAYMENT_STATUSES = new Set([
@@ -40,18 +103,25 @@ export function verifyNowpaymentsSignature(
     return hmac.digest("hex") === receivedSig;
 }
 
-function npHeaders(): HeadersInit {
-    return { "x-api-key": NOWPAYMENTS_API_KEY };
-}
-
 /** Single row from NOWPayments **Payments** tab (`GET /payment/:id`). */
 export async function fetchNowPaymentById(paymentId: string | number) {
     if (!NOWPAYMENTS_API_KEY || paymentId == null) return null;
     try {
-        const res = await fetch(`${NOWPAYMENTS_BASE}/payment/${paymentId}`, {
-            headers: npHeaders(),
+        let res = await fetch(`${NOWPAYMENTS_BASE}/payment/${paymentId}`, {
+            headers: npApiKeyHeaders(),
             cache: "no-store",
         });
+
+        if (res.status === 401) {
+            const authHeaders = await npAuthHeaders();
+            if (authHeaders) {
+                res = await fetch(`${NOWPAYMENTS_BASE}/payment/${paymentId}`, {
+                    headers: authHeaders,
+                    cache: "no-store",
+                });
+            }
+        }
+
         if (!res.ok) {
             console.error("NOWPayments GET /payment/:id failed:", res.status, await res.text());
             return null;
@@ -204,7 +274,23 @@ async function fetchPaymentsPage(
     url.searchParams.set("orderBy", "desc");
 
     try {
-        const res = await fetch(url.toString(), { headers: npHeaders(), cache: "no-store" });
+        let headers = await npAuthHeaders();
+        if (!headers) {
+            console.error(
+                "NOWPayments GET /payment/ requires JWT. Set NOWPAYMENTS_EMAIL and NOWPAYMENTS_PASSWORD env vars."
+            );
+            return [];
+        }
+
+        let res = await fetch(url.toString(), { headers, cache: "no-store" });
+
+        if (res.status === 401) {
+            headers = await npAuthHeaders(true);
+            if (headers) {
+                res = await fetch(url.toString(), { headers, cache: "no-store" });
+            }
+        }
+
         if (!res.ok) {
             console.error("NOWPayments GET /payment/ failed:", res.status, await res.text());
             return [];

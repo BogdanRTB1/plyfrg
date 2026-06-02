@@ -115,7 +115,15 @@ export async function GET(req: NextRequest) {
         pending: rows.filter((r) => !isCompletedPaymentStatus(r.payment_status) && !["failed", "expired", "refunded"].includes(r.payment_status || "")).length,
     };
 
-    return NextResponse.json({ success: true, rows, stats, syncedFromApi, creditedFromApi, npPaymentsFetched });
+    return NextResponse.json({
+        success: true,
+        rows,
+        stats,
+        syncedFromApi,
+        creditedFromApi,
+        npPaymentsFetched,
+        syncAuthConfigured: !!(process.env.NOWPAYMENTS_EMAIL && process.env.NOWPAYMENTS_PASSWORD),
+    });
     } catch (err) {
         console.error("Admin transactions GET error:", err);
         return NextResponse.json({ error: "Failed to load transactions" }, { status: 500 });
