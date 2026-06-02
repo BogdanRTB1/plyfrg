@@ -48,8 +48,10 @@ export async function GET(req: NextRequest) {
         for (const payment of paymentRows) {
             if (synced >= maxSync) break;
             const needsSync =
-                !payment.nowpayments_id &&
-                (payment.payment_status === "confirming" ||
+                !payment.credited &&
+                (!payment.nowpayments_id ||
+                    payment.payment_status === "waiting" ||
+                    payment.payment_status === "confirming" ||
                     isCompletedPaymentStatus(payment.payment_status));
             if (!needsSync) continue;
 
@@ -151,11 +153,11 @@ export async function POST(req: NextRequest) {
         if (!result.synced) {
             return NextResponse.json({
                 success: false,
-                pendingInvoice: !!result.pendingInvoice,
                 message:
                     result.message ||
-                    "No matching payment found on NOWPayments (check invoice/order id)",
+                    "No matching payment on NOWPayments Payments list (check order_id / API key)",
                 invoice_id: payment.invoice_id,
+                order_id: payment.order_id,
             });
         }
 
