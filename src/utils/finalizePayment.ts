@@ -66,8 +66,11 @@ export async function finalizePaymentFromNowPayments(
         order_id: fields.order_id,
     });
 
-    if (!payment && fields.payment_id) {
-        const remote = (await fetchNowPaymentById(fields.payment_id)) as Record<string, unknown> | null;
+    if (!payment && fields.payment_id != null) {
+        const remote = (await fetchNowPaymentById(fields.payment_id as string | number)) as Record<
+            string,
+            unknown
+        > | null;
         if (remote) {
             payment = await findCryptoPayment(admin, {
                 payment_id: fields.payment_id as string | number,
