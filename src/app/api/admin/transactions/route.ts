@@ -138,10 +138,14 @@ export async function POST(req: NextRequest) {
         }
         const result = await syncNowPaymentRecord(admin, payment);
         if (!result.synced) {
-            return NextResponse.json(
-                { error: "No matching payment found on NOWPayments (check invoice/order id)" },
-                { status: 404 }
-            );
+            return NextResponse.json({
+                success: false,
+                pendingInvoice: !!result.pendingInvoice,
+                message:
+                    result.message ||
+                    "No matching payment found on NOWPayments (check invoice/order id)",
+                invoice_id: payment.invoice_id,
+            });
         }
         return NextResponse.json({
             success: true,

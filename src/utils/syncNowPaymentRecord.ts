@@ -3,6 +3,7 @@ import {
     fetchNowPaymentById,
     fetchNowPaymentsByInvoiceId,
     fetchNowPaymentsByOrderId,
+    fetchNowPaymentsInvoiceInfo,
     isCompletedPaymentStatus,
 } from "@/utils/nowpayments";
 import { applyPaymentUpdate } from "@/utils/creditDeposit";
@@ -51,6 +52,9 @@ export type SyncNowPaymentResult = {
     synced: boolean;
     remote: Record<string, unknown> | null;
     fields?: Record<string, unknown>;
+    /** Invoice on NP exists; customer has not sent crypto yet — no payment_id. */
+    pendingInvoice?: boolean;
+    message?: string;
 };
 
 /** Pull status + payment_id from NOWPayments and persist on crypto_payments. */
@@ -60,7 +64,26 @@ export async function syncNowPaymentRecord(
 ): Promise<SyncNowPaymentResult> {
     const remote = await resolveRemoteNowPayment(payment);
     if (!remote) {
-        return { synced: false, remote: null };
+        if (payment.invoice_id) {
+            const invoiceInfo = await fetchNowPaymentsInvoiceInfo(String(payment.invoice_id));
+            if (invoiceInfo) {
+                return {
+                    synced: false,
+                    remote: null,
+                    pendingInvoice: true,
+                    message:
+                        "Invoice exists on NOWPayments, but no crypto payment was started yet. Payment ID appears only after the customer pays on the invoice page.",
+                };
+            }
+        }
+        return {
+            synced: false,
+            remote: null,
+            message:
+                payment.payment_status === "waiting"
+                    ? "No payment on NOWPayments yet — complete the invoice checkout or wait for the customer to pay. Use Invoice ID until then."
+                    : "No matching payment found on NOWPayments. Check invoice/order id or API key (live vs sandbox).",
+        };
     }
 
     const paymentId = remote.payment_id ?? remote.paymentId;

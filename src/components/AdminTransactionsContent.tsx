@@ -164,7 +164,9 @@ export default function AdminTransactionsContent() {
         });
         const payload = await res.json();
         if (!res.ok) {
-            toast.error(payload.error || "NOWPayments sync failed");
+            toast.error(payload.error || payload.message || "NOWPayments sync failed");
+        } else if (payload.success === false) {
+            toast.info(payload.message || "No NOWPayments payment yet", { duration: 8000 });
         } else {
             toast.success(`Payment ID: ${payload.nowpayments_id || "updated"}`);
             await fetchRows();
@@ -387,7 +389,9 @@ export default function AdminTransactionsContent() {
                                 <p className="font-mono text-xs break-all text-[#00b9f0]">
                                     {row.nowpayments_id != null && row.nowpayments_id !== ""
                                         ? String(row.nowpayments_id)
-                                        : "— (click Sync NP)"}
+                                        : row.payment_status === "waiting"
+                                          ? "— after customer pays"
+                                          : "— (Sync NP when paid)"}
                                 </p>
                             </div>
                             <div>
