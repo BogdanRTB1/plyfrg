@@ -46,6 +46,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Invalid bundle" }, { status: 400 });
         }
 
+        const orderId = `${user.id}_bundle_${bundleId}_${Date.now()}`;
+
         // Create invoice via NOWPayments API
         const invoiceResponse = await fetch(`${NOWPAYMENTS_BASE}/invoice`, {
             method: "POST",
@@ -58,7 +60,7 @@ export async function POST(req: NextRequest) {
                 price_currency: "usd",
                 pay_currency: payCurrency,
                 ipn_callback_url: `${APP_URL}/api/crypto/ipn`,
-                order_id: `${user.id}_bundle_${bundleId}_${Date.now()}`,
+                order_id: orderId,
                 order_description: `Playforges Bundle: ${bundle.diamonds.toLocaleString()} Diamonds + ${bundle.forgesCoins} Forges Coins`,
                 success_url: `${APP_URL}?deposit=success`,
                 cancel_url: `${APP_URL}?deposit=cancel`,
@@ -77,17 +79,27 @@ export async function POST(req: NextRequest) {
         const invoiceData = await invoiceResponse.json();
 
         // Store in database
-        const { error: dbError } = await getSupabaseAdmin().from("crypto_payments").insert({
+        const insertPayload: Record<string, unknown> = {
             user_id: user.id,
-            invoice_id: invoiceData.id,
+            invoice_id: String(invoiceData.id),
             invoice_url: invoiceData.invoice_url,
+            order_id: orderId,
             payment_status: "waiting",
             price_amount: bundle.price,
             price_currency: "usd",
             pay_currency: payCurrency,
             bundle_diamonds: bundle.diamonds,
             bundle_forges_coins: bundle.forgesCoins,
-        });
+        };
+
+        let { error: dbError } = await getSupabaseAdmin().from("crypto_payments").insert(insertPayload);
+
+        // Backward compatible if order_id column migration not applied yet
+        if (dbError?.message?.includes("order_id")) {
+            const { order_id: _removed, ...withoutOrderId } = insertPayload;
+            const retry = await getSupabaseAdmin().from("crypto_payments").insert(withoutOrderId);
+            dbError = retry.error;
+        }
 
         if (dbError) {
             console.error("DB error storing payment:", dbError);

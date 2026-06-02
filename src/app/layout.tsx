@@ -12,6 +12,7 @@ import { MobileNavProvider } from "@/components/MobileNavProvider";
 import KYCEnforcer from "@/components/KYCEnforcer";
 import GlobalGameModals from "@/components/GlobalGameModals";
 import GameLaunchHandler from "@/components/GameLaunchHandler";
+import DepositReturnHandler from "@/components/DepositReturnHandler";
 
 
 const outfit = Outfit({
@@ -53,6 +54,7 @@ export default function RootLayout({
           <GlobalGameModals />
           <Suspense fallback={null}>
             <GameLaunchHandler />
+            <DepositReturnHandler />
           </Suspense>
 
         </MobileNavProvider>
