@@ -25,6 +25,7 @@ import GameCard from "./GameCard";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
+import { displayRtpForHome } from "@/constants/originalsRtp";
 import { loadPublishedGames } from "@/utils/publishedGamesStorage";
 import { launchGame } from "@/utils/gameLaunch";
 
@@ -200,7 +201,7 @@ export default function HomeContent() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
                     {activeOriginals.map((game, index) => (
                         <div key={index} className="cursor-pointer h-full" onClick={() => void launchGame(game.name)}>
-                            <GameCard name={game.name} image={game.image} rtp={game.rtp} />
+                            <GameCard name={game.name} image={game.image} rtp={displayRtpForHome(game.rtp, game.name)} />
                         </div>
                     ))}
                 </div>
