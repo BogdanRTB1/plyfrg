@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/utils/requireAdmin";
 import { creditDepositIfEligible } from "@/utils/creditDeposit";
 import { isCompletedPaymentStatus } from "@/utils/nowpayments";
-import { syncNowPaymentRecord } from "@/utils/syncNowPaymentRecord";
+import { syncNowPaymentRecord, reconcileCryptoPaymentsFromNowPayments } from "@/utils/syncNowPaymentRecord";
 import { finalizePaymentFromNowPayments } from "@/utils/finalizePayment";
 
 export async function GET(req: NextRequest) {
@@ -38,29 +38,24 @@ export async function GET(req: NextRequest) {
     }
 
     const syncFromNp = req.nextUrl.searchParams.get("sync") === "true";
-    const maxSync = Math.min(Number(req.nextUrl.searchParams.get("maxSync") || 5), 10);
     let syncedFromApi = 0;
+    let creditedFromApi = 0;
+    let npPaymentsFetched = 0;
     const paymentRows = [...(payments || [])];
 
-    // Only sync when explicitly requested (avoids timeout on page load)
+    // Bulk reconcile: one fetch of NP Payments list, match all uncredited DB rows
     if (syncFromNp && process.env.NOWPAYMENTS_API_KEY) {
-        let synced = 0;
-        for (const payment of paymentRows) {
-            if (synced >= maxSync) break;
-            const needsSync =
-                !payment.credited &&
-                (!payment.nowpayments_id ||
-                    payment.payment_status === "waiting" ||
-                    payment.payment_status === "confirming" ||
-                    isCompletedPaymentStatus(payment.payment_status));
-            if (!needsSync) continue;
+        const toReconcile = paymentRows.filter((p) => !p.credited);
+        const reconcile = await reconcileCryptoPaymentsFromNowPayments(admin, toReconcile, {
+            maxPages: 20,
+        });
+        syncedFromApi = reconcile.synced;
+        npPaymentsFetched = reconcile.npPaymentsFetched;
 
-            const result = await syncNowPaymentRecord(admin, payment, { quick: true });
-            if (result.synced && result.fields) {
-                Object.assign(payment, result.fields);
-                syncedFromApi += 1;
-                synced += 1;
-            }
+        for (const { payment, remote } of reconcile.syncedRemotes) {
+            const finalize = await finalizePaymentFromNowPayments(admin, remote);
+            if (finalize.credited) creditedFromApi += 1;
+            if (finalize.credited) payment.credited = true;
         }
     }
 
@@ -120,7 +115,7 @@ export async function GET(req: NextRequest) {
         pending: rows.filter((r) => !isCompletedPaymentStatus(r.payment_status) && !["failed", "expired", "refunded"].includes(r.payment_status || "")).length,
     };
 
-    return NextResponse.json({ success: true, rows, stats, syncedFromApi });
+    return NextResponse.json({ success: true, rows, stats, syncedFromApi, creditedFromApi, npPaymentsFetched });
     } catch (err) {
         console.error("Admin transactions GET error:", err);
         return NextResponse.json({ error: "Failed to load transactions" }, { status: 500 });

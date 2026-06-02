@@ -87,6 +87,89 @@ function paymentMatchesOrder(p: Record<string, unknown>, orderId: string): boole
     return String(p.order_id ?? p.orderId ?? "") === orderId;
 }
 
+function paymentOrderId(p: Record<string, unknown>): string {
+    return String(p.order_id ?? p.orderId ?? "").trim();
+}
+
+function paymentInvoiceId(p: Record<string, unknown>): string {
+    return String(p.invoice_id ?? p.invoiceId ?? p.iid ?? "").trim();
+}
+
+function shouldReplacePayment(
+    current: Record<string, unknown>,
+    candidate: Record<string, unknown>
+): boolean {
+    const currentDone = isCompletedPaymentStatus(String(current.payment_status ?? ""));
+    const candidateDone = isCompletedPaymentStatus(String(candidate.payment_status ?? ""));
+    if (candidateDone && !currentDone) return true;
+    if (currentDone && !candidateDone) return false;
+    return true;
+}
+
+export type FindNowPaymentCriteria = {
+    paymentId?: string | number | null;
+    orderId?: string | null;
+    invoiceId?: string | null;
+};
+
+export type NowPaymentLookup = {
+    byPaymentId: Map<string, Record<string, unknown>>;
+    byOrderId: Map<string, Record<string, unknown>>;
+    byInvoiceId: Map<string, Record<string, unknown>>;
+    all: Record<string, unknown>[];
+};
+
+function putInLookupMap(
+    map: Map<string, Record<string, unknown>>,
+    key: string,
+    payment: Record<string, unknown>
+) {
+    if (!key) return;
+    const existing = map.get(key);
+    if (!existing || shouldReplacePayment(existing, payment)) {
+        map.set(key, payment);
+    }
+}
+
+/** Index Payments list for fast in-memory matching (order_id, invoice_id, payment_id). */
+export function buildNowPaymentLookup(payments: Record<string, unknown>[]): NowPaymentLookup {
+    const byPaymentId = new Map<string, Record<string, unknown>>();
+    const byOrderId = new Map<string, Record<string, unknown>>();
+    const byInvoiceId = new Map<string, Record<string, unknown>>();
+
+    for (const payment of payments) {
+        putInLookupMap(byPaymentId, paymentRowId(payment), payment);
+        putInLookupMap(byOrderId, paymentOrderId(payment), payment);
+        putInLookupMap(byInvoiceId, paymentInvoiceId(payment), payment);
+    }
+
+    return { byPaymentId, byOrderId, byInvoiceId, all: payments };
+}
+
+export function lookupNowPaymentInIndex(
+    criteria: FindNowPaymentCriteria,
+    index: NowPaymentLookup
+): Record<string, unknown> | null {
+    if (criteria.paymentId != null) {
+        const byId = index.byPaymentId.get(String(criteria.paymentId));
+        if (byId) return byId;
+    }
+
+    const orderId = criteria.orderId?.trim();
+    if (orderId) {
+        const byOrder = index.byOrderId.get(orderId);
+        if (byOrder) return byOrder;
+    }
+
+    const invoiceId = criteria.invoiceId != null ? String(criteria.invoiceId) : "";
+    if (invoiceId) {
+        const byInvoice = index.byInvoiceId.get(invoiceId);
+        if (byInvoice) return byInvoice;
+    }
+
+    return null;
+}
+
 function mergePaymentLists(...lists: Record<string, unknown>[][]): Record<string, unknown>[] {
     const seen = new Set<string>();
     const merged: Record<string, unknown>[] = [];
@@ -135,6 +218,11 @@ async function fetchPaymentsPage(
 
 /** Recent rows from Payments list (paginated). */
 export async function fetchRecentNowPayments(maxPages = 3): Promise<Record<string, unknown>[]> {
+    return fetchAllNowPaymentsPages(maxPages);
+}
+
+/** Fetch multiple pages from GET /payment/ (dashboard Payments tab). */
+export async function fetchAllNowPaymentsPages(maxPages = 10): Promise<Record<string, unknown>[]> {
     const merged: Record<string, unknown>[][] = [];
     for (let page = 0; page < maxPages; page += 1) {
         const batch = await fetchPaymentsPage({}, page);
@@ -161,10 +249,11 @@ async function queryPaymentsApi(
 export async function fetchNowPaymentsByOrderId(orderId: string, options?: FetchPaymentsOptions) {
     if (!orderId) return [];
     const list = await queryPaymentsApi([{ orderId }, { order_id: orderId }], options);
-    if (list.length) return list.filter((p) => paymentMatchesOrder(p, orderId));
+    const matched = list.filter((p) => paymentMatchesOrder(p, orderId));
+    if (matched.length) return matched;
 
     if (options?.skipScan) return [];
-    const recent = await fetchRecentNowPayments(options?.maxPages ?? 3);
+    const recent = await fetchRecentNowPayments(options?.maxPages ?? 5);
     return recent.filter((p) => paymentMatchesOrder(p, orderId));
 }
 
@@ -175,18 +264,13 @@ export async function fetchNowPaymentsByInvoiceId(invoiceId: string, options?: F
         [{ invoiceid: invoiceId }, { invoiceId }, { invoice_id: invoiceId }],
         options
     );
-    if (list.length) return list.filter((p) => paymentMatchesInvoice(p, invoiceId));
+    const matched = list.filter((p) => paymentMatchesInvoice(p, invoiceId));
+    if (matched.length) return matched;
 
     if (options?.skipScan) return [];
-    const recent = await fetchRecentNowPayments(options?.maxPages ?? 3);
+    const recent = await fetchRecentNowPayments(options?.maxPages ?? 5);
     return recent.filter((p) => paymentMatchesInvoice(p, invoiceId));
 }
-
-export type FindNowPaymentCriteria = {
-    paymentId?: string | number | null;
-    orderId?: string | null;
-    invoiceId?: string | null;
-};
 
 function pickBestPayment(list: Record<string, unknown>[]): Record<string, unknown> | null {
     if (!list.length) return null;
@@ -202,8 +286,12 @@ function pickBestPayment(list: Record<string, unknown>[]): Record<string, unknow
  */
 export async function findNowPaymentOnPaymentsApi(
     criteria: FindNowPaymentCriteria,
-    options?: FetchPaymentsOptions
+    options?: FetchPaymentsOptions & { lookup?: NowPaymentLookup }
 ): Promise<Record<string, unknown> | null> {
+    if (options?.lookup) {
+        return lookupNowPaymentInIndex(criteria, options.lookup);
+    }
+
     if (criteria.paymentId != null) {
         const byId = await fetchNowPaymentById(criteria.paymentId);
         if (byId) return byId as Record<string, unknown>;
@@ -224,7 +312,7 @@ export async function findNowPaymentOnPaymentsApi(
     }
 
     if (!options?.skipScan && (orderId || invoiceId)) {
-        const recent = await fetchRecentNowPayments(options?.maxPages ?? 5);
+        const recent = await fetchRecentNowPayments(options?.maxPages ?? 10);
         const match = recent.find(
             (p) =>
                 (orderId && paymentMatchesOrder(p, orderId)) ||

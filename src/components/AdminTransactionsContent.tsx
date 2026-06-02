@@ -126,13 +126,19 @@ export default function AdminTransactionsContent() {
         const params = new URLSearchParams({ limit: String(limit) });
         if (options?.syncNowPayments) {
             params.set("sync", "true");
-            params.set("maxSync", "10");
         }
         if (statusFilter !== "all") params.set("status", statusFilter);
         if (creditedFilter !== "all") params.set("credited", creditedFilter);
 
         let res: Response;
-        let payload: { rows?: TransactionRow[]; stats?: Stats; syncedFromApi?: number; error?: string };
+        let payload: {
+            rows?: TransactionRow[];
+            stats?: Stats;
+            syncedFromApi?: number;
+            creditedFromApi?: number;
+            npPaymentsFetched?: number;
+            error?: string;
+        };
         try {
             res = await fetch(`/api/admin/transactions?${params}`, {
                 headers: { Authorization: `Bearer ${session.access_token}` },
@@ -155,8 +161,20 @@ export default function AdminTransactionsContent() {
 
         setRows(payload.rows || []);
         setStats(payload.stats || null);
-        if ((payload.syncedFromApi ?? 0) > 0) {
-            toast.success(`Synced ${payload.syncedFromApi} payment(s) from NOWPayments`);
+        if ((payload.syncedFromApi ?? 0) > 0 || (payload.creditedFromApi ?? 0) > 0) {
+            const parts = [];
+            if ((payload.npPaymentsFetched ?? 0) > 0) {
+                parts.push(`${payload.npPaymentsFetched} NP Payments loaded`);
+            }
+            if ((payload.syncedFromApi ?? 0) > 0) {
+                parts.push(`${payload.syncedFromApi} matched`);
+            }
+            if ((payload.creditedFromApi ?? 0) > 0) {
+                parts.push(`${payload.creditedFromApi} credited`);
+            }
+            toast.success(parts.join(" · ") || "Synced from NOWPayments");
+        } else if (options?.syncNowPayments) {
+            toast.info("No new matches on NOWPayments Payments list", { duration: 6000 });
         }
         setLoading(false);
     };
