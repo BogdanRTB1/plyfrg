@@ -98,8 +98,9 @@ export default function AdminTransactionsContent() {
     const [creditedFilter, setCreditedFilter] = useState("all");
     const [creditingId, setCreditingId] = useState<string | null>(null);
     const [syncingId, setSyncingId] = useState<string | null>(null);
+    const [syncingAll, setSyncingAll] = useState(false);
 
-    const fetchRows = async () => {
+    const fetchRows = async (options?: { syncNowPayments?: boolean }) => {
         setLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
@@ -122,14 +123,28 @@ export default function AdminTransactionsContent() {
             return;
         }
 
-        const params = new URLSearchParams({ limit: String(limit), sync: "true" });
+        const params = new URLSearchParams({ limit: String(limit) });
+        if (options?.syncNowPayments) {
+            params.set("sync", "true");
+            params.set("maxSync", "10");
+        }
         if (statusFilter !== "all") params.set("status", statusFilter);
         if (creditedFilter !== "all") params.set("credited", creditedFilter);
 
-        const res = await fetch(`/api/admin/transactions?${params}`, {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        const payload = await res.json();
+        let res: Response;
+        let payload: { rows?: TransactionRow[]; stats?: Stats; syncedFromApi?: number; error?: string };
+        try {
+            res = await fetch(`/api/admin/transactions?${params}`, {
+                headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+            payload = await res.json();
+        } catch {
+            toast.error("Request failed — try again");
+            setRows([]);
+            setStats(null);
+            setLoading(false);
+            return;
+        }
         if (!res.ok) {
             toast.error(payload.error || "Failed to load transactions");
             setRows([]);
@@ -140,7 +155,7 @@ export default function AdminTransactionsContent() {
 
         setRows(payload.rows || []);
         setStats(payload.stats || null);
-        if (payload.syncedFromApi > 0) {
+        if ((payload.syncedFromApi ?? 0) > 0) {
             toast.success(`Synced ${payload.syncedFromApi} payment(s) from NOWPayments`);
         }
         setLoading(false);
@@ -176,6 +191,7 @@ export default function AdminTransactionsContent() {
 
     useEffect(() => {
         fetchRows();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [limit, statusFilter, creditedFilter]);
 
     const creditPayment = async (paymentId: string) => {
@@ -230,16 +246,32 @@ export default function AdminTransactionsContent() {
                 <div>
                     <h1 className="text-2xl font-black text-white">Purchases & Deposits</h1>
                     <p className="mt-1 text-sm text-slate-500">
-                        Deposits from NOWPayments — auto-syncs payment ID &amp; status from their API on load.
+                        Deposits from NOWPayments — use Sync from NOWPayments or Sync NP per row for payment IDs.
                     </p>
                 </div>
-                <button
-                    type="button"
-                    onClick={fetchRows}
-                    className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#0f212e] px-3 py-2 text-sm text-white hover:bg-[#1a2c38]"
-                >
-                    <RefreshCw size={14} /> Refresh
-                </button>
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        onClick={() => fetchRows()}
+                        disabled={loading || syncingAll}
+                        className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#0f212e] px-3 py-2 text-sm text-white hover:bg-[#1a2c38] disabled:opacity-50"
+                    >
+                        <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Refresh
+                    </button>
+                    <button
+                        type="button"
+                        disabled={loading || syncingAll}
+                        onClick={async () => {
+                            setSyncingAll(true);
+                            await fetchRows({ syncNowPayments: true });
+                            setSyncingAll(false);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg border border-[#00b9f0]/30 bg-[#00b9f0]/10 px-3 py-2 text-sm font-bold text-[#00b9f0] hover:bg-[#00b9f0]/20 disabled:opacity-50"
+                    >
+                        <RefreshCw size={14} className={syncingAll ? "animate-spin" : ""} />
+                        Sync from NOWPayments
+                    </button>
+                </div>
             </div>
 
             {stats && (

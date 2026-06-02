@@ -24,9 +24,12 @@ function pickBestRemotePayment(list: Record<string, unknown>[]): Record<string, 
     return completed || list[list.length - 1];
 }
 
+type ResolveOptions = { quick?: boolean };
+
 /** Resolve latest NOWPayments payment payload for a stored deposit row. */
 export async function resolveRemoteNowPayment(
-    payment: CryptoPaymentRecord
+    payment: CryptoPaymentRecord,
+    options?: ResolveOptions
 ): Promise<Record<string, unknown> | null> {
     if (payment.nowpayments_id) {
         const byId = await fetchNowPaymentById(payment.nowpayments_id);
@@ -34,13 +37,16 @@ export async function resolveRemoteNowPayment(
     }
 
     if (payment.invoice_id) {
-        const byInvoice = await fetchNowPaymentsByInvoiceId(String(payment.invoice_id));
+        const byInvoice = await fetchNowPaymentsByInvoiceId(
+            String(payment.invoice_id),
+            { skipScan: options?.quick }
+        );
         const best = pickBestRemotePayment(byInvoice);
         if (best) return best;
     }
 
     if (payment.order_id) {
-        const byOrder = await fetchNowPaymentsByOrderId(payment.order_id);
+        const byOrder = await fetchNowPaymentsByOrderId(payment.order_id, { skipScan: options?.quick });
         const best = pickBestRemotePayment(byOrder);
         if (best) return best;
     }
@@ -60,11 +66,12 @@ export type SyncNowPaymentResult = {
 /** Pull status + payment_id from NOWPayments and persist on crypto_payments. */
 export async function syncNowPaymentRecord(
     admin: SupabaseClient,
-    payment: CryptoPaymentRecord
+    payment: CryptoPaymentRecord,
+    options?: ResolveOptions
 ): Promise<SyncNowPaymentResult> {
-    const remote = await resolveRemoteNowPayment(payment);
+    const remote = await resolveRemoteNowPayment(payment, options);
     if (!remote) {
-        if (payment.invoice_id) {
+        if (!options?.quick && payment.invoice_id) {
             const invoiceInfo = await fetchNowPaymentsInvoiceInfo(String(payment.invoice_id));
             if (invoiceInfo) {
                 return {

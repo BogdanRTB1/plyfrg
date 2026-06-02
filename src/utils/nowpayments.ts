@@ -119,7 +119,7 @@ function paymentMatchesOrder(p: Record<string, unknown>, orderId: string): boole
 
 /** Scan recent payments when filtered list returns empty (API param quirks). */
 async function scanRecentPayments(match: (p: Record<string, unknown>) => boolean): Promise<Record<string, unknown>[]> {
-    const list = await fetchPaymentList({});
+    const list = await fetchPaymentList({ limit: "30" });
     return list.filter(match);
 }
 
@@ -137,8 +137,13 @@ function mergePaymentLists(...lists: Record<string, unknown>[][]): Record<string
     return merged;
 }
 
+type FetchPaymentsOptions = { skipScan?: boolean };
+
 /** List payments for a NOWPayments invoice id. */
-export async function fetchNowPaymentsByInvoiceId(invoiceId: string) {
+export async function fetchNowPaymentsByInvoiceId(
+    invoiceId: string,
+    options?: FetchPaymentsOptions
+) {
     if (!invoiceId) return [];
     const filtered = mergePaymentLists(
         await fetchPaymentList({ invoiceId }),
@@ -146,17 +151,19 @@ export async function fetchNowPaymentsByInvoiceId(invoiceId: string) {
         await fetchPaymentList({ invoice_id: invoiceId })
     );
     if (filtered.length) return filtered;
+    if (options?.skipScan) return [];
     return scanRecentPayments((p) => paymentMatchesInvoice(p, invoiceId));
 }
 
 /** List payments filtered by merchant order_id (invoice flow). */
-export async function fetchNowPaymentsByOrderId(orderId: string) {
+export async function fetchNowPaymentsByOrderId(orderId: string, options?: FetchPaymentsOptions) {
     if (!orderId) return [];
     const filtered = mergePaymentLists(
         await fetchPaymentList({ orderId }),
         await fetchPaymentList({ order_id: orderId })
     );
     if (filtered.length) return filtered;
+    if (options?.skipScan) return [];
     return scanRecentPayments((p) => paymentMatchesOrder(p, orderId));
 }
 

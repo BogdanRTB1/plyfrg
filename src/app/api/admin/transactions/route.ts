@@ -5,6 +5,7 @@ import { isCompletedPaymentStatus } from "@/utils/nowpayments";
 import { syncNowPaymentRecord } from "@/utils/syncNowPaymentRecord";
 
 export async function GET(req: NextRequest) {
+    try {
     const guard = await requireAdmin(req);
     if ("error" in guard) return guard.error;
 
@@ -35,22 +36,27 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Failed to load transactions" }, { status: 500 });
     }
 
-    const syncFromNp = req.nextUrl.searchParams.get("sync") !== "false";
+    const syncFromNp = req.nextUrl.searchParams.get("sync") === "true";
+    const maxSync = Math.min(Number(req.nextUrl.searchParams.get("maxSync") || 5), 10);
     let syncedFromApi = 0;
     const paymentRows = [...(payments || [])];
 
+    // Only sync when explicitly requested (avoids timeout on page load)
     if (syncFromNp && process.env.NOWPAYMENTS_API_KEY) {
+        let synced = 0;
         for (const payment of paymentRows) {
+            if (synced >= maxSync) break;
             const needsSync =
-                !payment.nowpayments_id ||
-                payment.payment_status === "waiting" ||
-                payment.payment_status === "confirming";
+                !payment.nowpayments_id &&
+                (payment.payment_status === "confirming" ||
+                    isCompletedPaymentStatus(payment.payment_status));
             if (!needsSync) continue;
 
-            const result = await syncNowPaymentRecord(admin, payment);
+            const result = await syncNowPaymentRecord(admin, payment, { quick: true });
             if (result.synced && result.fields) {
                 Object.assign(payment, result.fields);
                 syncedFromApi += 1;
+                synced += 1;
             }
         }
     }
@@ -112,6 +118,10 @@ export async function GET(req: NextRequest) {
     };
 
     return NextResponse.json({ success: true, rows, stats, syncedFromApi });
+    } catch (err) {
+        console.error("Admin transactions GET error:", err);
+        return NextResponse.json({ error: "Failed to load transactions" }, { status: 500 });
+    }
 }
 
 /** Credit user and/or sync one row from NOWPayments API. */
