@@ -4,6 +4,12 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Wallet, ArrowDownCircle, ArrowUpCircle, Gift, Bitcoin, Clock, Loader2, ExternalLink } from "lucide-react";
+import {
+    DEFAULT_DEPOSIT_CURRENCY,
+    DEPOSIT_CURRENCY_OPTIONS,
+    getDepositCurrencyOption,
+    type DepositCurrencyId,
+} from "@/constants/depositCurrencies";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
@@ -44,6 +50,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
     // Deposit/Purchase state
     const [selectedBundle, setSelectedBundle] = useState<number | null>(null);
+    const [selectedPayCurrency, setSelectedPayCurrency] = useState<DepositCurrencyId>(DEFAULT_DEPOSIT_CURRENCY);
 
     const [pendingInvoiceUrl, setPendingInvoiceUrl] = useState<string | null>(null);
 
@@ -137,7 +144,7 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                 },
                 body: JSON.stringify({
                     bundleId: selectedBundle,
-                    payCurrency: 'btc',
+                    payCurrency: selectedPayCurrency,
                 }),
             });
 
@@ -161,17 +168,18 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
             );
             window.open(data.invoiceUrl, '_blank');
 
+            const coin = getDepositCurrencyOption(selectedPayCurrency);
             const newTx: Transaction = {
                 id: data.invoiceId || Math.random().toString(36).substr(2, 9),
                 type: 'purchase',
                 amount: bundle.price,
                 date: new Date(),
                 status: 'pending',
-                method: 'Bitcoin (BTC)'
+                method: coin?.symbol ?? selectedPayCurrency.toUpperCase(),
             };
             setTransactions(prev => [newTx, ...prev]);
 
-            toast.success('Payment invoice created! Complete the payment in the new tab.', { duration: 6000 });
+            toast.success('Checkout opened — complete payment in the new tab.', { duration: 6000 });
             setSelectedBundle(null);
         } catch (error) {
             console.error('Crypto deposit error:', error);
@@ -436,34 +444,55 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                             >
                                 {activeTab === 'deposit' && (
                                     <div className="space-y-4 pb-2 md:space-y-6 md:pb-4">
-                                        <div className="flex items-center gap-3 rounded-xl border border-[#f7931a]/25 bg-gradient-to-r from-[#f7931a]/10 to-transparent p-3 sm:p-4">
-                                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f7931a]/20">
-                                                <Bitcoin size={22} className="text-[#f7931a]" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-bold text-white">Buy with Bitcoin</p>
-                                                <p className="text-[11px] leading-snug text-slate-400">Diamonds + bonus Forges Coins · secure checkout</p>
-                                            </div>
-                                        </div>
-
                                         {pendingInvoiceUrl && (
-                                            <div className="flex flex-col gap-3 rounded-xl border border-[#f7931a]/30 bg-[#f7931a]/10 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+                                            <div className="flex flex-col gap-3 rounded-xl border border-[#00b9f0]/30 bg-[#00b9f0]/10 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
                                                 <div className="min-w-0">
-                                                    <p className="text-xs font-bold text-[#f7931a]">Payment pending</p>
-                                                    <p className="mt-0.5 text-[10px] text-[#f7931a]/70">Finish payment in the tab we opened.</p>
+                                                    <p className="text-xs font-bold text-[#00b9f0]">Payment pending</p>
+                                                    <p className="mt-0.5 text-[10px] text-[#00b9f0]/70">Finish payment in the tab we opened.</p>
                                                 </div>
                                                 <button
                                                     type="button"
                                                     onClick={() => window.open(pendingInvoiceUrl, '_blank')}
-                                                    className="flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#f7931a] px-4 py-2.5 text-xs font-bold text-black transition-colors hover:bg-[#f7931a]/85 active:scale-[0.98]"
+                                                    className="flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#00b9f0] px-4 py-2.5 text-xs font-bold text-[#0f212e] transition-colors hover:bg-[#38bdf8] active:scale-[0.98]"
                                                 >
                                                     <ExternalLink size={14} />
-                                                    Open invoice
+                                                    Open checkout
                                                 </button>
                                             </div>
                                         )}
 
                                         <form onSubmit={handleDeposit} className="space-y-4 md:space-y-6">
+                                            <div className="space-y-2 md:space-y-3">
+                                                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Pay with</label>
+                                                <div className="grid grid-cols-4 gap-2 sm:grid-cols-4">
+                                                    {DEPOSIT_CURRENCY_OPTIONS.map((coin) => {
+                                                        const selected = selectedPayCurrency === coin.id;
+                                                        return (
+                                                            <button
+                                                                key={coin.id}
+                                                                type="button"
+                                                                onClick={() => setSelectedPayCurrency(coin.id)}
+                                                                className={`flex flex-col items-center justify-center gap-0.5 rounded-xl border px-1.5 py-2.5 transition-all active:scale-[0.98] sm:py-3 ${selected
+                                                                    ? "border-[#00b9f0] bg-[#00b9f0]/12 ring-1 ring-[#00b9f0]/40"
+                                                                    : "border-white/10 bg-[#0a161f] hover:border-white/25"
+                                                                    }`}
+                                                                style={selected ? { boxShadow: `0 0 14px ${coin.accent}33` } : undefined}
+                                                            >
+                                                                <span
+                                                                    className="text-[11px] font-black sm:text-xs"
+                                                                    style={{ color: selected ? coin.accent : "#e2e8f0" }}
+                                                                >
+                                                                    {coin.symbol}
+                                                                </span>
+                                                                <span className="hidden text-[9px] font-medium text-slate-500 sm:block">
+                                                                    {coin.label}
+                                                                </span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
                                             <div className="space-y-2 md:space-y-3">
                                                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Choose a bundle</label>
                                                 <div className="max-h-[min(42vh,320px)] overflow-y-auto overscroll-contain pr-0.5 md:max-h-none md:overflow-visible">
@@ -497,10 +526,16 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                             <button
                                                 type="submit"
                                                 disabled={loading || selectedBundle === null}
-                                                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#f7931a] text-sm font-bold text-black shadow-[0_0_20px_rgba(247,147,26,0.2)] transition-all hover:bg-[#f7931a]/85 hover:shadow-[0_0_28px_rgba(247,147,26,0.35)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 md:hover:-translate-y-0.5"
+                                                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#00b9f0] text-sm font-bold text-[#0f212e] shadow-[0_0_20px_rgba(0,185,240,0.25)] transition-all hover:bg-[#38bdf8] hover:shadow-[0_0_28px_rgba(0,185,240,0.35)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 md:hover:-translate-y-0.5"
                                             >
-                                                {loading ? <Loader2 className="animate-spin" size={20} /> : <Bitcoin size={20} />}
-                                                {loading ? 'Processing...' : 'Pay with Bitcoin'}
+                                                {loading ? (
+                                                    <Loader2 className="animate-spin" size={20} />
+                                                ) : null}
+                                                {loading
+                                                    ? "Processing..."
+                                                    : selectedBundle !== null
+                                                      ? `Pay $${bundles.find((b) => b.id === selectedBundle)?.price.toFixed(2) ?? ""}`
+                                                      : "Select a bundle"}
                                             </button>
                                         </form>
                                     </div>
