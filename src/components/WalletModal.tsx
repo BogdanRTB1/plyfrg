@@ -13,6 +13,8 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
+import { refreshBalanceFromServer } from "@/utils/balanceClient";
+import { isCompletedPaymentStatus } from "@/utils/paymentStatus";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 
 interface WalletModalProps {
@@ -41,10 +43,8 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
     const [show, setShow] = useState(false);
     const [shouldRender, setShouldRender] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [transactions, setTransactions] = useState<Transaction[]>(() => [
-        { id: '1', type: 'purchase', amount: 50.00, date: new Date(Date.now() - 86400000), status: 'completed', method: 'Credit Card' },
-        { id: '2', type: 'bonus', amount: 2.50, date: new Date(Date.now() - 172800000), status: 'completed' }
-    ]);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
 
     const supabase = createClient();
 
@@ -84,6 +84,82 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
             return () => clearTimeout(timer);
         }
     }, [isOpen]);
+
+    const loadTransactionHistory = async () => {
+        setHistoryLoading(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                setTransactions([]);
+                return;
+            }
+
+            const res = await fetch("/api/crypto/payment-status", {
+                headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setTransactions([]);
+                return;
+            }
+
+            const purchases: Transaction[] = (data.payments || []).map(
+                (p: {
+                    id: string;
+                    price_amount: number;
+                    payment_status: string;
+                    pay_currency?: string;
+                    credited?: boolean;
+                    created_at: string;
+                }) => ({
+                    id: p.id,
+                    type: "purchase" as const,
+                    amount: Number(p.price_amount || 0),
+                    date: new Date(p.created_at),
+                    status:
+                        p.credited || isCompletedPaymentStatus(p.payment_status)
+                            ? ("completed" as const)
+                            : ("pending" as const),
+                    method: (p.pay_currency || "crypto").toUpperCase(),
+                })
+            );
+
+            const redeems: Transaction[] = (data.payouts || []).map(
+                (p: {
+                    id: string;
+                    forges_coins_amount: number;
+                    payout_status: string;
+                    pay_currency?: string;
+                    created_at: string;
+                }) => ({
+                    id: p.id,
+                    type: "redeem" as const,
+                    amount: Number(p.forges_coins_amount || 0),
+                    date: new Date(p.created_at),
+                    status: p.payout_status === "completed" ? ("completed" as const) : ("pending" as const),
+                    method: (p.pay_currency || "crypto").toUpperCase(),
+                })
+            );
+
+            const merged = [...purchases, ...redeems].sort(
+                (a, b) => b.date.getTime() - a.date.getTime()
+            );
+            setTransactions(merged);
+        } catch (err) {
+            console.error("Wallet history load error:", err);
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!isOpen) return;
+        void refreshBalanceFromServer();
+        if (activeTab === "history") {
+            void loadTransactionHistory();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, activeTab]);
 
     const updateTimer = (lastDate: Date) => {
         const interval = setInterval(() => {
@@ -168,18 +244,10 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
             );
             window.open(data.invoiceUrl, '_blank');
 
-            const coin = getDepositCurrencyOption(selectedPayCurrency);
-            const newTx: Transaction = {
-                id: data.invoiceId || Math.random().toString(36).substr(2, 9),
-                type: 'purchase',
-                amount: bundle.price,
-                date: new Date(),
-                status: 'pending',
-                method: coin?.symbol ?? selectedPayCurrency.toUpperCase(),
-            };
-            setTransactions(prev => [newTx, ...prev]);
-
             toast.success('Checkout opened — complete payment in the new tab.', { duration: 6000 });
+            if (activeTab === "history") {
+                void loadTransactionHistory();
+            }
             setSelectedBundle(null);
         } catch (error) {
             console.error('Crypto deposit error:', error);
@@ -670,9 +738,23 @@ export default function WalletModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
                                 {activeTab === 'history' && (
                                     <div className="space-y-4">
-                                        <h3 className="text-lg font-bold text-white mb-4">Transaction History</h3>
+                                        <div className="mb-4 flex items-center justify-between gap-2">
+                                            <h3 className="text-lg font-bold text-white">Transaction History</h3>
+                                            <button
+                                                type="button"
+                                                onClick={() => void loadTransactionHistory()}
+                                                disabled={historyLoading}
+                                                className="text-xs font-bold text-[#00b9f0] hover:underline disabled:opacity-50"
+                                            >
+                                                {historyLoading ? "Loading…" : "Refresh"}
+                                            </button>
+                                        </div>
                                         <div className="space-y-3">
-                                            {transactions.length === 0 ? (
+                                            {historyLoading ? (
+                                                <div className="flex justify-center py-12">
+                                                    <Loader2 className="h-8 w-8 animate-spin text-[#00b9f0]" />
+                                                </div>
+                                            ) : transactions.length === 0 ? (
                                                 <div className="text-center py-12 text-slate-500">
                                                     <Clock size={48} className="mx-auto mb-4 opacity-50" />
                                                     <p>No transactions yet</p>

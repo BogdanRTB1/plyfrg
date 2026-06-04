@@ -109,20 +109,35 @@ export default function Header() {
     const [isSearchingCreators, setIsSearchingCreators] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-    // Sync balance with localStorage
+    // Sync balance from server (deposits) or localStorage (gameplay)
     useEffect(() => {
-        const handleSync = () => {
-            const d = localStorage.getItem('user_diamonds');
-            const f = localStorage.getItem('user_forges_coins');
-            if (d) setDiamonds(parseInt(d));
-            if (f) setForgesCoins(parseFloat(f));
+        const applyBalance = (diamonds: number, forges: number) => {
+            setDiamonds(Math.floor(diamonds));
+            setForgesCoins(Number(forges.toFixed(2)));
         };
+
+        const handleRefresh = (event: Event) => {
+            const detail = (event as CustomEvent<{ diamonds: number; forges_coins: number }>).detail;
+            if (detail) {
+                applyBalance(detail.diamonds, detail.forges_coins);
+                return;
+            }
+        };
+
+        const handleSync = () => {
+            const d = localStorage.getItem("user_diamonds");
+            const f = localStorage.getItem("user_forges_coins");
+            if (d) applyBalance(parseInt(d, 10), parseFloat(f || "0"));
+        };
+
         handleSync();
-        window.addEventListener('balance_updated', handleSync);
-        window.addEventListener('storage', handleSync);
+        window.addEventListener("balance_refreshed", handleRefresh);
+        window.addEventListener("balance_updated", handleSync);
+        window.addEventListener("storage", handleSync);
         return () => {
-            window.removeEventListener('balance_updated', handleSync);
-            window.removeEventListener('storage', handleSync);
+            window.removeEventListener("balance_refreshed", handleRefresh);
+            window.removeEventListener("balance_updated", handleSync);
+            window.removeEventListener("storage", handleSync);
         };
     }, []);
     const [notifications, setNotifications] = useState<any[]>([]);

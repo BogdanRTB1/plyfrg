@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { refreshBalanceFromServer } from "@/utils/balanceClient";
 import { toast } from "sonner";
 
 /** After NOWPayments success_url redirect, sync deposit and refresh wallet balance. */
@@ -73,11 +74,7 @@ export default function DepositReturnHandler() {
                     toast.success(
                         `Deposit confirmed! +${Number(data.diamondsAdded || 0).toLocaleString()} Diamonds and +${Number(data.forgesAdded || 0)} Forges Coins.`
                     );
-                    if (data.balance) {
-                        localStorage.setItem("user_diamonds", String(data.balance.diamonds));
-                        localStorage.setItem("user_forges_coins", String(data.balance.forges_coins));
-                    }
-                    window.dispatchEvent(new Event("balance_updated"));
+                    await refreshBalanceFromServer();
                 } else if ((data.updated ?? 0) > 0) {
                     toast.info(
                         "Payment recorded — waiting for blockchain confirmation. Balance updates when status is finished."

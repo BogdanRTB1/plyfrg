@@ -1,5 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { isCompletedPaymentStatus } from "@/utils/nowpayments";
+import { isCompletedPaymentStatus } from "@/utils/paymentStatus";
 
 export type CryptoPaymentRow = {
     id: string;

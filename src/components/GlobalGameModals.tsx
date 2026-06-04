@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { recordGameActivity, recordGameSession } from "@/utils/gameBridge";
 import { setGameMenuOpen } from "@/utils/winConfetti";
 import { clearGamePlayUrl } from "@/utils/gameLaunch";
 import { User } from "@supabase/supabase-js";
 import { usePathname } from "next/navigation";
+import {
+    BALANCE_REFRESH_EVENT,
+    applyBalanceToStorage,
+    type UserBalance,
+} from "@/utils/balanceClient";
 
 
 // Import all game modals
@@ -82,6 +87,26 @@ export default function GlobalGameModals() {
     const [forgesCoins, setForgesCoins] = useState(0);
     const [sessionUser, setSessionUser] = useState<User | null>(null);
     const [isInitialFetchDone, setIsInitialFetchDone] = useState(false);
+    const skipDbPushRef = useRef(true);
+
+    const applyServerBalance = useCallback((balance: UserBalance) => {
+        skipDbPushRef.current = true;
+        setDiamonds(balance.diamonds);
+        setForgesCoins(balance.forges_coins);
+        applyBalanceToStorage(balance);
+        window.setTimeout(() => {
+            skipDbPushRef.current = false;
+        }, 3000);
+    }, []);
+
+    useEffect(() => {
+        const handler = (event: Event) => {
+            const detail = (event as CustomEvent<UserBalance>).detail;
+            if (detail) applyServerBalance(detail);
+        };
+        window.addEventListener(BALANCE_REFRESH_EVENT, handler);
+        return () => window.removeEventListener(BALANCE_REFRESH_EVENT, handler);
+    }, [applyServerBalance]);
 
     useEffect(() => {
         const supabase = createClient();
@@ -95,16 +120,17 @@ export default function GlobalGameModals() {
                     .single();
 
                 if (!error && data) {
-                    setDiamonds(Number(data.diamonds));
-                    setForgesCoins(Number(data.forges_coins));
+                    applyServerBalance({
+                        diamonds: Math.floor(Number(data.diamonds)),
+                        forges_coins: Number(Number(data.forges_coins).toFixed(2)),
+                    });
                 } else if (error && error.code === 'PGRST116') {
                     await supabase.from('user_balances').insert({
                         id: user.id,
                         diamonds: 0,
                         forges_coins: 0
                     });
-                    setDiamonds(0);
-                    setForgesCoins(0);
+                    applyServerBalance({ diamonds: 0, forges_coins: 0 });
                 }
             } catch (err) {
                 console.error('Balance fetch error:', err);
@@ -140,26 +166,47 @@ export default function GlobalGameModals() {
         });
 
         return () => subscription.unsubscribe();
-    }, []);
+    }, [applyServerBalance]);
 
-    // Sync state to DB
+    // Persist gameplay balance changes only (not server refresh / deposits)
     useEffect(() => {
-        if (!isInitialFetchDone) return;
-        localStorage.setItem('user_diamonds', diamonds.toString());
-        localStorage.setItem('user_forges_coins', forgesCoins.toString());
-        window.dispatchEvent(new Event('balance_updated'));
+        if (!isInitialFetchDone || !sessionUser) return;
+        if (skipDbPushRef.current) return;
 
-        if (!sessionUser) return;
+        applyBalanceToStorage({ diamonds, forges_coins: forgesCoins });
+        window.dispatchEvent(new Event("balance_updated"));
+
         const supabase = createClient();
-        const timeout = setTimeout(async () => {
-            await supabase.from('user_balances').update({
-                diamonds: Math.floor(diamonds),
-                forges_coins: Number(forgesCoins.toFixed(2)),
-                updated_at: new Date().toISOString()
-            }).eq('id', sessionUser.id);
+        const timeout = window.setTimeout(async () => {
+            const { data: server } = await supabase
+                .from("user_balances")
+                .select("diamonds, forges_coins")
+                .eq("id", sessionUser.id)
+                .maybeSingle();
+
+            const serverDiamonds = Math.floor(Number(server?.diamonds ?? 0));
+            const localDiamonds = Math.floor(diamonds);
+
+            if (serverDiamonds > localDiamonds + 1) {
+                applyServerBalance({
+                    diamonds: serverDiamonds,
+                    forges_coins: Number(Number(server?.forges_coins ?? 0).toFixed(2)),
+                });
+                return;
+            }
+
+            await supabase
+                .from("user_balances")
+                .update({
+                    diamonds: localDiamonds,
+                    forges_coins: Number(forgesCoins.toFixed(2)),
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", sessionUser.id);
         }, 500);
-        return () => clearTimeout(timeout);
-    }, [diamonds, forgesCoins, sessionUser, isInitialFetchDone]);
+
+        return () => window.clearTimeout(timeout);
+    }, [diamonds, forgesCoins, sessionUser, isInitialFetchDone, applyServerBalance]);
 
     // Global Listeners
     useEffect(() => {
@@ -249,18 +296,6 @@ export default function GlobalGameModals() {
         isCustomSlotsOpen, isCustomPlinkoOpen, isCustomMinesOpen, isCustomCrashOpen,
         isCustomScratchOpen, isCustomWheelOpen, isCustomCaseOpen, isCustomHiloOpen, isAIGameOpen,
     ]);
-
-    // Listen for balance updates from Header/Wallet
-    useEffect(() => {
-        const handleExternalUpdate = () => {
-            const d = localStorage.getItem('user_diamonds');
-            const f = localStorage.getItem('user_forges_coins');
-            if (d) setDiamonds(parseInt(d));
-            if (f) setForgesCoins(parseFloat(f));
-        };
-        window.addEventListener('balance_updated', handleExternalUpdate);
-        return () => window.removeEventListener('balance_updated', handleExternalUpdate);
-    }, []);
 
     return (
         <>
