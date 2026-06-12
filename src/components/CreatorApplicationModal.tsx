@@ -197,7 +197,7 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
                 kick_url: formData.kickUrl,
                 tax_type: formData.taxType,
                 legal_name: formData.legalName || formData.companyName,
-                tax_id: formData.taxId,
+                tax_id: formData.taxType === 'business' ? formData.taxId : null,
                 state: formData.state,
                 updated_at: new Date().toISOString()
             });
@@ -439,7 +439,7 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
                         <div className="flex gap-4 mb-2">
                             <button
                                 type="button"
-                                onClick={() => setFormData({ ...formData, taxType: 'individual' })}
+                                onClick={() => setFormData({ ...formData, taxType: 'individual', taxId: '' })}
                                 className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 ${formData.taxType === 'individual' ? 'bg-blue-500/20 border-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.2)]' : 'bg-[#0f212e]/80 border-white/10 text-slate-400 hover:border-white/30'} transition-all`}
                             >
                                 <User size={24} className={formData.taxType === 'individual' ? 'text-blue-400' : ''} />
@@ -481,18 +481,20 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
                             </div>
                         )}
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-bold text-slate-300">{formData.taxType === 'business' ? 'Business Tax ID (VAT)' : 'Personal ID (SSN/CNP)'}</label>
-                                <input
-                                    type="text"
-                                    name="taxId"
-                                    value={formData.taxId}
-                                    onChange={handleChange}
-                                    placeholder="..."
-                                    className="bg-[#0f212e]/80 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#00b9f0] transition-colors"
-                                />
-                            </div>
+                        <div className={`grid grid-cols-1 gap-4 ${formData.taxType === 'business' ? 'sm:grid-cols-2' : ''}`}>
+                            {formData.taxType === 'business' && (
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-sm font-bold text-slate-300">Business Tax ID (VAT)</label>
+                                    <input
+                                        type="text"
+                                        name="taxId"
+                                        value={formData.taxId}
+                                        onChange={handleChange}
+                                        placeholder="..."
+                                        className="bg-[#0f212e]/80 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#00b9f0] transition-colors"
+                                    />
+                                </div>
+                            )}
 
                             <div className="flex flex-col gap-2 relative z-50">
                                 <label className="text-sm font-bold text-slate-300">State of Residence</label>
@@ -636,7 +638,7 @@ export default function CreatorApplicationModal({ isOpen, onClose }: CreatorAppl
             if (formData.taxType === 'business') {
                 return !formData.companyName.trim() || !formData.taxId.trim() || !formData.state;
             } else {
-                return !formData.legalName.trim() || !formData.taxId.trim() || !formData.state;
+                return !formData.legalName.trim() || !formData.state;
             }
         }
         if (step === 4) {
