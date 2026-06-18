@@ -1,4 +1,5 @@
 "use client";
+import { scaleDemoWin } from "@/utils/demoPlay";
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -102,7 +103,7 @@ export default function SlotsModal({ isOpen, onClose, diamonds, setDiamonds, for
                 setWinMultiplier(multi);
                 setGameState('WON');
 
-                const winAmount = betAmount * multi;
+                const winAmount = scaleDemoWin(betAmount * multi);
                 setLastWin({ amount: winAmount, currency: currencyType });
 
                 if (currencyType === 'GC') {

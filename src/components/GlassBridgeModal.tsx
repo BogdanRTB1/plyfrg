@@ -9,7 +9,7 @@ import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
-import { ORIGINALS_PAYOUT, pickGlassBridgeStepHolds } from "@/utils/originalsMath";
+import { calcOriginalsWin, pickGlassBridgeStepHolds } from "@/utils/originalsMath";
 
 export const BRIDGE_CONFIG = {
     theme: {
@@ -93,7 +93,7 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
         if (step === 0) return;
 
         const mult = BRIDGE_CONFIG.multipliers[step - 1];
-        const winAmount = betAmount * mult * ORIGINALS_PAYOUT.glassBridge;
+        const winAmount = calcOriginalsWin(betAmount, mult, 'glassBridge');
 
         setLastWin({ amount: winAmount, currency: currencyType, mult });
 

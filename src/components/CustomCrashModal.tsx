@@ -1,4 +1,5 @@
 "use client";
+import { scaleDemoWin } from "@/utils/demoPlay";
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -252,7 +253,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
         cashedOutAtRef.current = mult;
 
         const roundedMult = Number(mult.toFixed(1));
-        const winAmount = Number((betAmount * roundedMult).toFixed(2));
+        const winAmount = scaleDemoWin(Number((betAmount * roundedMult).toFixed(2)));
         setLastWin({ amount: winAmount, currency: currencyType, mult: roundedMult });
 
         if (currencyType === 'GC') {

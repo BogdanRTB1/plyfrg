@@ -13,6 +13,8 @@ import KYCEnforcer from "@/components/KYCEnforcer";
 import GlobalGameModals from "@/components/GlobalGameModals";
 import GameLaunchHandler from "@/components/GameLaunchHandler";
 import DepositReturnHandler from "@/components/DepositReturnHandler";
+import ReferralHandler from "@/components/ReferralHandler";
+import ReferralApplier from "@/components/ReferralApplier";
 
 
 const outfit = Outfit({
@@ -55,6 +57,8 @@ export default function RootLayout({
           <Suspense fallback={null}>
             <GameLaunchHandler />
             <DepositReturnHandler />
+            <ReferralHandler />
+            <ReferralApplier />
           </Suspense>
 
         </MobileNavProvider>

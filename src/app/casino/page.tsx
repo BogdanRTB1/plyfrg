@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
 import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
 import { loadPublishedGames } from "@/utils/publishedGamesStorage";
-import { launchGame } from "@/utils/gameLaunch";
+import { openGamePicker } from "@/utils/gameLaunch";
 
 export default function CasinoPage() {
     const allGames = FEATURED_GAMES.map((game) => ({
@@ -57,8 +57,8 @@ export default function CasinoPage() {
         return () => window.removeEventListener('storage', handleStorage);
     }, []);
 
-    const playNow = (game: any) => {
-        launchGame(game);
+    const playNow = (game: string | Record<string, unknown>) => {
+        openGamePicker(game);
     };
 
     const filteredGames = useMemo(() => {
@@ -192,12 +192,13 @@ export default function CasinoPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 * (index % 10) }}
                     >
-                        <div className="relative h-full cursor-pointer" onClick={() => playNow(game.name)}>
+                        <div className="relative h-full">
                             <GameCard
                                 name={game.name}
                                 image={game.image || ""}
                                 rtp={game.rtp}
                                 provider={game.provider}
+                                onClick={() => playNow(game.name)}
                             />
                             {game.badge && (
                                 <div className="absolute top-2 left-2 z-20">
@@ -235,12 +236,13 @@ export default function CasinoPage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.05 * index }}
                             >
-                                <div className="relative h-full cursor-pointer" onClick={() => playNow(game)}>
+                                <div className="relative h-full">
                                     <GameCard
                                         name={game.name}
                                         image={game.coverImage || ""}
                                         rtp="88.0%"
                                         provider={game.creatorName ? `@${game.creatorName}` : undefined}
+                                        onClick={() => playNow(game)}
                                     />
                                     <div className="absolute top-2 left-2 z-20">
                                         <span className="px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider backdrop-blur-md border bg-fuchsia-500/90 text-white border-fuchsia-400/50 shadow-[0_0_10px_rgba(217,70,239,0.5)]">

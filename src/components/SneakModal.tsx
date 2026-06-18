@@ -9,7 +9,7 @@ import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
-import { generateSneakBustSeconds, getSneakMultiplierPerSecond, ORIGINALS_PAYOUT } from "@/utils/originalsMath";
+import { generateSneakBustSeconds, getSneakMultiplierPerSecond, calcOriginalsWin } from "@/utils/originalsMath";
 
 export const SNEAK_CONFIG = {
     theme: {
@@ -95,7 +95,7 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
         setGameState('ESCAPED');
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
 
-        const winAmount = betAmount * multiplier * ORIGINALS_PAYOUT.sneak;
+        const winAmount = calcOriginalsWin(betAmount, multiplier, 'sneak');
         setLastWin({ amount: winAmount, currency: currencyType, mult: multiplier });
 
         if (currencyType === 'GC') {

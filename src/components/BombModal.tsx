@@ -10,7 +10,7 @@ import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./Mo
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
 import {
-    ORIGINALS_PAYOUT,
+    calcOriginalsWin,
     BOMB_ROUND_SECONDS,
     allBombSafeWiresCut,
     bombMultiplierFromSafeCuts,
@@ -43,7 +43,7 @@ export default function BombModal({ isOpen, onClose, diamonds, setDiamonds, forg
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const safeCutsRef = useRef(0);
 
-    const payoutPreview = (mult: number) => betAmount * mult * ORIGINALS_PAYOUT.bomb;
+    const payoutPreview = (mult: number) => calcOriginalsWin(betAmount, mult, 'bomb');
 
     const clearTimer = () => {
         if (timerRef.current) {
@@ -128,7 +128,7 @@ export default function BombModal({ isOpen, onClose, diamonds, setDiamonds, forg
         setMultiplier(mult);
         setGameState("WON");
 
-        const winAmount = betAmount * mult * ORIGINALS_PAYOUT.bomb;
+        const winAmount = calcOriginalsWin(betAmount, mult, 'bomb');
         setLastWin({ amount: winAmount, currency: currencyType });
 
         if (currencyType === "GC") {

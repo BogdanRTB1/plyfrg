@@ -9,7 +9,7 @@ import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
-import { ORIGINALS_PAYOUT, getInfluencerGrowthStep, pickInfluencerTick } from "@/utils/originalsMath";
+import { calcOriginalsWin, getInfluencerGrowthStep, pickInfluencerTick } from "@/utils/originalsMath";
 
 const EVENT_LABELS = {
     good: ["Viral dance video!", "Signed brand deal!", "Trending #1!", "Collab announced!"],
@@ -92,7 +92,7 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
         if (timerRef.current) clearInterval(timerRef.current);
 
         setGameState('WON');
-        const winAmount = betAmount * multiplier * ORIGINALS_PAYOUT.influencer;
+        const winAmount = calcOriginalsWin(betAmount, multiplier, 'influencer');
         setLastWin({ amount: winAmount, currency: currencyType });
 
         if (currencyType === 'GC') {

@@ -20,7 +20,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { launchGame } from "@/utils/gameLaunch";
+import { openGamePicker } from "@/utils/gameLaunch";
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useMobileNav } from "@/components/MobileNavProvider";
@@ -193,7 +193,7 @@ export default function Sidebar() {
                                 key={index}
                                 onClick={() => {
                                     setIsOpen(false);
-                                    void launchGame(fav.label);
+                                    void openGamePicker(fav.label);
                                 }}
                                 className="w-full flex items-center justify-between px-4 py-2 text-slate-400 hover:bg-[#1a2c38] hover:text-white rounded-lg transition-colors group"
                             >

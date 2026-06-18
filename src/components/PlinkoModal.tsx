@@ -7,7 +7,7 @@ import { X, Play, RotateCw, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
-import { ORIGINALS_PAYOUT, pickPlinkoBucketIndex } from "@/utils/originalsMath";
+import { calcOriginalsWin, pickPlinkoBucketIndex } from "@/utils/originalsMath";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
@@ -148,7 +148,7 @@ export default function PlinkoModal({ isOpen, onClose, diamonds, setDiamonds, fo
                     const randomBucketForDemo = pickPlinkoBucketIndex();
                     const multiplier = MULTIPLIERS[randomBucketForDemo];
 
-                    const winAmount = betAmount * multiplier * ORIGINALS_PAYOUT.plinko;
+                    const winAmount = calcOriginalsWin(betAmount, multiplier, 'plinko');
                     setLastWin({ amount: winAmount, currency: currencyType });
 
                     if (currencyType === 'GC') {

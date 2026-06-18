@@ -1,3 +1,4 @@
+import { scaleDemoWin } from "@/utils/demoPlay";
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Volume2, VolumeX, ArrowUp, ArrowDown, Target, MoreHorizontal, Zap, Trophy } from 'lucide-react';
@@ -285,7 +286,7 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
         setIsPlaying(false);
         setGameOver(true);
 
-        const winAmount = betAmount * multiplier * 0.88;
+        const winAmount = scaleDemoWin(betAmount * multiplier * 0.88);
         setLastWin({ amount: winAmount, currency: currencyType });
         
         if (currencyType === 'GC' && setDiamonds) {

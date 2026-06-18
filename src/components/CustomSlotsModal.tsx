@@ -1,4 +1,5 @@
 "use client";
+import { scaleDemoWin } from "@/utils/demoPlay";
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -80,7 +81,7 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
                 setGameState('WON');
                 playGameSound("slots", "win");
 
-                const winAmount = betAmount * multi;
+                const winAmount = scaleDemoWin(betAmount * multi);
                 setLastWin({ amount: winAmount, currency: currencyType });
 
                 if (currencyType === 'GC') {

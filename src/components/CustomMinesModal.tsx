@@ -1,4 +1,5 @@
 "use client";
+import { scaleDemoWin } from "@/utils/demoPlay";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -251,7 +252,7 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
 
         const finalMult = calcMult(multiplier);
         setGameState('WON');
-        const winAmount = betAmount * finalMult;
+        const winAmount = scaleDemoWin(betAmount * finalMult);
         setLastWin({ amount: winAmount, currency: currencyType });
 
         if (currencyType === 'GC') {

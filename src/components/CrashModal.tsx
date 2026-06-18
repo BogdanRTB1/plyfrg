@@ -9,7 +9,7 @@ import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
-import { ORIGINALS_PAYOUT, generateCrashPoint } from "@/utils/originalsMath";
+import { calcOriginalsWin, generateCrashPoint } from "@/utils/originalsMath";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
 export const CRASH_CONFIG = {
@@ -208,7 +208,7 @@ export default function CrashModal({ isOpen, onClose, diamonds, setDiamonds, for
         setCashedOutAt(mult);
         cashedOutAtRef.current = mult;
 
-        const winAmount = betAmount * mult * ORIGINALS_PAYOUT.crash;
+        const winAmount = calcOriginalsWin(betAmount, mult, 'crash');
         setLastWin({ amount: winAmount, currency: currencyType, mult });
 
         if (currencyType === 'GC') {

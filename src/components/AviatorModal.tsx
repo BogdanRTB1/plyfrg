@@ -9,7 +9,7 @@ import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
-import { ORIGINALS_PAYOUT, generateCrashPoint } from "@/utils/originalsMath";
+import { calcOriginalsWin, generateCrashPoint } from "@/utils/originalsMath";
 
 // AVIATOR CUSTOMIZATION CONFIG
 export const AVIATOR_CONFIG = {
@@ -217,7 +217,7 @@ export default function AviatorModal({ isOpen, onClose, diamonds, setDiamonds, f
         setCashedOutAt(mult);
         cashedOutAtRef.current = mult;
 
-        const winAmount = betAmount * mult * ORIGINALS_PAYOUT.aviator;
+        const winAmount = calcOriginalsWin(betAmount, mult, 'aviator');
         setLastWin({ amount: winAmount, currency: currencyType, mult });
 
         if (currencyType === 'GC') {

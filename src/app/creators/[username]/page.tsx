@@ -9,7 +9,7 @@ import { User as UserIcon, Calendar, Trophy, Medal, Star, Shield, Lock, Activity
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { loadPublishedGamesForCreator } from "@/utils/publishedGamesStorage";
-import { launchGame } from "@/utils/gameLaunch";
+import { openGamePicker } from "@/utils/gameLaunch";
 
 export default function CreatorProfilePage() {
     const params = useParams();
@@ -299,7 +299,7 @@ export default function CreatorProfilePage() {
                                             transition={{ delay: 0.1 * idx }}
                                             key={idx} 
                                             className="bg-[#0f212e] hover:bg-[#162c3d] cursor-pointer transition-all duration-300 border border-white/5 hover:border-[#00b9f0]/40 rounded-3xl overflow-hidden group hover:-translate-y-2 shadow-lg hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] flex flex-col"
-                                            onClick={() => launchGame(game)}
+                                            onClick={() => openGamePicker(game)}
                                         >
                                             <div className="aspect-[16/10] bg-gradient-to-br from-[#0b1622] to-[#152a3a] relative flex items-center justify-center p-4 overflow-hidden">
                                                 {/* Background patterns */}

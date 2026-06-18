@@ -3,6 +3,8 @@
  * All random outcomes for lobby games should flow through these helpers.
  */
 
+import { isDemoSessionActive, scaleDemoWin } from "@/utils/demoPlay";
+
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
 /** Payout = bet × multiplier × house factor (profit tax on crash-style games). */
@@ -12,7 +14,7 @@ export function applyOriginalsPayout(bet: number, multiplier: number, payoutFact
 
 /** Standard crash curve — instant 1x bust ~15.5%, heavy tail trimmed. */
 export function generateCrashPoint() {
-    const instantBustChance = 0.165;
+    const instantBustChance = isDemoSessionActive() ? 0.09 : 0.165;
     if (Math.random() < instantBustChance) return 1.0;
     const u = Math.max(0.0001, Math.random());
     return clamp((1 - instantBustChance) / (1 - u), 1.0, 80);
@@ -39,9 +41,32 @@ export const ORIGINALS_PAYOUT = {
     glassBridge: 0.88,
 } as const;
 
+export function getOriginalsPayout(key: keyof typeof ORIGINALS_PAYOUT): number {
+    return ORIGINALS_PAYOUT[key];
+}
+
+export function calcOriginalsWin(bet: number, multiplier: number, key: keyof typeof ORIGINALS_PAYOUT): number {
+    if (multiplier <= 0) return 0;
+    return scaleDemoWin(bet * multiplier * ORIGINALS_PAYOUT[key]);
+}
+
 /** Plinko bucket index 0–16 for multiplier array in PlinkoModal. */
 export function pickPlinkoBucketIndex(): number {
+    const demo = isDemoSessionActive();
     const r = Math.random();
+    if (demo) {
+        if (r < 0.0002) return Math.random() < 0.5 ? 0 : 16;
+        if (r < 0.002) return Math.random() < 0.5 ? 1 : 15;
+        if (r < 0.01) return Math.random() < 0.5 ? 2 : 14;
+        if (r < 0.04) return Math.random() < 0.5 ? 3 : 13;
+        if (r < 0.12) return Math.random() < 0.5 ? 4 : 12;
+        if (r < 0.28) return Math.random() < 0.5 ? 5 : 11;
+        if (r < 0.5) return Math.random() < 0.5 ? 6 : 10;
+        const inner = Math.random();
+        if (inner < 0.35) return 7;
+        if (inner < 0.65) return 8;
+        return 9;
+    }
     if (r < 0.00004) return Math.random() < 0.5 ? 0 : 16;
     if (r < 0.00015) return Math.random() < 0.5 ? 1 : 15;
     if (r < 0.0005) return Math.random() < 0.5 ? 2 : 14;
@@ -57,6 +82,7 @@ export function pickPlinkoBucketIndex(): number {
 
 /** Slots symbol indices 0–5; returns null when no triple win. */
 export function pickSlotsReels(symCount: number): number[] | null {
+    const demo = isDemoSessionActive();
     const pickNonTriple = (): number[] => {
         for (let k = 0; k < 40; k++) {
             const a = Math.floor(Math.random() * symCount);
@@ -68,12 +94,18 @@ export function pickSlotsReels(symCount: number): number[] | null {
     };
 
     const r0 = Math.random();
-    if (r0 < 0.805) return null;
-    if (r0 < 0.945) return [0, 0, 0];
-    if (r0 < 0.982) return [1, 1, 1];
-    if (r0 < 0.994) return [2, 2, 2];
-    if (r0 < 0.9985) return [3, 3, 3];
-    if (r0 < 0.9997) return [4, 4, 4];
+    const missChance = demo ? 0.62 : 0.805;
+    const tier2 = demo ? 0.88 : 0.945;
+    const tier3 = demo ? 0.95 : 0.982;
+    const tier4 = demo ? 0.98 : 0.994;
+    const tier5 = demo ? 0.992 : 0.9985;
+    const tier6 = demo ? 0.998 : 0.9997;
+    if (r0 < missChance) return null;
+    if (r0 < tier2) return [0, 0, 0];
+    if (r0 < tier3) return [1, 1, 1];
+    if (r0 < tier4) return [2, 2, 2];
+    if (r0 < tier5) return [3, 3, 3];
+    if (r0 < tier6) return [4, 4, 4];
     return [5, 5, 5];
 }
 
@@ -83,7 +115,8 @@ export function pickRouletteWinningNumber(
     betColor: "red" | "black" | "green"
 ): number {
     let n = Math.floor(Math.random() * segments.length);
-    if (betColor !== "green" && Math.random() < 0.28) {
+    const nudgeChance = isDemoSessionActive() ? 0.12 : 0.28;
+    if (betColor !== "green" && Math.random() < nudgeChance) {
         let guard = 0;
         while (segments[n]?.color === betColor && guard < 40) {
             n = Math.floor(Math.random() * segments.length);
@@ -94,7 +127,7 @@ export function pickRouletteWinningNumber(
 }
 
 export function pickGlassBridgeStepHolds(): boolean {
-    return Math.random() < 0.31;
+    return Math.random() < (isDemoSessionActive() ? 0.48 : 0.31);
 }
 
 /** Tomatoes target index. */
@@ -109,7 +142,7 @@ export function pickTomatoTargetIndex(): number {
 }
 
 export function pickFootballOutcome(): { scored: boolean; multiplier: number } {
-    const scored = Math.random() < 0.36;
+    const scored = Math.random() < (isDemoSessionActive() ? 0.52 : 0.36);
     const multiplier = scored ? 1.35 + Math.random() * 0.85 : 0;
     return { scored, multiplier: Number(multiplier.toFixed(2)) };
 }
@@ -161,7 +194,9 @@ export function calcMinesLobbyMultiplier(revealedSafe: number, totalTiles = 25, 
     for (let i = 0; i < revealedSafe; i++) {
         fairMult *= (totalTiles - i) / (safeTiles - i);
     }
-    const houseDiscount = 0.8 - revealedSafe * 0.012;
+    const houseDiscount = isDemoSessionActive()
+        ? 0.94 - revealedSafe * 0.008
+        : 0.8 - revealedSafe * 0.012;
     return Number((fairMult * Math.max(houseDiscount, 0.66)).toFixed(1));
 }
 
@@ -169,9 +204,10 @@ export function applyBlackjackPayout(bet: number, multiplier: number) {
     let winAmount = bet * multiplier;
     if (multiplier > 1) {
         const profit = winAmount - bet;
-        winAmount = bet + profit * 0.85;
+        const tax = isDemoSessionActive() ? 0.65 : 0.85;
+        winAmount = bet + profit * tax;
     }
-    return winAmount;
+    return scaleDemoWin(winAmount);
 }
 
 /** Bomb Defuse — 5 wires, 2 are traps; multiplier only grows on safe cuts (no passive timer ramp). */

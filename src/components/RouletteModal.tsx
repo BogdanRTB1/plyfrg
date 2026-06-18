@@ -1,4 +1,5 @@
 "use client";
+import { scaleDemoWin } from "@/utils/demoPlay";
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -86,7 +87,7 @@ export default function RouletteModal({ isOpen, onClose, diamonds, setDiamonds, 
 
             if (multi > 0) {
                 setGameState('WON');
-                const winAmount = betAmount * multi;
+                const winAmount = scaleDemoWin(betAmount * multi);
                 setLastWin({ amount: winAmount, currency: currencyType });
 
                 if (currencyType === 'GC') {

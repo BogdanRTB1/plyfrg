@@ -9,7 +9,7 @@ import FavoriteToggle from "./FavoriteToggle";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
-import { ORIGINALS_PAYOUT, pickFootballOutcome } from "@/utils/originalsMath";
+import { calcOriginalsWin, pickFootballOutcome } from "@/utils/originalsMath";
 
 export const FOOTBALL_CONFIG = {
     theme: {
@@ -77,7 +77,7 @@ export default function FootballModal({ isOpen, onClose, diamonds, setDiamonds, 
     };
 
     const handleWin = (multiplier: number) => {
-        const winAmount = betAmount * multiplier * (multiplier > 0 ? ORIGINALS_PAYOUT.football : 1);
+        const winAmount = multiplier > 0 ? calcOriginalsWin(betAmount, multiplier, 'football') : 0;
 
         setLastWin({ amount: winAmount, currency: currencyType, mult: multiplier });
 

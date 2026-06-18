@@ -3,7 +3,7 @@
 // @ts-nocheck
 
 import { useRef, useEffect, useState } from "react";
-import { User, Shield, Bell, Lock, Camera, Trash2, Save, Loader2, ChevronRight, Check } from "lucide-react";
+import { User, Shield, Bell, Lock, Camera, Trash2, Save, Loader2, ChevronRight, Check, Gift, Copy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
@@ -43,6 +43,11 @@ export default function SettingsContent() {
     const [isDisablingMfa, setIsDisablingMfa] = useState(false);
     const [disableMfaCode, setDisableMfaCode] = useState("");
 
+    const [referralLoading, setReferralLoading] = useState(true);
+    const [referralCode, setReferralCode] = useState("");
+    const [inviteLink, setInviteLink] = useState("");
+    const [referralCount, setReferralCount] = useState(0);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const supabase = createClient();
     const router = useRouter();
@@ -69,11 +74,39 @@ export default function SettingsContent() {
                     const verifiedFactor = mfaData.totp.find((f: any) => f.status === 'verified');
                     if (verifiedFactor) setMfaStatus('enabled');
                 }
+
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.access_token) {
+                    try {
+                        const res = await fetch("/api/referral/me", {
+                            headers: { Authorization: `Bearer ${session.access_token}` },
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            setReferralCode(data.referralCode || "");
+                            setInviteLink(data.inviteLink || "");
+                            setReferralCount(Number(data.referralCount || 0));
+                        }
+                    } catch (err) {
+                        console.error("Failed to load referral info:", err);
+                    }
+                }
             }
+            setReferralLoading(false);
             setLoading(false);
         };
         getUser();
     }, []);
+
+    const handleCopyInviteLink = async () => {
+        if (!inviteLink) return;
+        try {
+            await navigator.clipboard.writeText(inviteLink);
+            toast.success("Invite link copied!");
+        } catch {
+            toast.error("Could not copy link.");
+        }
+    };
 
     const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         try {
@@ -577,6 +610,59 @@ export default function SettingsContent() {
                                                     {saveLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                                                     <span>Save Changes</span>
                                                 </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-[#0f212e] border border-white/5 rounded-2xl p-8 relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 p-32 bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                                            <div className="relative">
+                                                <h3 className="font-bold text-white flex items-center gap-2 mb-2 text-lg">
+                                                    <Gift size={18} className="text-emerald-400" /> Invite Friends
+                                                </h3>
+                                                <p className="text-slate-400 text-sm mb-6">
+                                                    Share your link — you earn <span className="text-white font-bold">3 ForgeCoins</span> per signup, and friends get <span className="text-white font-bold">10,000 Diamonds</span>.
+                                                </p>
+
+                                                {referralLoading ? (
+                                                    <div className="flex items-center gap-2 text-slate-500 text-sm">
+                                                        <Loader2 size={16} className="animate-spin" />
+                                                        Loading invite link...
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-4">
+                                                        <div className="space-y-2">
+                                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Your invite code</label>
+                                                            <div className="bg-[#1a2c38] border border-white/5 rounded-xl h-11 px-4 flex items-center font-mono font-bold text-emerald-400 tracking-widest">
+                                                                {referralCode || "—"}
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Invite link</label>
+                                                            <div className="flex flex-col sm:flex-row gap-3">
+                                                                <input
+                                                                    type="text"
+                                                                    readOnly
+                                                                    value={inviteLink}
+                                                                    className="flex-1 bg-[#1a2c38] border border-white/5 rounded-xl h-11 px-4 text-slate-300 text-sm focus:outline-none"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={handleCopyInviteLink}
+                                                                    disabled={!inviteLink}
+                                                                    className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-[#0f212e] px-5 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
+                                                                >
+                                                                    <Copy size={16} />
+                                                                    Copy link
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <p className="text-xs text-slate-500">
+                                                            {referralCount === 1
+                                                                ? "1 friend joined with your link."
+                                                                : `${referralCount} friends joined with your link.`}
+                                                        </p>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 

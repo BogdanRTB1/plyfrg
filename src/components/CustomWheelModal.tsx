@@ -1,4 +1,5 @@
 "use client";
+import { scaleDemoWin } from "@/utils/demoPlay";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -398,7 +399,7 @@ export default function CustomWheelModal({ isOpen, onClose, gameData, diamonds, 
         }
 
         const effectiveMult = seg.multiplier * nextMultiplierBonus;
-        const winAmount = betAmount * effectiveMult;
+        const winAmount = scaleDemoWin(betAmount * effectiveMult);
 
         setLastWin({ amount: winAmount, currency: currencyType, mult: effectiveMult });
 

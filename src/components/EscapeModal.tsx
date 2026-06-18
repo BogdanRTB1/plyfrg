@@ -9,7 +9,7 @@ import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
-import { ORIGINALS_PAYOUT, generateRampCrashPoint } from "@/utils/originalsMath";
+import { calcOriginalsWin, generateRampCrashPoint } from "@/utils/originalsMath";
 
 const ESCAPE_CONFIG = {
     names: { title: "Escape" },
@@ -84,7 +84,7 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
         if (timerRef.current) clearInterval(timerRef.current);
 
         setGameState('WON');
-        const winAmount = betAmount * multiplier * ORIGINALS_PAYOUT.escape;
+        const winAmount = calcOriginalsWin(betAmount, multiplier, 'escape');
         setLastWin({ amount: winAmount, currency: currencyType });
 
         if (currencyType === 'GC') {

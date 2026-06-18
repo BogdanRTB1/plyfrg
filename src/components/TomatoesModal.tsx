@@ -9,7 +9,7 @@ import FavoriteToggle from "./FavoriteToggle";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
-import { ORIGINALS_PAYOUT, pickTomatoTargetIndex } from "@/utils/originalsMath";
+import { calcOriginalsWin, pickTomatoTargetIndex } from "@/utils/originalsMath";
 
 export const TOMATOES_CONFIG = {
     theme: {
@@ -92,7 +92,7 @@ export default function TomatoesModal({ isOpen, onClose, diamonds, setDiamonds, 
 
     const handleWin = (idx: number) => {
         const target = TOMATOES_CONFIG.targets[idx];
-        const winAmount = betAmount * target.mult * (target.mult > 0 ? ORIGINALS_PAYOUT.tomatoes : 1);
+        const winAmount = target.mult > 0 ? calcOriginalsWin(betAmount, target.mult, 'tomatoes') : 0;
 
         setLastWin({ amount: winAmount, currency: currencyType, mult: target.mult });
 

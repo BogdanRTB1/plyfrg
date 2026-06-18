@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { launchGame, resolveGameFromSlug } from "@/utils/gameLaunch";
+import { openGamePicker, resolveGameFromSlug } from "@/utils/gameLaunch";
 
 export default function PlayGamePage() {
     const params = useParams();
@@ -24,7 +24,7 @@ export default function PlayGamePage() {
             if (cancelled) return;
 
             if (resolved) {
-                await launchGame(resolved, { updateUrl: false });
+                openGamePicker(resolved);
                 router.replace("/");
                 return;
             }

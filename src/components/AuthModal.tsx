@@ -5,7 +5,8 @@ import { toast } from "sonner";
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Mail, Lock, User, Eye, EyeOff, Loader2 } from "lucide-react";
+import { X, Mail, Lock, User, Eye, EyeOff, Loader2, Gift } from "lucide-react";
+import { getPendingReferralCode, storePendingReferralCode } from "@/utils/referralClient";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -54,6 +55,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', vari
     const [password, setPassword] = useState("");
     const [username, setUsername] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [referralCode, setReferralCode] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -86,6 +88,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', vari
             setPassword("");
             setUsername("");
             setConfirmPassword("");
+            setReferralCode(initialMode === "signup" ? (getPendingReferralCode() || "") : "");
             setIsForgotPassword(false);
         } else {
             setShow(false);
@@ -229,6 +232,9 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', vari
             } else {
                 if (password !== confirmPassword) {
                     throw new Error("Passwords do not match");
+                }
+                if (referralCode.trim()) {
+                    storePendingReferralCode(referralCode);
                 }
                 const { error } = await supabase.auth.signUp({
                     email,
@@ -405,6 +411,20 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', vari
                                                     disabled={loading}
                                                     required
                                                     autoComplete="off"
+                                                />
+                                            </div>
+                                        )}
+
+                                        {!isLogin && !isForgotPassword && (
+                                            <div className="relative group">
+                                                <Gift className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#00b9f0] transition-colors" size={18} />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Invite code (optional)"
+                                                    className="w-full bg-[#0a161f]/80 border border-white/10 rounded-xl h-12 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#00b9f0] focus:ring-1 focus:ring-[#00b9f0] transition-all uppercase tracking-wider"
+                                                    value={referralCode}
+                                                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                                                    disabled={loading}
                                                 />
                                             </div>
                                         )}

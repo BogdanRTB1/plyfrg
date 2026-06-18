@@ -18,8 +18,11 @@ export interface GameReport {
     gameId?: string;
 }
 
+import { isDemoSessionActive } from "./demoPlay";
+
 export const recordGameSession = async (report: GameReport) => {
     if (report.wagered === 0 && report.payout === 0) return;
+    if (isDemoSessionActive()) return;
 
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();

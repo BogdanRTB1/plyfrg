@@ -9,7 +9,7 @@ import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
-import { ORIGINALS_PAYOUT } from "@/utils/originalsMath";
+import { calcOriginalsWin } from "@/utils/originalsMath";
 
 export const WANTED_CONFIG = {
     theme: {
@@ -256,7 +256,7 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
         if (gameState !== "PLAYING") return;
         clearAllTimers();
         setGameState("CASHED_OUT");
-        const winAmount = betAmount * multiplier * ORIGINALS_PAYOUT.wanted;
+        const winAmount = calcOriginalsWin(betAmount, multiplier, 'wanted');
         setLastWin({ amount: winAmount, currency: currencyType, mult: multiplier });
 
         if (currencyType === 'GC') {

@@ -9,7 +9,7 @@ import { User as UserIcon, Calendar, Trophy, Medal, Star, Shield, Lock, Activity
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { loadPublishedGames } from "@/utils/publishedGamesStorage";
-import { launchGame } from "@/utils/gameLaunch";
+import { openGamePicker } from "@/utils/gameLaunch";
 
 export default function ProfilePage() {
     const params = useParams();
@@ -344,7 +344,7 @@ export default function ProfilePage() {
                                             <div 
                                                 key={idx} 
                                                 className="bg-[#1a2c38] hover:bg-[#203645] cursor-pointer transition-colors border border-white/5 rounded-xl overflow-hidden group"
-                                                onClick={() => launchGame(game)}
+                                                onClick={() => openGamePicker(game)}
                                             >
                                                 <div className="aspect-[4/3] bg-gradient-to-tr from-[#0b1622] to-[#152a3a] relative flex items-center justify-center p-4">
                                                     <div className="absolute inset-0 bg-[#0b1622]/40 group-hover:bg-transparent transition-colors"></div>

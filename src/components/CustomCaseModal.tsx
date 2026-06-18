@@ -1,4 +1,5 @@
 "use client";
+import { scaleDemoWin } from "@/utils/demoPlay";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -283,7 +284,7 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
             }
 
             // Calculate payout
-            const winAmount = betAmount * winner.multiplier;
+            const winAmount = scaleDemoWin(betAmount * winner.multiplier);
             setLastWin({ amount: winAmount, currency: currencyType, item: winner });
 
             if (winAmount > 0) {

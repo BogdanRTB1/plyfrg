@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
 import { ORIGINALS_MARKETING_RTP_BANNER } from "@/constants/originalsRtp";
-import { launchGame } from "@/utils/gameLaunch";
+import { openGamePicker } from "@/utils/gameLaunch";
 import { setGameMenuOpen } from "@/utils/winConfetti";
 import PlinkoModal from "@/components/PlinkoModal";
 import MinesModal from "@/components/MinesModal";
@@ -174,7 +174,7 @@ export default function OriginalsPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 * index }}
                     >
-                        <div className="relative h-full group cursor-pointer" onClick={() => void launchGame(game.name)}>
+                        <div className="relative h-full group">
                             {/* Glow effect behind card for Originals */}
                             <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition duration-500 z-[-1]"></div>
 
@@ -183,6 +183,7 @@ export default function OriginalsPage() {
                                 image={game.image || ""}
                                 rtp={game.rtp}
                                 provider={game.provider}
+                                onClick={() => openGamePicker(game.name)}
                             />
 
                             {/* Customized Badge for Originals */}

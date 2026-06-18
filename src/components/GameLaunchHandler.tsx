@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { launchGameFromQueryParam, resolveGameFromSlug, launchGame } from "@/utils/gameLaunch";
+import { launchGameFromQueryParam, launchGameReal, resolveGameFromSlug } from "@/utils/gameLaunch";
 import { consumeAuthReturnPath } from "@/utils/authReturn";
 
 /** Handles `/?play=GameName` deep links and re-opens games after register/login. */
@@ -20,7 +20,7 @@ export default function GameLaunchHandler() {
 
             const slug = returnPath.replace(/^\/play\//, "");
             const resolved = await resolveGameFromSlug(slug);
-            if (resolved) launchGame(resolved, { updateUrl: false });
+            if (resolved) launchGameReal(resolved, { updateUrl: false });
         };
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {

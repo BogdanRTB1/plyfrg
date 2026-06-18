@@ -1,4 +1,5 @@
 "use client";
+import { scaleDemoWin } from "@/utils/demoPlay";
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -87,7 +88,7 @@ export default function DartWheelModal({ isOpen, onClose, diamonds, setDiamonds,
 
     const handleWin = (idx: number) => {
         const seg = DART_CONFIG.segments[idx];
-        const winAmount = betAmount * seg.mult;
+        const winAmount = scaleDemoWin(betAmount * seg.mult);
 
         setLastWin({ amount: winAmount, currency: currencyType, mult: seg.mult });
 

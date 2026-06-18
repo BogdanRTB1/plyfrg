@@ -9,7 +9,7 @@ import FavoriteToggle from "./FavoriteToggle";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
-import { ORIGINALS_PAYOUT, generateRampCrashPoint } from "@/utils/originalsMath";
+import { calcOriginalsWin, generateRampCrashPoint } from "@/utils/originalsMath";
 
 const HEIST_CONFIG = {
     names: { title: "Heist" },
@@ -72,7 +72,7 @@ export default function HeistModal({ isOpen, onClose, diamonds, setDiamonds, for
         if (timerRef.current) clearInterval(timerRef.current);
 
         setGameState('WON');
-        const winAmount = betAmount * multiplier * ORIGINALS_PAYOUT.heist;
+        const winAmount = calcOriginalsWin(betAmount, multiplier, 'heist');
         setCashOutValue(winAmount);
         setLastWin({ amount: winAmount, currency: currencyType });
 

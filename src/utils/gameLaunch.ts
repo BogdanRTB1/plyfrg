@@ -5,7 +5,7 @@ import { loadPublishedGames } from "@/utils/publishedGamesStorage";
 import { createClient } from "@/utils/supabase/client";
 import { saveAuthReturnPath } from "@/utils/authReturn";
 
-export type GameLaunchPayload = string | Record<string, unknown>;
+export type GameLaunchPayload = string | (Record<string, unknown> & { isDemo?: boolean; isPreview?: boolean });
 
 function getSlugForPayload(game: GameLaunchPayload): string | null {
     if (typeof game === "string") {
@@ -18,6 +18,19 @@ function getSlugForPayload(game: GameLaunchPayload): string | null {
 
 function isPreviewGame(game: GameLaunchPayload): boolean {
     return typeof game === "object" && game !== null && !!(game as { isPreview?: boolean }).isPreview;
+}
+
+function isDemoGame(game: GameLaunchPayload): boolean {
+    return typeof game === "object" && game !== null && !!(game as { isDemo?: boolean }).isDemo;
+}
+
+export function normalizeGamePayload(game: GameLaunchPayload): Record<string, unknown> & { name?: string } {
+    if (typeof game === "string") return { name: game };
+    return game as Record<string, unknown> & { name?: string };
+}
+
+export function withDemoFlag(game: GameLaunchPayload): Record<string, unknown> & { isDemo: true; name?: string } {
+    return { ...normalizeGamePayload(game), isDemo: true };
 }
 
 function openGameModal(game: GameLaunchPayload, options?: { updateUrl?: boolean }) {
@@ -41,8 +54,36 @@ function promptAuthForGame(game: GameLaunchPayload, options?: { updateUrl?: bool
     }
 }
 
-/** Opens a game when logged in; otherwise shows register/login and remembers the game for after auth. */
+/** Opens picker menu — Play (real) or Demo. */
+export function openGamePicker(game: GameLaunchPayload) {
+    window.dispatchEvent(new CustomEvent("open_game_picker", { detail: game }));
+}
+
+/** Opens a game in demo mode (virtual balance, no account). */
+export function launchGameDemo(game: GameLaunchPayload, options?: { updateUrl?: boolean }) {
+    openGameModal(withDemoFlag(game), options);
+}
+
+/** Opens a game with real balance when logged in; guests see the auth prompt. */
 export async function launchGame(game: GameLaunchPayload, options?: { updateUrl?: boolean }) {
+    if (isPreviewGame(game) || isDemoGame(game)) {
+        openGameModal(game, options);
+        return;
+    }
+
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+        launchGameDemo(game, options);
+        return;
+    }
+
+    openGameModal(game, options);
+}
+
+/** Real-money play — prompts login/register when guest. */
+export async function launchGameReal(game: GameLaunchPayload, options?: { updateUrl?: boolean }) {
     if (isPreviewGame(game)) {
         openGameModal(game, options);
         return;
@@ -92,5 +133,5 @@ export async function resolveGameFromSlug(slug: string): Promise<GameLaunchPaylo
 /** Handle legacy `/?play=...` links from creator profiles. */
 export async function launchGameFromQueryParam(playParam: string) {
     const resolved = await resolveGameFromSlug(playParam);
-    await launchGame(resolved ?? playParam, { updateUrl: true });
+    openGamePicker(resolved ?? playParam);
 }
