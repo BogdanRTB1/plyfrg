@@ -243,7 +243,7 @@ export function applyBlackjackPayout(bet: number, multiplier: number) {
     let winAmount = bet * multiplier;
     if (multiplier > 1) {
         const profit = winAmount - bet;
-        const tax = isDemoSessionActive() ? 0.65 : 0.85;
+        const tax = isDemoSessionActive() ? 0.78 : 0.92;
         winAmount = bet + profit * tax;
     }
     return scaleDemoWin(winAmount);

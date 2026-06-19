@@ -88,7 +88,6 @@ export default function GameLaunchPickerModal({ isOpen, game, onClose }: GameLau
                                 >
                                     <Play size={18} className="fill-current" />
                                     Play
-                                    <span className="text-[11px] font-semibold opacity-80">(real balance)</span>
                                 </button>
                                 <button
                                     type="button"
@@ -97,7 +96,6 @@ export default function GameLaunchPickerModal({ isOpen, game, onClose }: GameLau
                                 >
                                     <Sparkles size={18} />
                                     Demo Play
-                                    <span className="text-[11px] font-semibold opacity-80">(99,999 · bigger wins)</span>
                                 </button>
                             </div>
                         </div>

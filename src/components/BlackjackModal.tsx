@@ -12,6 +12,14 @@ import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./Mo
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
 import { applyBlackjackPayout } from "@/utils/originalsMath";
+import {
+    type BlackjackCard,
+    createShuffledDeck,
+    drawFromDeck,
+    calculateBlackjackHand,
+    shouldDealerHit,
+    dealInitialBlackjackHands,
+} from "@/utils/blackjackEngine";
 
 // INFLUENCER/ADMIN CUSTOMIZATION CONFIG
 export const BLACKJACK_CONFIG = {
@@ -32,12 +40,7 @@ export const BLACKJACK_CONFIG = {
     }
 };
 
-type Card = {
-    suit: 'Hearts' | 'Diamonds' | 'Clubs' | 'Spades';
-    value: string; // 'A', '2', ..., '10', 'J', 'Q', 'K'
-    numValue: number; // 1-11
-    hidden?: boolean;
-};
+type Card = BlackjackCard;
 
 export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds, forgesCoins, setForgesCoins }: any) {
     const [currencyType, setCurrencyType] = useState<'GC' | 'FC'>('GC');
@@ -57,55 +60,10 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
     const [dealerHand, setDealerHand] = useState<Card[]>([]);
     const dealerTimeoutRef = useRef<number | null>(null);
     const roundIdRef = useRef(0);
+    const deckRef = useRef<Card[]>(createShuffledDeck());
 
-    // simple deck logic
-    const drawCard = (): Card => {
-        const suits: ('Hearts' | 'Diamonds' | 'Clubs' | 'Spades')[] = ['Hearts', 'Diamonds', 'Clubs', 'Spades'];
-        const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-        const suit = suits[Math.floor(Math.random() * suits.length)];
-        const value = values[Math.floor(Math.random() * values.length)];
-
-        let numValue = parseInt(value);
-        if (value === 'A') numValue = 11;
-        if (['J', 'Q', 'K'].includes(value)) numValue = 10;
-
-        return { suit, value, numValue };
-    };
-
-    const calculateHand = (hand: Card[]) => {
-        let total = 0;
-        let aces = 0;
-        hand.forEach(c => {
-            if (!c.hidden) {
-                total += c.numValue;
-                if (c.value === 'A') aces += 1;
-            }
-        });
-        while (total > 21 && aces > 0) {
-            total -= 10;
-            aces -= 1;
-        }
-        return total;
-    };
-
-    const getHandTotals = (hand: Card[]) => {
-        let total = 0;
-        let aces = 0;
-        hand.forEach(c => {
-            if (!c.hidden) {
-                total += c.numValue;
-                if (c.value === 'A') aces += 1;
-            }
-        });
-
-        let acesCountedAsEleven = aces;
-        while (total > 21 && acesCountedAsEleven > 0) {
-            total -= 10;
-            acesCountedAsEleven -= 1;
-        }
-
-        return { total, isSoft: acesCountedAsEleven > 0 };
-    };
+    const calculateHand = calculateBlackjackHand;
+    const drawCard = () => drawFromDeck(deckRef.current);
 
     const clearDealerTimeout = () => {
         if (dealerTimeoutRef.current !== null) {
@@ -128,8 +86,7 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
         setSessionWagered(prev => prev + betAmount);
         playGameSound('blackjack', 'bet');
 
-        const pHand: Card[] = [drawCard(), drawCard()];
-        const dHand: Card[] = [drawCard(), { ...drawCard(), hidden: true }];
+        const { playerHand: pHand, dealerHand: dHand } = dealInitialBlackjackHands(deckRef.current);
 
         setPlayerHand(pHand);
         setDealerHand(dHand);
@@ -166,14 +123,11 @@ export default function BlackjackModal({ isOpen, onClose, diamonds, setDiamonds,
 
         let dHand: Card[] = dealerHand.map(c => ({ ...c, hidden: false }));
 
-        // Dealer should hit on totals below 17 and on soft 17.
+        // Dealer stands on all 17+ (including soft 17).
         const playDealer = () => {
             if (activeRoundId !== roundIdRef.current || !isOpen) return;
 
-            const { total: dTotal, isSoft } = getHandTotals(dHand);
-            const shouldHit = dTotal < 17 || (dTotal === 17 && isSoft);
-
-            if (shouldHit) {
+            if (shouldDealerHit(dHand)) {
                 dealerTimeoutRef.current = window.setTimeout(() => {
                     if (activeRoundId !== roundIdRef.current || !isOpen) return;
                     const newCard = drawCard();
