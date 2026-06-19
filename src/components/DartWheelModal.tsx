@@ -7,6 +7,8 @@ import { X, Target, Zap, Trophy, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
@@ -43,6 +45,7 @@ export default function DartWheelModal({ isOpen, onClose, diamonds, setDiamonds,
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
     const [gameState, setGameState] = useState<'IDLE' | 'SPINNING' | 'FINISHED'>('IDLE');
     const [wheelRotation, setWheelRotation] = useState(0);
@@ -178,6 +181,7 @@ export default function DartWheelModal({ isOpen, onClose, diamonds, setDiamonds,
                             <Target className={DART_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{DART_CONFIG.names.title}</h2>
                             <FavoriteToggle gameName={DART_CONFIG.names.title} />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>
@@ -314,6 +318,7 @@ export default function DartWheelModal({ isOpen, onClose, diamonds, setDiamonds,
                         </motion.div>
                     </motion.div>
                 )}
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={"Dart Wheel"} />
             </AnimatePresence>
         </div>,
         document.body

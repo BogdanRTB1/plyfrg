@@ -8,6 +8,8 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import type { MinesConfig, MinesGridSize } from "@/types/minesConfig";
 import { DEFAULT_MINES_CONFIG, GRID_SIZE_PRESETS as MINES_GRID_PRESETS, GRID_DEFAULT_MINE_COUNT } from "@/types/minesConfig";
@@ -97,6 +99,7 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'EXPLODED' | 'WON'>('IDLE');
     const [multiplier, setMultiplier] = useState(1.00);
@@ -439,6 +442,7 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
                             <Target style={{ color: accentColor }} className="w-5 h-5" />
                             <h2 className="text-sm font-black uppercase tracking-widest truncate max-w-[120px]">{config.theme.gameName}</h2>
                             <FavoriteToggle gameName={gameData?.name || "Mines"} />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         {lastWin ? (
                             <span className="text-sm font-black text-green-400 font-mono flex items-center gap-1">

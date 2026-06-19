@@ -25,7 +25,6 @@ import GameCard from "./GameCard";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
-import { displayRtpForHome } from "@/constants/originalsRtp";
 import { loadPublishedGames } from "@/utils/publishedGamesStorage";
 import { openGamePicker } from "@/utils/gameLaunch";
 
@@ -112,12 +111,7 @@ export default function HomeContent() {
         window.location.href = `/creators/${encodeURIComponent(creatorName)}`;
     };
 
-    const originals = FEATURED_GAMES.map((game) => ({
-        ...game,
-        image: getGameCoverImage(game.name),
-    }));
-
-    const activeOriginals = originals.slice(0, 12);
+    const featuredInfluencerGames = customGames.slice(0, 12);
 
     const recentWins = [
         { game: "Plinko", user: "AlexM99", multiplier: "130.00", payout: "1,300 FC", icon: "/images/game-plinko.png" },
@@ -131,7 +125,9 @@ export default function HomeContent() {
         setIsRandomizing(true);
         setTimeout(() => {
             setIsRandomizing(false);
-            const allGames = [...originals, ...customGames];
+            const allGames = customGames.length > 0
+                ? customGames
+                : FEATURED_GAMES.map((game) => ({ name: game.name, image: getGameCoverImage(game.name) }));
             if (allGames.length === 0) return;
             const randomPick = allGames[Math.floor(Math.random() * allGames.length)];
             const payload = typeof randomPick === "object" && randomPick !== null && "type" in randomPick
@@ -192,24 +188,40 @@ export default function HomeContent() {
                 </div>
             </motion.section>
 
-            {/* Originals Section */}
+            {/* Influencer Games */}
             <motion.div variants={item} className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3 mb-6">
-                <h2 className="text-2xl font-bold text-white flex items-center gap-3 before:content-[''] before:w-1 before:h-6 before:bg-[#00b9f0] before:rounded-full">PlayForges Originals</h2>
+                <h2 className="text-2xl font-bold text-white flex items-center gap-3 before:content-[''] before:w-1 before:h-6 before:bg-purple-500 before:rounded-full">Influencer Games</h2>
+                <Link href="/casino" className="text-sm font-bold text-[#00b9f0] hover:text-[#38bdf8] transition">View All</Link>
             </motion.div>
 
             <motion.div variants={item} className="mb-12">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
-                    {activeOriginals.map((game, index) => (
-                        <div key={index} className="h-full">
-                            <GameCard
-                                name={game.name}
-                                image={game.image}
-                                rtp={displayRtpForHome(game.rtp, game.name)}
-                                onClick={() => openGamePicker(game.name)}
-                            />
-                        </div>
-                    ))}
-                </div>
+                {featuredInfluencerGames.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
+                        {featuredInfluencerGames.map((game: any, index: number) => (
+                            <div key={game.id || index} className="h-full relative">
+                                <GameCard
+                                    name={game.name}
+                                    image={game.coverImage || ""}
+                                    rtp="88.0%"
+                                    provider={game.creatorName ? `@${game.creatorName}` : "Creator"}
+                                    onClick={() => openGamePicker(game)}
+                                />
+                                <div className="absolute top-2 left-2 z-20 pointer-events-none">
+                                    <span className="px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider backdrop-blur-md border bg-fuchsia-500/90 text-white border-fuchsia-400/50 shadow-[0_0_10px_rgba(217,70,239,0.5)]">
+                                        Creator
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="bg-[#0f212e] border border-white/5 rounded-2xl p-10 text-center">
+                        <p className="text-slate-400 mb-4">No influencer games published yet. Check back soon or explore creators building new games.</p>
+                        <Link href="/creators" className="inline-flex items-center justify-center bg-[#00b9f0] hover:bg-[#38bdf8] text-[#0f212e] px-6 py-2.5 rounded-xl font-bold text-sm transition-all">
+                            Browse Creators
+                        </Link>
+                    </div>
+                )}
             </motion.div>
 
             {/* Top Creators */}

@@ -6,6 +6,8 @@ import { HiLoConfig, DEFAULT_HILO_CONFIG } from '@/types/hiloConfig';
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { createPortal } from "react-dom";
 import { getSharedAudioContext } from "@/utils/gameAudioContext";
@@ -81,6 +83,7 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
     useEffect(() => {
         if (isOpen) audioCtxRef.current = getSharedAudioContext();
@@ -499,6 +502,7 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
                             <Target style={{ color: config.accentColor }} className="w-5 h-5" />
                             <h2 className="text-sm font-black uppercase tracking-widest truncate max-w-[120px]">{config.theme.gameName}</h2>
                             <FavoriteToggle gameName={gameName || "Hi-Lo"} />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         {lastWin ? (
                             <span className="text-sm font-black text-green-400 font-mono flex items-center gap-1">
@@ -649,6 +653,7 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
                         </motion.div>
                     </motion.div>
                 )}
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={gameName || gameConfig?.theme?.gameName || "Hi-Lo"} />
             </AnimatePresence>
         </div>,
         document.body

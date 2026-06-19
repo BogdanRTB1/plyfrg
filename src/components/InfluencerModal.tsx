@@ -6,6 +6,8 @@ import { X, Heart, MessageCircle, Share2, Flame, Trophy, Smartphone, MoreHorizon
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
@@ -31,6 +33,7 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const likeIdRef = useRef(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
     const startGame = () => {
         if (balance < betAmount) return;
@@ -178,6 +181,7 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
                             <Smartphone className="text-purple-500" />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">Viral</h2>
                             <FavoriteToggle gameName="Viral" />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>
@@ -354,10 +358,12 @@ export default function InfluencerModal({ isOpen, onClose, diamonds, setDiamonds
                                 <span className="text-[10px] font-bold uppercase text-slate-400">Last win</span>
                                 {lastWin ? <span className="flex items-center gap-1 text-sm font-black text-green-400">+{lastWin.amount.toFixed(2)} {lastWin.currency === "GC" ? <DiamondIcon className="h-3 w-3" /> : <ForgesCoinIcon className="h-3 w-3" />}</span> : <span className="font-mono text-xs text-slate-600">—</span>}
                             </div>
+                            <GameLeaderboardTrigger variant="mobile-menu" onClick={() => { setLeaderboardOpen(true); setMobileMoreOpen(false); }} />
                             <button type="button" onClick={() => setMobileMoreOpen(false)} className="w-full rounded-xl border border-white/10 bg-[#1a2c38] py-3 text-sm font-bold text-white active:bg-white/10">Done</button>
                         </motion.div>
                     </motion.div>
                 )}
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={"Influencer"} />
             </AnimatePresence>
         </div>,
         document.body

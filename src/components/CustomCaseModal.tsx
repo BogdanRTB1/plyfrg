@@ -8,6 +8,8 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import type { CaseConfig, CaseItem, CaseRarity } from "@/types/caseConfig";
 import { DEFAULT_CASE_CONFIG, RARITY_CONFIG } from "@/types/caseConfig";
@@ -151,6 +153,7 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
     const [gameState, setGameState] = useState<'IDLE' | 'OPENING' | 'REVEALING' | 'FINISHED'>('IDLE');
     const [bandItems, setBandItems] = useState<CaseItem[]>([]);
@@ -491,6 +494,7 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
                             <Package style={{ color: accentColor }} className="w-5 h-5" />
                             <span className="text-sm font-black uppercase tracking-widest truncate max-w-[120px]">{config.theme.gameName}</span>
                             <FavoriteToggle gameName={gameData?.name || "Case"} />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         {lastWin ? (
                             <span className="text-sm font-black font-mono flex items-center gap-1"
@@ -721,6 +725,7 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
                         </motion.div>
                     </motion.div>
                 )}
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={gameData?.name || "Custom Case"} />
             </AnimatePresence>
         </div>,
         document.body

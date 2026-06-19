@@ -22,3 +22,15 @@ export function clearPendingReferralCode() {
     if (typeof window === "undefined") return;
     localStorage.removeItem(PENDING_REFERRAL_STORAGE_KEY);
 }
+
+const inviteAckKey = (code: string) => `referral_invite_ack_${code}`;
+
+export function wasReferralInviteAcknowledged(code: string): boolean {
+    if (typeof window === "undefined") return false;
+    return sessionStorage.getItem(inviteAckKey(code)) === "1";
+}
+
+export function markReferralInviteAcknowledged(code: string) {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem(inviteAckKey(code), "1");
+}

@@ -8,6 +8,8 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { resumeGameAudio } from "@/utils/gameAudioContext";
 import { playGameSound } from "@/utils/originalGameSounds";
@@ -23,6 +25,7 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
     const [gameState, setGameState] = useState<'IDLE' | 'SPINNING' | 'WON' | 'LOST'>('IDLE');
     const [reels, setReels] = useState<number[]>([1, 1, 1]);
@@ -188,6 +191,7 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
                             <div className="flex items-center gap-2">
                                 <h2 className="text-xl font-black uppercase italic tracking-widest">{gameData?.name || "Slots"}</h2>
                                 <FavoriteToggle gameName={gameData?.name || "Slots"} />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                             </div>
                             <p className="text-[10px] text-purple-400 font-bold uppercase tracking-widest truncate w-[200px]">By {gameData.creatorName}</p>
                         </div>
@@ -342,6 +346,24 @@ export default function CustomSlotsModal({ isOpen, onClose, gameData, diamonds, 
                     </div>
                 </div>
             </motion.div>
+
+            <AnimatePresence>
+                {mobileMoreOpen && (
+                    <motion.div key="custom-slots-mobile-more" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110] flex flex-col justify-end md:hidden">
+                        <button type="button" className="min-h-0 flex-1 bg-black/55" aria-label="Close menu" onClick={() => setMobileMoreOpen(false)} />
+                        <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 320 }} className="max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain rounded-t-2xl border border-white/10 border-b-0 bg-[#121c22] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
+                            <div className="mb-4 flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{gameData?.name || "Slots"}</span>
+                                <FavoriteToggle gameName={gameData?.name || "Slots"} />
+                            </div>
+                            <GameLeaderboardTrigger variant="mobile-menu" onClick={() => { setLeaderboardOpen(true); setMobileMoreOpen(false); }} />
+                            <button type="button" onClick={() => setMobileMoreOpen(false)} className="w-full rounded-xl border border-white/10 bg-[#1a2c38] py-3 text-sm font-bold text-white active:bg-white/10">Done</button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={gameData?.name || "Custom Game"} />
         </div>,
         document.body
     );

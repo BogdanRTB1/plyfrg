@@ -46,6 +46,7 @@ import CustomScratchModal from "@/components/CustomScratchModal";
 import CustomWheelModal from "@/components/CustomWheelModal";
 import CustomCaseModal from "@/components/CustomCaseModal";
 import CustomHiloModal from "@/components/CustomHiloModal";
+import CustomBlackjackModal from "@/components/CustomBlackjackModal";
 import AIGameModal from "@/components/AIGameModal";
 
 // Other modals
@@ -80,6 +81,7 @@ export default function GlobalGameModals() {
     const [isCustomWheelOpen, setIsCustomWheelOpen] = useState(false);
     const [isCustomCaseOpen, setIsCustomCaseOpen] = useState(false);
     const [isCustomHiloOpen, setIsCustomHiloOpen] = useState(false);
+    const [isCustomBlackjackOpen, setIsCustomBlackjackOpen] = useState(false);
     const [isAIGameOpen, setIsAIGameOpen] = useState(false);
 
     const [isCreatorAppOpen, setIsCreatorAppOpen] = useState(false);
@@ -315,6 +317,7 @@ export default function GlobalGameModals() {
                 else if (raw.type === "wheel") setIsCustomWheelOpen(true);
                 else if (raw.type === "case") setIsCustomCaseOpen(true);
                 else if (raw.type === "hilo") setIsCustomHiloOpen(true);
+                else if (raw.type === "blackjack") setIsCustomBlackjackOpen(true);
                 recordGameActivity(label);
                 return;
             }
@@ -382,7 +385,7 @@ export default function GlobalGameModals() {
         isDartOpen || isAviatorOpen || isTomatoesOpen || isFootballOpen ||
         isBridgeOpen || isCustomSlotsOpen || isCustomPlinkoOpen ||
         isCustomMinesOpen || isCustomCrashOpen || isCustomScratchOpen ||
-        isCustomWheelOpen || isCustomCaseOpen || isCustomHiloOpen || isAIGameOpen;
+        isCustomWheelOpen || isCustomCaseOpen || isCustomHiloOpen || isCustomBlackjackOpen || isAIGameOpen;
 
     useEffect(() => {
         setGameMenuOpen(anyGameOpen);
@@ -398,7 +401,7 @@ export default function GlobalGameModals() {
         isMinesOpen, isSlotsOpen, isBlackjackOpen, isRouletteOpen, isCrashOpen, isSneakOpen,
         isDartOpen, isAviatorOpen, isTomatoesOpen, isFootballOpen, isBridgeOpen,
         isCustomSlotsOpen, isCustomPlinkoOpen, isCustomMinesOpen, isCustomCrashOpen,
-        isCustomScratchOpen, isCustomWheelOpen, isCustomCaseOpen, isCustomHiloOpen, isAIGameOpen,
+        isCustomScratchOpen, isCustomWheelOpen, isCustomCaseOpen, isCustomHiloOpen, isCustomBlackjackOpen, isAIGameOpen,
     ]);
 
     const customBalance = getCustomBalanceProps(activeCustomGame);
@@ -436,6 +439,7 @@ export default function GlobalGameModals() {
             <CustomWheelModal isOpen={isCustomWheelOpen} onClose={() => setIsCustomWheelOpen(false)} gameData={activeCustomGame} diamonds={customBalance.diamonds} setDiamonds={customBalance.setDiamonds} forgesCoins={customBalance.forgesCoins} setForgesCoins={customBalance.setForgesCoins} />
             <CustomCaseModal isOpen={isCustomCaseOpen} onClose={() => setIsCustomCaseOpen(false)} gameData={activeCustomGame} diamonds={customBalance.diamonds} setDiamonds={customBalance.setDiamonds} forgesCoins={customBalance.forgesCoins} setForgesCoins={customBalance.setForgesCoins} />
             <CustomHiloModal isOpen={isCustomHiloOpen} onClose={() => setIsCustomHiloOpen(false)} gameConfig={activeCustomGame} gameName={activeCustomGame?.name} diamonds={customBalance.diamonds} setDiamonds={customBalance.setDiamonds} forgesCoins={customBalance.forgesCoins} setForgesCoins={customBalance.setForgesCoins} />
+            <CustomBlackjackModal isOpen={isCustomBlackjackOpen} onClose={() => setIsCustomBlackjackOpen(false)} gameData={activeCustomGame} diamonds={customBalance.diamonds} setDiamonds={customBalance.setDiamonds} forgesCoins={customBalance.forgesCoins} setForgesCoins={customBalance.setForgesCoins} />
             
             {activeCustomGame && (
                 <AIGameModal isOpen={isAIGameOpen} onClose={() => setIsAIGameOpen(false)} gameData={activeCustomGame} diamonds={customBalance.diamonds} setDiamonds={customBalance.setDiamonds} forgesCoins={customBalance.forgesCoins} setForgesCoins={customBalance.setForgesCoins} />

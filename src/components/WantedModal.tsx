@@ -6,6 +6,8 @@ import { X, Trophy, Skull, Zap, ChevronLeft, ChevronRight, MoreHorizontal } from
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
@@ -50,6 +52,7 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
     const [gameState, setGameState] = useState<GameState>("IDLE");
     const [countdown, setCountdown] = useState(3);
@@ -406,6 +409,7 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
                             <Skull className={WANTED_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase tracking-widest">Wanted Pursuit</h2>
                             <FavoriteToggle gameName={WANTED_CONFIG.names.title} />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>
@@ -621,6 +625,7 @@ export default function WantedModal({ isOpen, onClose, diamonds, setDiamonds, fo
                         </motion.div>
                     </motion.div>
                 )}
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={"Wanted"} />
             </AnimatePresence>
         </div>,
         document.body

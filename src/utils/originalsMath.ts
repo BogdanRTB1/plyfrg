@@ -12,24 +12,63 @@ export function applyOriginalsPayout(bet: number, multiplier: number, payoutFact
     return bet * multiplier * payoutFactor;
 }
 
-/** Standard crash curve — instant 1x bust ~15.5%, heavy tail trimmed. */
+/** Standard crash curve — instant 1x bust ~18%, heavy tail trimmed. */
 export function generateCrashPoint() {
-    const instantBustChance = isDemoSessionActive() ? 0.09 : 0.165;
+    const instantBustChance = isDemoSessionActive() ? 0.11 : 0.18;
     if (Math.random() < instantBustChance) return 1.0;
     const u = Math.max(0.0001, Math.random());
     return clamp((1 - instantBustChance) / (1 - u), 1.0, 80);
 }
 
-/** Heist / Escape style linear multiplier ramp. */
+/** Creator crash template — respects configured edge with a sensible floor. */
+export function generateCreatorCrashPoint(houseEdgePercent: number, maxMultiplier = 35) {
+    const edge = Math.max(18, Number(houseEdgePercent) || 18);
+    const edgeFraction = edge / 100;
+    const instantBustChance = isDemoSessionActive()
+        ? Math.min(0.14, edgeFraction + 0.04)
+        : edgeFraction;
+
+    if (Math.random() < instantBustChance) return 1.0;
+
+    const u = Math.max(0.0001, Math.random());
+    const cp = (1 - edgeFraction) / (1 - u);
+    return Number(Math.max(1.03, Math.min(cp, maxMultiplier)).toFixed(2));
+}
+
+export const CRASH_MIN_CASHOUT_MULT = 1.08;
+export const CRASH_MIN_PLAY_MS = 450;
+export const CRASH_ROUND_COOLDOWN_MS = 600;
+
+export function canCrashCashOut(roundStartMs: number, multiplier: number, isPlaying: boolean): boolean {
+    if (!isPlaying || roundStartMs <= 0) return false;
+    return (
+        performance.now() - roundStartMs >= CRASH_MIN_PLAY_MS &&
+        multiplier >= CRASH_MIN_CASHOUT_MULT
+    );
+}
+
+/** Heist style linear multiplier ramp. */
 export function generateRampCrashPoint() {
     const e = 2 ** (Math.random() * 2.65);
     return Math.max(1.0, e * 0.48);
 }
 
+/** Escape — anti-spam curve; tuned ~heist-adjacent RTP with brief cash window. */
+export function generateEscapeCrashPoint() {
+    const instantBustChance = isDemoSessionActive() ? 0.11 : 0.18;
+    if (Math.random() < instantBustChance) return 1.0;
+    const e = 2 ** (Math.random() * 2.35);
+    return Math.max(1.03, e * 0.44);
+}
+
+export const ESCAPE_MIN_CASHOUT_MULT = 1.12;
+export const ESCAPE_MIN_PLAY_MS = 450;
+export const ESCAPE_ROUND_COOLDOWN_MS = 600;
+
 export const ORIGINALS_PAYOUT = {
-    crash: 0.94,
+    crash: 0.90,
     heist: 0.88,
-    escape: 0.88,
+    escape: 0.90,
     aviator: 0.94,
     sneak: 0.88,
     bomb: 0.82,

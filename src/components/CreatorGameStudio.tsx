@@ -34,6 +34,11 @@ import {
 import {
   HiLoConfig, DEFAULT_HILO_CONFIG, HILO_DEAL_SOUNDS, HILO_LOSS_SOUNDS
 } from '@/types/hiloConfig';
+import {
+  BlackjackConfig, DEFAULT_BLACKJACK_CONFIG,
+  BLACKJACK_CARD_BACK_PRESETS, BLACKJACK_FELT_PRESETS, BLACKJACK_OVERLAY_PRESETS,
+  BLACKJACK_WIN_SOUNDS
+} from '@/types/blackjackConfig';
 import CustomHiloModal from './CustomHiloModal';
 import StudioTemplateStylePicker from './StudioTemplateStylePicker';
 import { createClient } from '@/utils/supabase/client';
@@ -69,7 +74,7 @@ const SCRATCH_MAX_SYMBOL_PAYOUT = 6;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-type GameType = 'slots' | 'crash' | 'scratch' | 'wheel' | 'mines' | 'case' | 'hilo';
+type GameType = 'slots' | 'crash' | 'scratch' | 'wheel' | 'mines' | 'case' | 'hilo' | 'blackjack';
 type WheelOddsProfile = 'house_safe' | 'balanced' | 'volatile';
 
 interface CreatorGameStudioProps {
@@ -89,7 +94,8 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
         { id: 'wheel', label: 'Wheel of Fortune', icon: '🎡', desc: 'Spin to win — custom odds', style: 'border-rose-500 bg-rose-500/10 text-rose-400', iconBg: 'bg-rose-500/20' },
         { id: 'mines', label: 'Mines', icon: '💣', desc: 'Avoid mines — reveal gems', style: 'border-orange-500 bg-orange-500/10 text-orange-400', iconBg: 'bg-orange-500/20' },
         { id: 'case', label: 'Case Opening', icon: '📦', desc: 'Unbox items & rarities', style: 'border-indigo-500 bg-indigo-500/10 text-indigo-400', iconBg: 'bg-indigo-500/20' },
-        { id: 'hilo', label: 'Cards Hi-Lo', icon: '🃏', desc: 'Pick higher or lower', style: 'border-sky-500 bg-sky-500/10 text-sky-400', iconBg: 'bg-sky-500/20' }
+        { id: 'hilo', label: 'Cards Hi-Lo', icon: '🃏', desc: 'Pick higher or lower', style: 'border-sky-500 bg-sky-500/10 text-sky-400', iconBg: 'bg-sky-500/20' },
+        { id: 'blackjack', label: 'Blackjack', icon: '🂡', desc: 'Beat the dealer to 21', style: 'border-teal-500 bg-teal-500/10 text-teal-400', iconBg: 'bg-teal-500/20' }
     ];
 
     // ─── Slot Config State ─────────────────────────────────────────────────
@@ -214,6 +220,31 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
     const [hiloLossSoundType, setHiloLossSoundType] = useState(DEFAULT_HILO_CONFIG.lossSoundType);
     const [hiloLossSoundFile, setHiloLossSoundFile] = useState<string | null>(DEFAULT_HILO_CONFIG.lossSoundFile);
     const [hiloActiveSection, setHiloActiveSection] = useState<'design' | 'audio' | 'preview'>('design');
+
+    // ─── Blackjack Config State ──────────────────────────────────────────────
+    const [blackjackGameName, setBlackjackGameName] = useState(DEFAULT_BLACKJACK_CONFIG.theme.gameName);
+    const [blackjackGameDescription, setBlackjackGameDescription] = useState(DEFAULT_BLACKJACK_CONFIG.theme.gameDescription);
+    const [blackjackCoverImage, setBlackjackCoverImage] = useState<string | null>(null);
+    const [blackjackAccentColor, setBlackjackAccentColor] = useState(DEFAULT_BLACKJACK_CONFIG.accentColor);
+    const [blackjackBgColor, setBlackjackBgColor] = useState(DEFAULT_BLACKJACK_CONFIG.backgroundColor);
+    const [blackjackPanelColor, setBlackjackPanelColor] = useState(DEFAULT_BLACKJACK_CONFIG.panelColor);
+    const [blackjackTableColor, setBlackjackTableColor] = useState(DEFAULT_BLACKJACK_CONFIG.tableColor);
+    const [blackjackBgImage, setBlackjackBgImage] = useState<string | null>(DEFAULT_BLACKJACK_CONFIG.backgroundImage);
+    const [blackjackFeltPattern, setBlackjackFeltPattern] = useState<BlackjackConfig['tableFeltPattern']>(DEFAULT_BLACKJACK_CONFIG.tableFeltPattern);
+    const [blackjackTableOverlay, setBlackjackTableOverlay] = useState<BlackjackConfig['tableOverlay']>(DEFAULT_BLACKJACK_CONFIG.tableOverlay);
+    const [blackjackCardBackImage, setBlackjackCardBackImage] = useState<string | null>(DEFAULT_BLACKJACK_CONFIG.cardBackImage);
+    const [blackjackCardBackEmoji, setBlackjackCardBackEmoji] = useState(DEFAULT_BLACKJACK_CONFIG.cardBackEmoji);
+    const [blackjackFaceJ, setBlackjackFaceJ] = useState<string | null>(DEFAULT_BLACKJACK_CONFIG.customFaceCards.J);
+    const [blackjackFaceQ, setBlackjackFaceQ] = useState<string | null>(DEFAULT_BLACKJACK_CONFIG.customFaceCards.Q);
+    const [blackjackFaceK, setBlackjackFaceK] = useState<string | null>(DEFAULT_BLACKJACK_CONFIG.customFaceCards.K);
+    const [blackjackFaceA, setBlackjackFaceA] = useState<string | null>(DEFAULT_BLACKJACK_CONFIG.customFaceCards.A);
+    const [blackjackDealSoundType, setBlackjackDealSoundType] = useState(DEFAULT_BLACKJACK_CONFIG.dealSoundType);
+    const [blackjackDealSoundFile, setBlackjackDealSoundFile] = useState<string | null>(DEFAULT_BLACKJACK_CONFIG.dealSoundFile);
+    const [blackjackWinSoundType, setBlackjackWinSoundType] = useState(DEFAULT_BLACKJACK_CONFIG.winSoundType);
+    const [blackjackWinSoundFile, setBlackjackWinSoundFile] = useState<string | null>(DEFAULT_BLACKJACK_CONFIG.winSoundFile);
+    const [blackjackLossSoundType, setBlackjackLossSoundType] = useState(DEFAULT_BLACKJACK_CONFIG.lossSoundType);
+    const [blackjackLossSoundFile, setBlackjackLossSoundFile] = useState<string | null>(DEFAULT_BLACKJACK_CONFIG.lossSoundFile);
+    const [blackjackActiveSection, setBlackjackActiveSection] = useState<'design' | 'effects' | 'preview'>('design');
 
     // ─── UI State ──────────────────────────────────────────────────────────
     const [winEffect, setWinEffect] = useState('confetti');
@@ -562,6 +593,32 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
             }
         };
     }, [hiloCardBackImage, hiloFaceJ, hiloFaceQ, hiloFaceK, hiloFaceA, hiloAccentColor, hiloBgColor, hiloDealSoundType, hiloDealSoundFile, hiloLossSoundType, hiloLossSoundFile, hiloGameName, hiloGameDescription]);
+
+    const buildBlackjackConfig = useCallback((): BlackjackConfig => ({
+        accentColor: blackjackAccentColor,
+        backgroundColor: blackjackBgColor,
+        panelColor: blackjackPanelColor,
+        tableColor: blackjackTableColor,
+        backgroundImage: blackjackBgImage,
+        tableFeltPattern: blackjackFeltPattern,
+        tableOverlay: blackjackTableOverlay,
+        cardBackImage: blackjackCardBackImage,
+        cardBackEmoji: blackjackCardBackEmoji,
+        customFaceCards: { J: blackjackFaceJ, Q: blackjackFaceQ, K: blackjackFaceK, A: blackjackFaceA },
+        dealSoundType: blackjackDealSoundType as BlackjackConfig['dealSoundType'],
+        dealSoundFile: blackjackDealSoundFile,
+        winSoundType: blackjackWinSoundType as BlackjackConfig['winSoundType'],
+        winSoundFile: blackjackWinSoundFile,
+        lossSoundType: blackjackLossSoundType as BlackjackConfig['lossSoundType'],
+        lossSoundFile: blackjackLossSoundFile,
+        theme: { gameName: blackjackGameName, gameDescription: blackjackGameDescription },
+    }), [
+        blackjackAccentColor, blackjackBgColor, blackjackPanelColor, blackjackTableColor, blackjackBgImage,
+        blackjackFeltPattern, blackjackTableOverlay, blackjackCardBackImage, blackjackCardBackEmoji,
+        blackjackFaceJ, blackjackFaceQ, blackjackFaceK, blackjackFaceA,
+        blackjackDealSoundType, blackjackDealSoundFile, blackjackWinSoundType, blackjackWinSoundFile,
+        blackjackLossSoundType, blackjackLossSoundFile, blackjackGameName, blackjackGameDescription,
+    ]);
 
     // ─── Test Spin ─────────────────────────────────────────────────────────
     const handleTestSpin = async () => {
@@ -1129,6 +1186,54 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                     setIsSuccess(false);
                 }, 2500);
             }, 1500);
+        } else if (gameType === 'blackjack') {
+            if (!blackjackGameName.trim()) { alert("Please provide a game name."); return; }
+            if (!blackjackCoverImage) { alert("Please upload a cover image before publishing."); return; }
+
+            if (await hasDuplicateName(blackjackGameName)) {
+                alert("A game with this name already exists. Please choose a unique name.");
+                return;
+            }
+
+            setIsPublishing(true);
+
+            setTimeout(async () => {
+                const blackjackConfig = buildBlackjackConfig();
+                const newGame = {
+                    id: 'blackjack_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    creatorId: creatorData.id || creatorData.name,
+                    creatorName: creatorData.name,
+                    type: 'blackjack',
+                    name: blackjackGameName,
+                    gameDescription: blackjackGameDescription,
+                    coverImage: blackjackCoverImage,
+                    themeEmoji: '🂡',
+                    themeColor: blackjackAccentColor,
+                    blackjackConfig,
+                    winEffect,
+                    winSound,
+                    publishedAt: new Date().toISOString()
+                };
+                const preparedGame = await prepareGameForStorage(newGame);
+
+                const saveResult = await savePublishedGame(preparedGame);
+                if (!saveResult.ok) {
+                    setIsPublishing(false);
+                    alert(saveResult.reason === 'duplicate_name'
+                        ? 'A game with this name already exists. Please choose a unique name.'
+                        : 'Could not save the game. Please try again.');
+                    return;
+                }
+                setIsPublishing(false);
+                setIsSuccess(true);
+
+                setTimeout(() => {
+                    setBlackjackGameName(DEFAULT_BLACKJACK_CONFIG.theme.gameName);
+                    setBlackjackGameDescription(DEFAULT_BLACKJACK_CONFIG.theme.gameDescription);
+                    setBlackjackCoverImage(null);
+                    setIsSuccess(false);
+                }, 2500);
+            }, 1500);
         }
     };
 
@@ -1167,7 +1272,7 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                 <div className="mb-4 flex justify-between items-center sm:mb-6">
                     <div className="min-w-0">
                         <div className="mb-2 flex items-center gap-2 sm:gap-3">
-                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 sm:rounded-xl ${gameType === 'crash' ? 'bg-emerald-500/20 text-emerald-400' : gameType === 'scratch' ? 'bg-amber-500/20 text-amber-400' : gameType === 'wheel' ? 'bg-rose-500/20 text-rose-400' : gameType === 'mines' ? 'bg-orange-500/20 text-orange-400' : gameType === 'case' ? 'bg-indigo-500/20 text-indigo-400' : gameType === 'hilo' ? 'bg-sky-500/20 text-sky-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 sm:rounded-xl ${gameType === 'crash' ? 'bg-emerald-500/20 text-emerald-400' : gameType === 'scratch' ? 'bg-amber-500/20 text-amber-400' : gameType === 'wheel' ? 'bg-rose-500/20 text-rose-400' : gameType === 'mines' ? 'bg-orange-500/20 text-orange-400' : gameType === 'case' ? 'bg-indigo-500/20 text-indigo-400' : gameType === 'hilo' ? 'bg-sky-500/20 text-sky-400' : gameType === 'blackjack' ? 'bg-teal-500/20 text-teal-400' : 'bg-purple-500/20 text-purple-400'}`}>
                                 {gameType === 'crash' ? <Rocket size={18} className="sm:h-6 sm:w-6" /> : gameType === 'scratch' ? <Sparkles size={18} className="sm:h-6 sm:w-6" /> : gameType === 'wheel' ? <RotateCcw size={18} className="sm:h-6 sm:w-6" /> : gameType === 'mines' ? <Grid3X3 size={18} className="sm:h-6 sm:w-6" /> : <Sparkles size={18} className="sm:h-6 sm:w-6" />}
                             </div>
                             <h2 className="truncate text-xl font-black tracking-tight text-white sm:text-2xl md:text-3xl">Game Creator Studio</h2>
@@ -1481,6 +1586,40 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                     onClick={() => setHiloActiveSection(s.id as any)}
                                     className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${hiloActiveSection === s.id
                                         ? 'bg-gradient-to-r from-blue-600 to-sky-600 text-white shadow-lg shadow-blue-500/20'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                >
+                                    {s.icon}
+                                    {s.label}
+                                </button>
+                            ))}
+                            </div>
+                        </>
+                        )}
+
+                        {gameType === 'blackjack' && (
+                        <>
+                            <StudioTemplateStylePicker
+                                fieldLabel="Studio section"
+                                value={blackjackActiveSection}
+                                onChange={(id) => setBlackjackActiveSection(id as typeof blackjackActiveSection)}
+                                options={[
+                                    { id: 'design', label: 'Design & Cards', icon: <Palette size={16} /> },
+                                    { id: 'effects', label: 'Table & Audio', icon: <Sparkles size={16} /> },
+                                    { id: 'preview', label: 'Preview & Publish', icon: <Eye size={16} /> },
+                                ]}
+                            />
+                            <div className="hidden md:flex bg-[#0a111a] rounded-xl p-1 border border-white/10 gap-1 overflow-x-auto">
+                            {[
+                                { id: 'design', icon: <Palette size={16} />, label: 'Design & Cards' },
+                                { id: 'effects', icon: <Sparkles size={16} />, label: 'Table & Audio' },
+                                { id: 'preview', icon: <Eye size={16} />, label: 'Preview & Publish' },
+                            ].map((s) => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => setBlackjackActiveSection(s.id as typeof blackjackActiveSection)}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${blackjackActiveSection === s.id
+                                        ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-lg shadow-teal-500/20'
                                         : 'text-slate-400 hover:text-white hover:bg-white/5'
                                     }`}
                                 >
@@ -3920,6 +4059,178 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                                               {isPublishing ? <><Loader2 className="animate-spin" size={20} /> Publishing...</> : <><Save size={20} /> Publish to Lobby</>}
                                           </button>
                                      </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {gameType === 'blackjack' && blackjackActiveSection === 'design' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Palette size={16} className="text-teal-400" /> Branding & Card Design
+                                </h3>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <label className="block">
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Game Name</span>
+                                            <input type="text" value={blackjackGameName} onChange={e => setBlackjackGameName(e.target.value)} className="w-full bg-[#0a111a] border border-white/10 rounded-xl p-4 text-white focus:border-teal-500 font-bold outline-none" />
+                                        </label>
+                                        <label className="block">
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Description</span>
+                                            <textarea value={blackjackGameDescription} onChange={e => setBlackjackGameDescription(e.target.value)} className="w-full bg-[#0a111a] border border-white/10 rounded-xl p-4 text-white focus:border-teal-500 h-24 resize-none outline-none" />
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {[
+                                                { label: 'Accent', value: blackjackAccentColor, set: setBlackjackAccentColor },
+                                                { label: 'Background', value: blackjackBgColor, set: setBlackjackBgColor },
+                                                { label: 'Panel', value: blackjackPanelColor, set: setBlackjackPanelColor },
+                                                { label: 'Table Felt', value: blackjackTableColor, set: setBlackjackTableColor },
+                                            ].map((c) => (
+                                                <div key={c.label}>
+                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">{c.label}</label>
+                                                    <div className="flex items-center gap-2 bg-[#0a111a] border border-white/10 rounded-xl p-2">
+                                                        <input type="color" value={c.value} onChange={(e) => c.set(e.target.value)} className="w-9 h-9 rounded-lg border border-white/20 cursor-pointer bg-transparent" />
+                                                        <span className="text-white font-mono text-[10px]">{c.value}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div>
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Card Back Symbol</span>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {BLACKJACK_CARD_BACK_PRESETS.map((preset) => (
+                                                    <button key={preset.id} type="button" onClick={() => setBlackjackCardBackEmoji(preset.emoji)} className={`p-3 rounded-xl border text-xl transition-all ${blackjackCardBackEmoji === preset.emoji ? 'border-teal-500 bg-teal-500/10' : 'border-white/10 bg-[#0a111a] hover:border-white/20'}`}>{preset.emoji}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Card Imagery</span>
+                                        {[
+                                            { label: 'Card Back Cover', desc: 'Hidden dealer/player card backs', img: blackjackCardBackImage, set: setBlackjackCardBackImage },
+                                            { label: 'Jack (J) Face', desc: 'Custom center art for Jacks', img: blackjackFaceJ, set: setBlackjackFaceJ },
+                                            { label: 'Queen (Q) Face', desc: 'Custom center art for Queens', img: blackjackFaceQ, set: setBlackjackFaceQ },
+                                            { label: 'King (K) Face', desc: 'Custom center art for Kings', img: blackjackFaceK, set: setBlackjackFaceK },
+                                            { label: 'Ace (A) Face', desc: 'Custom center art for Aces', img: blackjackFaceA, set: setBlackjackFaceA },
+                                        ].map((row) => (
+                                            <div key={row.label} className="border-2 border-dashed border-white/10 rounded-xl p-4 flex justify-between items-center bg-[#0a111a]">
+                                                <label className="flex gap-4 items-center cursor-pointer flex-1">
+                                                    {row.img ? <img src={row.img} className="w-10 h-16 object-cover rounded-md" alt="" /> : <div className="w-10 h-16 bg-white/5 rounded-md flex items-center justify-center"><ImageIcon size={16} /></div>}
+                                                    <div><span className="font-bold text-sm block">{row.label}</span><span className="text-xs text-slate-500">{row.desc}</span></div>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, row.set, 400)} />
+                                                </label>
+                                                {row.img && <button type="button" onClick={() => row.set(null)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg"><Trash2 size={18} /></button>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {gameType === 'blackjack' && blackjackActiveSection === 'effects' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Sparkles size={16} className="text-teal-400" /> Table Effects & Audio
+                                </h3>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <div className="border-2 border-dashed border-white/10 rounded-xl p-4 bg-[#0a111a]">
+                                            <label className="flex gap-4 items-center cursor-pointer">
+                                                {blackjackBgImage ? <img src={blackjackBgImage} className="w-16 h-16 object-cover rounded-lg" alt="" /> : <div className="w-16 h-16 bg-white/5 rounded-lg flex items-center justify-center"><ImageIcon size={20} /></div>}
+                                                <div><span className="font-bold text-sm block">Table Background Image</span><span className="text-xs text-slate-500">Optional felt wallpaper / casino photo</span></div>
+                                                <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setBlackjackBgImage, 1200)} />
+                                            </label>
+                                            {blackjackBgImage && <button type="button" onClick={() => setBlackjackBgImage(null)} className="mt-3 text-xs text-red-400">Remove background</button>}
+                                        </div>
+                                        <div>
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Felt Pattern</span>
+                                            <div className="grid grid-cols-1 gap-2">
+                                                {BLACKJACK_FELT_PRESETS.map((preset) => (
+                                                    <button key={preset.id} type="button" onClick={() => setBlackjackFeltPattern(preset.id)} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${blackjackFeltPattern === preset.id ? 'border-teal-500 bg-teal-500/10' : 'border-white/10 bg-[#0a111a]'}`}>
+                                                        <span className="text-xl">{preset.emoji}</span><span className="font-bold text-sm">{preset.label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Table Overlay Effect</span>
+                                            <div className="grid grid-cols-1 gap-2">
+                                                {BLACKJACK_OVERLAY_PRESETS.map((preset) => (
+                                                    <button key={preset.id} type="button" onClick={() => setBlackjackTableOverlay(preset.id)} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${blackjackTableOverlay === preset.id ? 'border-teal-500 bg-teal-500/10' : 'border-white/10 bg-[#0a111a]'}`}>
+                                                        <span className="text-xl">{preset.emoji}</span><span className="font-bold text-sm">{preset.label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Deal Sound</span>
+                                        <div className="grid grid-cols-1 gap-2">{HILO_DEAL_SOUNDS.map(preset => (
+                                            <button key={preset.id} type="button" onClick={() => setBlackjackDealSoundType(preset.id as typeof blackjackDealSoundType)} className={`flex items-center gap-3 p-3 rounded-xl border ${blackjackDealSoundType === preset.id ? 'border-teal-500 bg-teal-500/10' : 'border-white/10 bg-[#0a111a]'}`}><span>{preset.emoji}</span><span className="font-bold text-sm">{preset.label}</span></button>
+                                        ))}</div>
+                                        {blackjackDealSoundType === 'custom' && (
+                                            <label className="border border-white/20 rounded-lg p-3 flex gap-4 items-center cursor-pointer"><Upload size={16} /><span className="text-sm">{blackjackDealSoundFile ? 'Custom loaded' : 'Upload MP3/WAV'}</span><input type="file" accept="audio/*" className="hidden" onChange={e => handleFileUpload(e, setBlackjackDealSoundFile)} /></label>
+                                        )}
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block pt-2">Win Sound</span>
+                                        <div className="grid grid-cols-1 gap-2">{BLACKJACK_WIN_SOUNDS.map(preset => (
+                                            <button key={preset.id} type="button" onClick={() => setBlackjackWinSoundType(preset.id as typeof blackjackWinSoundType)} className={`flex items-center gap-3 p-3 rounded-xl border ${blackjackWinSoundType === preset.id ? 'border-teal-500 bg-teal-500/10' : 'border-white/10 bg-[#0a111a]'}`}><span>{preset.emoji}</span><span className="font-bold text-sm">{preset.label}</span></button>
+                                        ))}</div>
+                                        {blackjackWinSoundType === 'custom' && (
+                                            <label className="border border-white/20 rounded-lg p-3 flex gap-4 items-center cursor-pointer"><Upload size={16} /><span className="text-sm">{blackjackWinSoundFile ? 'Custom loaded' : 'Upload MP3/WAV'}</span><input type="file" accept="audio/*" className="hidden" onChange={e => handleFileUpload(e, setBlackjackWinSoundFile)} /></label>
+                                        )}
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block pt-2">Loss Sound</span>
+                                        <div className="grid grid-cols-1 gap-2">{HILO_LOSS_SOUNDS.map(preset => (
+                                            <button key={preset.id} type="button" onClick={() => setBlackjackLossSoundType(preset.id as typeof blackjackLossSoundType)} className={`flex items-center gap-3 p-3 rounded-xl border ${blackjackLossSoundType === preset.id ? 'border-teal-500 bg-teal-500/10' : 'border-white/10 bg-[#0a111a]'}`}><span>{preset.emoji}</span><span className="font-bold text-sm">{preset.label}</span></button>
+                                        ))}</div>
+                                        {blackjackLossSoundType === 'custom' && (
+                                            <label className="border border-white/20 rounded-lg p-3 flex gap-4 items-center cursor-pointer"><Upload size={16} /><span className="text-sm">{blackjackLossSoundFile ? 'Custom loaded' : 'Upload MP3/WAV'}</span><input type="file" accept="audio/*" className="hidden" onChange={e => handleFileUpload(e, setBlackjackLossSoundFile)} /></label>
+                                        )}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {gameType === 'blackjack' && blackjackActiveSection === 'preview' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2">
+                                    <Eye size={16} className="text-teal-400" /> Review & Publish
+                                </h3>
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <div className="lg:col-span-2">
+                                        <div className="rounded-2xl border border-white/10 overflow-hidden h-[450px] relative flex flex-col items-center justify-center p-8 text-center" style={{ backgroundColor: blackjackTableColor, boxShadow: `0 0 40px ${blackjackAccentColor}22` }}>
+                                            {blackjackBgImage && <img src={blackjackBgImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />}
+                                            <div className="relative z-10 flex gap-3 mb-6">
+                                                <div className="w-14 h-20 rounded-lg border border-white/20 flex items-center justify-center text-2xl" style={{ background: blackjackCardBackImage ? undefined : `linear-gradient(135deg, ${blackjackPanelColor}, ${blackjackAccentColor}88)` }}>
+                                                    {blackjackCardBackImage ? <img src={blackjackCardBackImage} alt="" className="w-full h-full object-cover rounded-lg" /> : blackjackCardBackEmoji}
+                                                </div>
+                                                <div className="w-14 h-20 rounded-lg bg-white flex items-center justify-center text-red-500 font-black text-xl">A♥</div>
+                                            </div>
+                                            <h4 className="relative z-10 text-xl font-black text-white mb-2 uppercase tracking-widest">{blackjackGameName}</h4>
+                                            <p className="relative z-10 text-sm text-slate-300 max-w-sm mb-8">{blackjackGameDescription}</p>
+                                            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('open_game', { detail: { type: 'blackjack', blackjackConfig: buildBlackjackConfig(), name: blackjackGameName, gameDescription: blackjackGameDescription, coverImage: blackjackCoverImage || '/images/game-blackjack.png', creatorName: creatorData?.name, winEffect, winSound, themeColor: blackjackAccentColor, isPreview: true } }))} className="relative z-10 bg-gradient-to-r from-teal-600 to-emerald-600 hover:brightness-110 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg shadow-teal-500/20">
+                                                <Play size={20} /> Launch Preview
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-2 text-xs">
+                                            <div className="flex justify-between"><span className="text-slate-500 font-bold">Type</span><span className="text-teal-400 font-bold">Blackjack</span></div>
+                                            <div className="flex justify-between"><span className="text-slate-500 font-bold">Felt</span><span className="text-white capitalize">{blackjackFeltPattern}</span></div>
+                                            <div className="flex justify-between"><span className="text-slate-500 font-bold">Overlay</span><span className="text-white capitalize">{blackjackTableOverlay}</span></div>
+                                            <div className="flex justify-between"><span className="text-slate-500 font-bold">Custom Faces</span><span className="text-white font-mono">{[blackjackFaceJ, blackjackFaceQ, blackjackFaceK, blackjackFaceA].filter(Boolean).length}/4</span></div>
+                                        </div>
+                                        <div className="bg-[#0a111a] rounded-xl border border-white/10 p-4 space-y-3">
+                                            <div className="flex justify-between items-center"><h4 className="text-xs font-black text-white uppercase tracking-widest">Lobby Cover</h4>{blackjackCoverImage && <button type="button" onClick={() => setBlackjackCoverImage(null)} className="text-xs text-red-400">Remove</button>}</div>
+                                            {blackjackCoverImage ? <img src={blackjackCoverImage} alt="Cover" className="w-full h-40 object-cover rounded-lg border border-white/10" /> : (
+                                                <label className="flex flex-col items-center gap-2 text-slate-400 cursor-pointer bg-white/5 rounded-xl p-8 border-2 border-dashed border-white/10 hover:border-teal-500/30">
+                                                    <ImageIcon size={24} /><span className="text-xs font-bold">Upload Cover Image</span>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setBlackjackCoverImage, 800)} />
+                                                </label>
+                                            )}
+                                        </div>
+                                        <button type="button" onClick={handlePublish} disabled={isPublishing || !blackjackGameName.trim() || !blackjackCoverImage} className={`w-full py-4 rounded-xl font-black text-lg tracking-widest uppercase flex justify-center items-center gap-2 ${isPublishing || !blackjackGameName.trim() || !blackjackCoverImage ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:brightness-110 shadow-[0_5px_20px_rgba(20,184,166,0.3)]'}`}>
+                                            {isPublishing ? <><Loader2 className="animate-spin" size={20} /> Publishing...</> : <><Save size={20} /> Publish to Lobby</>}
+                                        </button>
+                                    </div>
                                 </div>
                             </motion.div>
                         )}

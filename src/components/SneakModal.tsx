@@ -6,6 +6,8 @@ import { X, Key, ShieldAlert, Zap, Trophy, EyeOff, AlertTriangle, Hand, MoreHori
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
@@ -34,6 +36,7 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
     const [gameState, setGameState] = useState<'IDLE' | 'HOLDING' | 'CAUGHT' | 'ESCAPED'>('IDLE');
     const [multiplier, setMultiplier] = useState(1.00);
@@ -211,6 +214,7 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
                             <Key className={SNEAK_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{SNEAK_CONFIG.names.title}</h2>
                             <FavoriteToggle gameName={SNEAK_CONFIG.names.title} />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>
@@ -356,6 +360,7 @@ export default function SneakModal({ isOpen, onClose, diamonds, setDiamonds, for
                         </motion.div>
                     </motion.div>
                 )}
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={"Secret Sneak"} />
             </AnimatePresence>
         </div>,
         document.body

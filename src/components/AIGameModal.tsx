@@ -7,6 +7,8 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { recordGameSession } from "@/utils/gameBridge";
 import { resumeGameAudio } from "@/utils/gameAudioContext";
@@ -47,6 +49,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
     // Determine which mode this game uses
     const isSlotEngine = gameData?.type === 'slot_engine' && gameData?.slotConfig;
@@ -320,6 +323,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                             <Play className="text-[#00b9f0]" />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{gameData.name}</h2>
                             <FavoriteToggle gameName={gameData.name} />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white transition-colors" /></button>
                     </div>
@@ -574,6 +578,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                         </motion.div>
                     </motion.div>
                 )}
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={gameData?.name || "AI Game"} />
             </AnimatePresence>
         </div>,
         document.body

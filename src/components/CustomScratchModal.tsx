@@ -7,6 +7,8 @@ import { DiamondIcon, ForgesCoinIcon } from './CurrencyIcons';
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from './MobileGameHudBar';
 import { resumeGameAudio } from '@/utils/gameAudioContext';
 import { playSynthSound } from '@/utils/playSynthSound';
+import GameLeaderboardTrigger from './GameLeaderboardTrigger';
+import GameLeaderboardModal from './GameLeaderboardModal';
 
 interface CustomScratchModalProps {
     isOpen: boolean;
@@ -30,6 +32,7 @@ export default function CustomScratchModal({
     const [lastWin, setLastWin] = useState<number | null>(null);
     const [totalProfit, setTotalProfit] = useState(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
     const balance = currency === 'diamonds' ? diamonds : forgesCoins;
     const intBalance = Math.max(1, Math.floor(balance));
@@ -153,6 +156,7 @@ export default function CustomScratchModal({
                                     by {gameData?.creatorName || 'Creator'}
                                 </p>
                             </div>
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         <button onClick={onClose}
                             className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
@@ -324,11 +328,13 @@ export default function CustomScratchModal({
                                     <span className="font-bold text-slate-500">Session:</span>
                                     <span className={`font-black ${totalProfit >= 0 ? "text-green-400" : "text-red-400"}`}>{totalProfit >= 0 ? "+" : ""}{totalProfit}</span>
                                 </div>
+                                <GameLeaderboardTrigger variant="mobile-menu" onClick={() => { setLeaderboardOpen(true); setMobileMoreOpen(false); }} />
                                 <button type="button" onClick={() => setMobileMoreOpen(false)} className="w-full rounded-xl border border-white/10 bg-[#1a2c38] py-3 text-sm font-bold text-white active:bg-white/10">Done</button>
                             </motion.div>
                         </motion.div>
                     )}
                 </AnimatePresence>
+                <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={gameData?.name || "Scratch"} />
             </motion.div>
         </AnimatePresence>
     );

@@ -6,10 +6,12 @@ import { X, Play, Skull, Zap, ShieldAlert, Trophy, MoreHorizontal } from "lucide
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
-import { calcOriginalsWin, generateRampCrashPoint } from "@/utils/originalsMath";
+import { calcOriginalsWin, generateEscapeCrashPoint, ESCAPE_MIN_CASHOUT_MULT, ESCAPE_MIN_PLAY_MS, ESCAPE_ROUND_COOLDOWN_MS } from "@/utils/originalsMath";
 
 const ESCAPE_CONFIG = {
     names: { title: "Escape" },
@@ -32,11 +34,25 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
     const [copProximity, setCopProximity] = useState(0);
 
     const crashPointRef = useRef(1.00);
+    const multiplierRef = useRef(1.00);
+    const roundStartRef = useRef(0);
+    const cooldownUntilRef = useRef(0);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+    const [cooldownUntil, setCooldownUntil] = useState(0);
+    const [tick, setTick] = useState(0);
+
+    const isRoundCooldown = Date.now() < cooldownUntil;
+    const canCashOut =
+        gameState === "PLAYING" &&
+        tick >= 0 &&
+        Date.now() - roundStartRef.current >= ESCAPE_MIN_PLAY_MS &&
+        multiplier >= ESCAPE_MIN_CASHOUT_MULT;
 
     const startGame = () => {
         if (balance < betAmount) return;
+        if (Date.now() < cooldownUntilRef.current) return;
 
         if (currencyType === 'GC') {
             setDiamonds((prev: number) => prev - betAmount);
@@ -49,17 +65,20 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
         setGameState('PLAYING');
         setMultiplier(1.00);
+        multiplierRef.current = 1.00;
         setCopProximity(0);
         setRunnerAngle(0);
+        roundStartRef.current = Date.now();
 
-        crashPointRef.current = generateRampCrashPoint();
+        crashPointRef.current = generateEscapeCrashPoint();
 
         if (timerRef.current) clearInterval(timerRef.current);
 
         timerRef.current = setInterval(() => {
             setMultiplier(prev => {
-                const step = prev < 2 ? 0.02 : prev < 5 ? 0.05 : 0.15;
-                const next = prev + step;
+                const step = prev < 1.5 ? 0.018 : prev < 3 ? 0.045 : prev < 6 ? 0.09 : 0.14;
+                const next = Number((prev + step).toFixed(3));
+                multiplierRef.current = next;
 
                 setRunnerAngle(a => a + 5);
 
@@ -68,23 +87,29 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
                     playGameSound('escape', 'crash');
                     setGameState('CAUGHT');
                     setCopProximity(100);
+                    cooldownUntilRef.current = Date.now() + ESCAPE_ROUND_COOLDOWN_MS;
+                    setCooldownUntil(cooldownUntilRef.current);
+                    multiplierRef.current = crashPointRef.current;
                     return crashPointRef.current;
                 }
 
                 const distanceRatio = next / crashPointRef.current;
-                setCopProximity(c => c + (100 * distanceRatio * 0.02));
+                setCopProximity(c => Math.min(100, c + (100 * distanceRatio * 0.028)));
 
                 return next;
             });
-        }, 80);
+            setTick((t) => t + 1);
+        }, 90);
     };
 
     const cashOut = () => {
         if (gameState !== 'PLAYING') return;
+        if (Date.now() - roundStartRef.current < ESCAPE_MIN_PLAY_MS) return;
+        if (multiplierRef.current < ESCAPE_MIN_CASHOUT_MULT) return;
         if (timerRef.current) clearInterval(timerRef.current);
 
         setGameState('WON');
-        const winAmount = calcOriginalsWin(betAmount, multiplier, 'escape');
+        const winAmount = calcOriginalsWin(betAmount, multiplierRef.current, 'escape');
         setLastWin({ amount: winAmount, currency: currencyType });
 
         if (currencyType === 'GC') {
@@ -95,6 +120,8 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
         setSessionPayout(prev => prev + winAmount);
         playGameSound('escape', 'win');
+        cooldownUntilRef.current = Date.now() + ESCAPE_ROUND_COOLDOWN_MS;
+        setCooldownUntil(cooldownUntilRef.current);
 
         fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
     };
@@ -106,14 +133,22 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
         setBetAmount(Number(newAmount.toFixed(2)));
     };
 
-    
     useEffect(() => {
         if (isOpen) resumeOriginalGameAudio();
     }, [isOpen]);
 
     useEffect(() => {
+        if (cooldownUntil <= Date.now()) return;
+        const ms = cooldownUntil - Date.now() + 40;
+        const id = window.setTimeout(() => setCooldownUntil(0), ms);
+        return () => window.clearTimeout(id);
+    }, [cooldownUntil]);
+
+    useEffect(() => {
         if (!isOpen) {
             setMobileMoreOpen(false);
+            setCooldownUntil(0);
+            cooldownUntilRef.current = 0;
             // Save session to history if any bets were made
             if (sessionWagered > 0) {
                 window.dispatchEvent(new CustomEvent('game_session_complete', {
@@ -158,12 +193,12 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
                     }
                     center={
                         gameState === "PLAYING" ? (
-                            <button type="button" onClick={cashOut} className="flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full bg-green-500 text-[10px] font-black uppercase leading-tight text-[#0f212e] shadow-[0_0_20px_rgba(34,197,94,0.45)] active:scale-95">
+                            <button type="button" onClick={cashOut} disabled={!canCashOut} className={`flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full text-[10px] font-black uppercase leading-tight text-[#0f212e] active:scale-95 ${canCashOut ? "bg-green-500 shadow-[0_0_20px_rgba(34,197,94,0.45)]" : "cursor-not-allowed bg-slate-600 opacity-50"}`}>
                                 <Trophy className="mb-0.5 h-5 w-5" />
-                                <span className="text-[10px]">{(betAmount * multiplier).toFixed(0)}</span>
+                                <span className="text-[10px]">{canCashOut ? (betAmount * multiplier).toFixed(0) : "…"}</span>
                             </button>
                         ) : (
-                            <button type="button" onClick={startGame} disabled={balance < betAmount || betAmount <= 0} className="flex h-[68px] w-[68px] items-center justify-center rounded-full bg-gradient-to-br from-[#00b9f0] to-blue-600 text-[#0f212e] shadow-[0_0_22px_rgba(0,185,240,0.35)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45" aria-label="Start evasion">
+                            <button type="button" onClick={startGame} disabled={balance < betAmount || betAmount <= 0 || isRoundCooldown} className="flex h-[68px] w-[68px] items-center justify-center rounded-full bg-gradient-to-br from-[#00b9f0] to-blue-600 text-[#0f212e] shadow-[0_0_22px_rgba(0,185,240,0.35)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45" aria-label="Start evasion">
                                 <Zap className="h-7 w-7" strokeWidth={2.2} />
                             </button>
                         )
@@ -188,6 +223,7 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
                             <Skull className={ESCAPE_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{ESCAPE_CONFIG.names.title}</h2>
                             <FavoriteToggle gameName={ESCAPE_CONFIG.names.title} />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-white" /></button>
                     </div>
@@ -243,14 +279,14 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
                     <div className="mt-auto">
                         {gameState !== 'PLAYING' ? (
-                            <button onClick={startGame} disabled={balance < betAmount || betAmount <= 0} className="w-full bg-gradient-to-r from-[#00b9f0] to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white h-16 rounded-xl font-black text-xl tracking-widest uppercase transition-all shadow-[0_5px_20px_rgba(0,185,240,0.4)] disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-1 relative overflow-hidden group">
-                                <span className="relative z-10 flex items-center justify-center gap-2"><Zap size={20} className="text-yellow-300" /> Start Evasion</span>
+                            <button onClick={startGame} disabled={balance < betAmount || betAmount <= 0 || isRoundCooldown} className="w-full bg-gradient-to-r from-[#00b9f0] to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white h-16 rounded-xl font-black text-xl tracking-widest uppercase transition-all shadow-[0_5px_20px_rgba(0,185,240,0.4)] disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-1 relative overflow-hidden group">
+                                <span className="relative z-10 flex items-center justify-center gap-2"><Zap size={20} className="text-yellow-300" /> {isRoundCooldown ? "Stand by…" : "Start Evasion"}</span>
                                 <div className="absolute inset-0 bg-white/20 -translate-x-full group-hover:animate-[shimmer_1s_infinite]"></div>
                             </button>
                         ) : (
-                            <button onClick={cashOut} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white h-16 rounded-xl font-black text-2xl uppercase shadow-[0_0_30px_rgba(34,197,94,0.5)] animate-pulse hover:scale-[1.02] transition-transform flex flex-col items-center justify-center">
-                                <span>ESCAPE</span>
-                                <span className="text-xs text-green-200 mt-[-4px]">Win {(betAmount * multiplier).toFixed(2)}</span>
+                            <button onClick={cashOut} disabled={!canCashOut} className={`w-full h-16 rounded-xl font-black text-2xl uppercase transition-transform flex flex-col items-center justify-center ${canCashOut ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white shadow-[0_0_30px_rgba(34,197,94,0.5)] animate-pulse hover:scale-[1.02]" : "bg-slate-700 text-slate-400 cursor-not-allowed opacity-70"}`}>
+                                <span>{canCashOut ? "ESCAPE" : "HOLD…"}</span>
+                                <span className="text-xs mt-[-4px]">{canCashOut ? `Win ${(betAmount * multiplier).toFixed(2)}` : `Need ${ESCAPE_MIN_CASHOUT_MULT.toFixed(2)}x+`}</span>
                             </button>
                         )}
                     </div>
@@ -323,7 +359,11 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
 
                         <div className="h-12 flex items-center justify-center relative z-20">
                             {gameState === 'IDLE' && <p className="text-slate-400 font-bold tracking-[0.2em] uppercase text-sm border border-slate-700 bg-slate-800/50 px-6 py-2 rounded-full">System Ready</p>}
-                            {gameState === 'PLAYING' && <p className="text-[#00b9f0] font-mono animate-pulse font-bold tracking-[0.2em]">EVADING PATROLS...</p>}
+                            {gameState === 'PLAYING' && (
+                                <p className="text-[#00b9f0] font-mono animate-pulse font-bold tracking-[0.2em]">
+                                    {canCashOut ? "EVADING PATROLS…" : "BREAKING CONTAINMENT…"}
+                                </p>
+                            )}
                             {gameState === 'CAUGHT' && (
                                 <div className="bg-red-950/80 border-2 border-red-500 px-8 py-2 rounded-full flex items-center gap-3 shadow-[0_0_20px_rgba(239,68,68,0.5)]">
                                     <ShieldAlert className="text-red-500" />
@@ -350,10 +390,12 @@ export default function EscapeModal({ isOpen, onClose, diamonds, setDiamonds, fo
                                 <span className="text-[10px] font-bold uppercase text-slate-400">Last win</span>
                                 {lastWin ? <span className="flex items-center gap-1 text-sm font-black text-green-400">+{lastWin.amount.toFixed(2)} {lastWin.currency === "GC" ? <DiamondIcon className="h-3 w-3" /> : <ForgesCoinIcon className="h-3 w-3" />}</span> : <span className="font-mono text-xs text-slate-600">—</span>}
                             </div>
+                            <GameLeaderboardTrigger variant="mobile-menu" onClick={() => { setLeaderboardOpen(true); setMobileMoreOpen(false); }} />
                             <button type="button" onClick={() => setMobileMoreOpen(false)} className="w-full rounded-xl border border-white/10 bg-[#1a2c38] py-3 text-sm font-bold text-white active:bg-white/10">Done</button>
                         </motion.div>
                     </motion.div>
                 )}
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={"Escape"} />
             </AnimatePresence>
         </div>,
         document.body

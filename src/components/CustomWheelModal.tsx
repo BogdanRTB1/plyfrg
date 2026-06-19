@@ -8,6 +8,8 @@ import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import type { WheelConfig, WheelSegment } from "@/types/wheelConfig";
 import { DEFAULT_WHEEL_CONFIG } from "@/types/wheelConfig";
@@ -94,6 +96,7 @@ export default function CustomWheelModal({ isOpen, onClose, gameData, diamonds, 
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
     const [gameState, setGameState] = useState<'IDLE' | 'SPINNING' | 'FINISHED'>('IDLE');
     const [wheelRotation, setWheelRotation] = useState(0);
@@ -614,6 +617,7 @@ export default function CustomWheelModal({ isOpen, onClose, gameData, diamonds, 
                             <RotateCw style={{ color: accentColor }} className="w-5 h-5" />
                             <span className="text-sm font-black uppercase tracking-widest">{config.theme.gameName}</span>
                             <FavoriteToggle gameName={gameData?.name || "Wheel"} />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         {lastWin ? (
                             <span className="text-sm font-black text-green-400 font-mono flex items-center gap-1">
@@ -757,6 +761,7 @@ export default function CustomWheelModal({ isOpen, onClose, gameData, diamonds, 
                         </motion.div>
                     </motion.div>
                 )}
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={gameData?.name || "Custom Wheel"} />
             </AnimatePresence>
         </div>,
         document.body

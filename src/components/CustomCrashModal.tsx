@@ -1,5 +1,6 @@
 "use client";
 import { scaleDemoWin } from "@/utils/demoPlay";
+import { calcOriginalsWin, generateCreatorCrashPoint, CRASH_MIN_CASHOUT_MULT, CRASH_ROUND_COOLDOWN_MS, canCrashCashOut } from "@/utils/originalsMath";
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,6 +11,8 @@ import { fireWinConfetti } from "@/utils/winConfetti";
 import { resumeGameAudio } from "@/utils/gameAudioContext";
 import { playGameSound } from "@/utils/originalGameSounds";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 
 export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, setDiamonds, forgesCoins, setForgesCoins }: any) {
@@ -23,6 +26,8 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
     const [sessionWagered, setSessionWagered] = useState(0);
     const [sessionPayout, setSessionPayout] = useState(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+    const [cooldownUntil, setCooldownUntil] = useState(0);
 
     const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'CRASHED'>('IDLE');
     const [cashedOutAt, setCashedOutAt] = useState<number | null>(null);
@@ -32,6 +37,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const timeStartRef = useRef<number>(0);
     const requestRef = useRef<number | null>(null);
+    const cooldownUntilRef = useRef(0);
 
     const gameStateRef = useRef(gameState);
     gameStateRef.current = gameState;
@@ -55,8 +61,20 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
     const BACKGROUND_IMAGE = config.backgroundImage || null;
 
     const configAcceleration = config.accelerationCurve || 0.08;
-    const configHouseEdge = config.houseEdge || 5;
+    const configHouseEdge = config.houseEdge || 18;
     const configMaxMultiplier = Math.min(config.maxMultiplier || 1000, 35);
+
+    const isRoundCooldown = Date.now() < cooldownUntil;
+    const canCashOut =
+        gameState === "PLAYING" &&
+        cashedOutAt === null &&
+        canCrashCashOut(timeStartRef.current, multiplier, true);
+
+    const applyRoundCooldown = () => {
+        const until = Date.now() + CRASH_ROUND_COOLDOWN_MS;
+        cooldownUntilRef.current = until;
+        setCooldownUntil(until);
+    };
 
     // We pre-load images to draw them on canvas
     const [rocketImgObj, setRocketImgObj] = useState<HTMLImageElement | null>(null);
@@ -75,22 +93,12 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
         }
     }, [ROCKET_IMAGE, CRASH_IMAGE]);
 
-    const generateCrashPoint = () => {
-        const edge = Math.max(12, Number(configHouseEdge) || 16);
-        const edgeFraction = edge / 100;
-
-        // Guaranteed instant loss based on the configured house edge
-        if (Math.random() < edgeFraction) {
-            return 1.0;
-        }
-
-        const u = Math.max(0.0001, Math.random());
-        const cp = (1 - edgeFraction) / (1 - u);
-        return Number(Math.max(1.0, Math.min(cp, configMaxMultiplier)).toFixed(1));
-    };
+    const generateCrashPoint = () =>
+        generateCreatorCrashPoint(configHouseEdge, configMaxMultiplier);
 
     const startGame = () => {
         if (!gameData || balance < betAmount || betAmount <= 0 || (gameState === 'PLAYING' && cashedOutAt !== null)) return;
+        if (Date.now() < cooldownUntilRef.current) return;
 
         if (currencyType === 'GC') {
             setDiamonds((prev: number) => prev - betAmount);
@@ -129,6 +137,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
             setMultiplier(crashPointRef.current);
             setGameState('CRASHED');
             if (cashedOutAtRef.current === null) playGameSound("crash", "crash");
+            applyRoundCooldown();
             drawGraph(timeElapsedSec, crashPointRef.current, true);
             return;
         }
@@ -136,8 +145,14 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
         currentMultiplierRef.current = nextMultiplier;
         setMultiplier(nextMultiplier);
 
-        if (autoCashoutRef.current > 1.00 && nextMultiplier >= autoCashoutRef.current && cashedOutAtRef.current === null) {
-            cashOut(autoCashoutRef.current);
+        const autoTarget = autoCashoutRef.current;
+        if (
+            autoTarget >= CRASH_MIN_CASHOUT_MULT &&
+            nextMultiplier >= autoTarget &&
+            cashedOutAtRef.current === null &&
+            canCrashCashOut(timeStartRef.current, nextMultiplier, true)
+        ) {
+            cashOut(autoTarget);
         }
 
         drawGraph(timeElapsedSec, nextMultiplier, false);
@@ -247,13 +262,16 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
 
     const cashOut = (forceMultiplier?: number) => {
         if (gameStateRef.current !== 'PLAYING') return;
+        if (!canCrashCashOut(timeStartRef.current, currentMultiplierRef.current, true)) return;
 
         const mult = forceMultiplier || currentMultiplierRef.current;
+        if (mult < CRASH_MIN_CASHOUT_MULT) return;
+
         setCashedOutAt(mult);
         cashedOutAtRef.current = mult;
 
-        const roundedMult = Number(mult.toFixed(1));
-        const winAmount = scaleDemoWin(Number((betAmount * roundedMult).toFixed(2)));
+        const roundedMult = Number(mult.toFixed(2));
+        const winAmount = scaleDemoWin(calcOriginalsWin(betAmount, roundedMult, 'crash'));
         setLastWin({ amount: winAmount, currency: currencyType, mult: roundedMult });
 
         if (currencyType === 'GC') {
@@ -265,6 +283,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
         setSessionPayout(prev => prev + winAmount);
 
         playGameSound("crash", "win");
+        applyRoundCooldown();
         fireWinConfetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
     };
 
@@ -276,8 +295,17 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
     };
 
     useEffect(() => {
+        if (cooldownUntil <= Date.now()) return;
+        const ms = cooldownUntil - Date.now() + 40;
+        const t = setTimeout(() => setCooldownUntil(0), ms);
+        return () => clearTimeout(t);
+    }, [cooldownUntil]);
+
+    useEffect(() => {
         if (!isOpen) {
             setMobileMoreOpen(false);
+            setCooldownUntil(0);
+            cooldownUntilRef.current = 0;
             // Save session to history if any bets were made
             if (sessionWagered > 0) {
                 window.dispatchEvent(new CustomEvent('game_session_complete', {
@@ -337,15 +365,15 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                     }
                     center={
                         gameState === "PLAYING" && cashedOutAt === null ? (
-                            <button type="button" onClick={() => cashOut()} className="flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full bg-green-500 text-[9px] font-black uppercase leading-tight text-[#0f212e] shadow-[0_0_20px_rgba(34,197,94,0.45)] active:scale-95">
-                                <span className="text-[9px]">Out</span>
-                                <span className="text-xs font-black">{(betAmount * multiplier).toFixed(1)}</span>
+                            <button type="button" onClick={() => cashOut()} disabled={!canCashOut} className={`flex h-[68px] w-[68px] flex-col items-center justify-center rounded-full text-[9px] font-black uppercase leading-tight text-[#0f212e] active:scale-95 ${canCashOut ? "bg-green-500 shadow-[0_0_20px_rgba(34,197,94,0.45)]" : "cursor-not-allowed bg-slate-600 opacity-50"}`}>
+                                <span className="text-[9px]">{canCashOut ? "Out" : "…"}</span>
+                                <span className="text-xs font-black">{canCashOut ? (betAmount * multiplier).toFixed(1) : "Hold"}</span>
                             </button>
                         ) : (
                             <button
                                 type="button"
                                 onClick={startGame}
-                                disabled={balance < betAmount || betAmount <= 0 || (gameState === "PLAYING" && cashedOutAt !== null)}
+                                disabled={balance < betAmount || betAmount <= 0 || isRoundCooldown || (gameState === "PLAYING" && cashedOutAt !== null)}
                                 className="flex h-[68px] w-[68px] items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-[0_0_22px_rgba(34,197,94,0.35)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
                                 aria-label="Fly"
                             >
@@ -417,7 +445,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                             <input
                                 type="number"
                                 step="0.01"
-                                min="1.01"
+                                min={CRASH_MIN_CASHOUT_MULT}
                                 value={autoCashout}
                                 onChange={(e) => setAutoCashout(e.target.value)}
                                 disabled={gameState === 'PLAYING'}
@@ -435,6 +463,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                             <TrendingUp className="text-[#00b9f0]" />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{gameData?.name || "Crash"}</h2>
                             <FavoriteToggle gameName={gameData?.name || "Crash"} />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         {lastWin ? (
                             <span className="text-sm font-black text-green-400 font-mono flex items-center gap-1">
@@ -447,20 +476,20 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
 
                     <div className="mt-auto space-y-3">
                         {gameState === 'PLAYING' && cashedOutAt === null ? (
-                            <button onClick={() => cashOut()} className={`w-full bg-green-500 hover:bg-green-400 text-[#0f212e] h-14 rounded-xl font-black text-xl tracking-widest uppercase transition-all shadow-[0_5px_20px_rgba(34,197,94,0.4)] relative overflow-hidden group`}>
+                            <button onClick={() => cashOut()} disabled={!canCashOut} className={`w-full h-14 rounded-xl font-black text-xl tracking-widest uppercase transition-all relative overflow-hidden group ${canCashOut ? "bg-green-500 hover:bg-green-400 text-[#0f212e] shadow-[0_5px_20px_rgba(34,197,94,0.4)]" : "bg-slate-700 text-slate-400 cursor-not-allowed opacity-70"}`}>
                                 <span className="relative z-10 flex flex-col items-center justify-center">
-                                    <span className="text-lg">CASHOUT</span>
-                                    <span className="text-xs opacity-80 mt-[-4px]">Win {(betAmount * multiplier).toFixed(1)}</span>
+                                    <span className="text-lg">{canCashOut ? "CASHOUT" : "HOLD…"}</span>
+                                    <span className="text-xs opacity-80 mt-[-4px]">{canCashOut ? `Win ${(betAmount * multiplier).toFixed(1)}` : `Need ${CRASH_MIN_CASHOUT_MULT.toFixed(2)}x+`}</span>
                                 </span>
                             </button>
                         ) : (
                             <button
                                 onClick={startGame}
-                                disabled={balance < betAmount || betAmount <= 0 || (gameState === 'PLAYING' && cashedOutAt !== null)}
+                                disabled={balance < betAmount || betAmount <= 0 || isRoundCooldown || (gameState === 'PLAYING' && cashedOutAt !== null)}
                                 className={`w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:brightness-110 text-white h-14 rounded-xl font-black text-xl tracking-widest uppercase transition-all shadow-[0_5px_20px_rgba(34,197,94,0.4)] disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-1 relative overflow-hidden group`}
                             >
                                 <span className="relative z-10 flex gap-2 items-center justify-center">
-                                    <Rocket size={20} /> {(gameState === 'PLAYING' && cashedOutAt !== null) ? 'ESCAPED' : 'FLY'}
+                                    <Rocket size={20} /> {isRoundCooldown ? "Stand by…" : (gameState === 'PLAYING' && cashedOutAt !== null) ? 'ESCAPED' : 'FLY'}
                                 </span>
                             </button>
                         )}
@@ -532,7 +561,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                                 <label className="text-[10px] font-bold uppercase text-slate-500">Auto cashout</label>
                                 <div className="relative">
                                     <Goal className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                                    <input type="number" step="0.01" min="1.01" value={autoCashout} onChange={(e) => setAutoCashout(e.target.value)} disabled={gameState === "PLAYING"} placeholder="Off" className="w-full rounded-xl border border-white/10 bg-[#0a1114] py-3 pl-10 pr-8 font-mono text-base font-bold text-white outline-none focus:border-green-500 disabled:opacity-50" />
+                                    <input type="number" step="0.01" min={CRASH_MIN_CASHOUT_MULT} value={autoCashout} onChange={(e) => setAutoCashout(e.target.value)} disabled={gameState === "PLAYING"} placeholder="Off" className="w-full rounded-xl border border-white/10 bg-[#0a1114] py-3 pl-10 pr-8 font-mono text-base font-bold text-white outline-none focus:border-green-500 disabled:opacity-50" />
                                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-bold text-slate-500">×</span>
                                 </div>
                             </div>
@@ -552,6 +581,7 @@ export default function CustomCrashModal({ isOpen, onClose, gameData, diamonds, 
                         </motion.div>
                     </motion.div>
                 )}
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={gameData?.name || "Custom Game"} />
             </AnimatePresence>
         </div>,
         document.body

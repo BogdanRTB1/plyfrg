@@ -6,6 +6,8 @@ import { X, Trophy, Footprints, Skull, MoreHorizontal } from "lucide-react";
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
@@ -39,6 +41,7 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
     const [currentStep, setCurrentStep] = useState(0);
     const [path, setPath] = useState<('left' | 'right')[]>([]);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
     const startGame = () => {
         if (balance < betAmount || betAmount <= 0) return;
@@ -188,6 +191,7 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
                             <Footprints className={BRIDGE_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{BRIDGE_CONFIG.names.title}</h2>
                             <FavoriteToggle gameName={BRIDGE_CONFIG.names.title} />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         <button onClick={onClose}><X className="text-slate-400 hover:text-cyan-400 transition-colors" /></button>
                     </div>
@@ -380,6 +384,7 @@ export default function GlassBridgeModal({ isOpen, onClose, diamonds, setDiamond
                         </motion.div>
                     </motion.div>
                 )}
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={"Glass Bridge"} />
             </AnimatePresence>
         </div>,
         document.body

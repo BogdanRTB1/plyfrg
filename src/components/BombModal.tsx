@@ -6,6 +6,8 @@ import { X, Scissors, Trophy, Bomb, ShieldAlert, MoreHorizontal } from "lucide-r
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import { createPortal } from "react-dom";
 import FavoriteToggle from "./FavoriteToggle";
+import GameLeaderboardTrigger from "./GameLeaderboardTrigger";
+import GameLeaderboardModal from "./GameLeaderboardModal";
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./MobileGameHudBar";
 import { fireWinConfetti } from "@/utils/winConfetti";
 import { playGameSound, resumeOriginalGameAudio } from "@/utils/originalGameSounds";
@@ -39,6 +41,7 @@ export default function BombModal({ isOpen, onClose, diamonds, setDiamonds, forg
     const [wires, setWires] = useState<BombWireState[]>([]);
     const [shake, setShake] = useState(false);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+    const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const safeCutsRef = useRef(0);
@@ -258,6 +261,7 @@ export default function BombModal({ isOpen, onClose, diamonds, setDiamonds, forg
                             <ShieldAlert className={BOMB_CONFIG.theme.accent} />
                             <h2 className="text-xl font-black uppercase italic tracking-widest">{BOMB_CONFIG.names.title}</h2>
                             <FavoriteToggle gameName={BOMB_CONFIG.names.title} />
+                            <GameLeaderboardTrigger variant="header" onClick={() => setLeaderboardOpen(true)} />
                         </div>
                         <button onClick={onClose}>
                             <X className="text-slate-400 hover:text-white" />
