@@ -91,22 +91,24 @@ export default function AdminCreatorFollowersContent() {
             return;
         }
 
-        const body =
-            mode === "set"
-                ? { creatorId: selected.id, fakeFollowers: Number(setFakeValue) }
-                : { creatorId: selected.id, addFakeFollowers: Number(addFakeValue) };
+        const amount =
+            mode === "set" ? Number(setFakeValue) : Number(addFakeValue);
 
-        const amount = mode === "set" ? body.fakeFollowers : body.addFakeFollowers;
         if (!Number.isFinite(amount) || amount < 0) {
             toast.error("Enter a valid non-negative number");
             return;
         }
 
+        const body =
+            mode === "set"
+                ? { creatorId: selected.id, fakeFollowers: amount }
+                : { creatorId: selected.id, addFakeFollowers: amount };
+
         if (
             !window.confirm(
                 mode === "set"
-                    ? `Set fake followers for ${selected.displayName} to ${Math.floor(amount!)}?`
-                    : `Add ${Math.floor(amount!)} fake followers to ${selected.displayName}?`
+                    ? `Set fake followers for ${selected.displayName} to ${Math.floor(amount)}?`
+                    : `Add ${Math.floor(amount)} fake followers to ${selected.displayName}?`
             )
         ) {
             return;
