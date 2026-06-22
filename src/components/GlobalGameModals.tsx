@@ -318,6 +318,9 @@ export default function GlobalGameModals() {
                 else if (raw.type === "case") setIsCustomCaseOpen(true);
                 else if (raw.type === "hilo") setIsCustomHiloOpen(true);
                 else if (raw.type === "blackjack") setIsCustomBlackjackOpen(true);
+                else {
+                    console.warn("Unknown creator game type:", raw.type);
+                }
                 recordGameActivity(label);
                 return;
             }

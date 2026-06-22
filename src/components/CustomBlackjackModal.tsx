@@ -472,8 +472,8 @@ export default function CustomBlackjackModal({
                         </motion.div>
                     </motion.div>
                 )}
-                <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={gameTitle} />
             </AnimatePresence>
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={gameTitle} />
         </div>,
         document.body
     );

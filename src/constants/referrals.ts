@@ -1,5 +1,10 @@
-/** ForgeCoins granted to the user who shared their invite link. */
+/** ForgeCoins granted to the user who shared their invite link (one-time signup bonus). */
 export const REFERRER_FC_REWARD = 3;
+
+/** Share of invitee house profit paid to the referrer on each losing session (5%). */
+export const REFERRER_PROFIT_SHARE = 0.05;
+
+export const REFERRER_PROFIT_SHARE_PERCENT = 5;
 
 /** Diamonds granted to the newly invited user. */
 export const REFERRED_DIAMONDS_REWARD = 10_000;

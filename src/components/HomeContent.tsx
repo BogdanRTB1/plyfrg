@@ -23,8 +23,10 @@ import {
 import { DiamondIcon, ForgesCoinIcon } from "./CurrencyIcons";
 import GameCard from "./GameCard";
 import { createClient } from "@/utils/supabase/client";
+import { getCreatorDisplayFollowers, fetchCreatorsForDisplay } from "@/utils/creatorFollowers";
 import { toast } from "sonner";
 import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
+import { DEFAULT_ORIGINAL_CARD_RTP } from "@/constants/originalsRtp";
 import { loadPublishedGames } from "@/utils/publishedGamesStorage";
 import { openGamePicker } from "@/utils/gameLaunch";
 
@@ -58,36 +60,41 @@ export default function HomeContent() {
             const { data: { session } } = await supabase.auth.getSession();
             const userId = session?.user?.id;
 
-            // Fetch Creators from Supabase
-            const { data: dbCreators, error } = await supabase
-                .from('creators')
-                .select('display_name, profile_picture, followers_count')
-                .order('followers_count', { ascending: false })
-                .limit(6);
+            const { data: dbCreators, error } = await fetchCreatorsForDisplay(supabase, {
+                orderByFollowers: true,
+                limit: 6,
+            });
 
-            if (error) {
-                console.error("Error fetching creators:", error.message);
+            if (error || !dbCreators || Array.isArray(dbCreators) === false) {
+                if (error) console.error("Error fetching creators:", error.message);
                 return;
             }
+
+            const creators = dbCreators as Array<{
+                display_name: string;
+                profile_picture: string | null;
+                followers_count: number | null;
+                fake_followers?: number | null;
+            }>;
 
             const fMap: Record<string, boolean> = {};
             const globalFollows: Record<string, number> = {};
 
-            dbCreators?.forEach(c => {
+            creators.forEach(c => {
                 if (userId) {
                     fMap[c.display_name] = !!localStorage.getItem(`following_${userId}_${c.display_name}`);
                 }
-                globalFollows[c.display_name] = c.followers_count || 0;
+                globalFollows[c.display_name] = getCreatorDisplayFollowers(c.followers_count, c.fake_followers);
             });
 
             setFollowingMap(fMap);
             setGlobalFollowersMap(globalFollows);
             
             // Map formatted creators for render
-            const formatted = dbCreators?.map(c => ({
+            const formatted = creators.map(c => ({
                 name: c.display_name,
                 image: c.profile_picture || `/images/creator-${(c.display_name.length % 3) + 1}.png`,
-                followersCount: c.followers_count || 0
+                followersCount: getCreatorDisplayFollowers(c.followers_count, c.fake_followers)
             })) || [];
 
             setTopCreatorsRender(formatted);
@@ -202,7 +209,7 @@ export default function HomeContent() {
                                 <GameCard
                                     name={game.name}
                                     image={game.coverImage || ""}
-                                    rtp="88.0%"
+                                    rtp={DEFAULT_ORIGINAL_CARD_RTP}
                                     provider={game.creatorName ? `@${game.creatorName}` : "Creator"}
                                     onClick={() => openGamePicker(game)}
                                 />

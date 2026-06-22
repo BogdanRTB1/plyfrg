@@ -1356,7 +1356,16 @@ export default function CreatorGameStudio({ creatorData, onGoBack }: CreatorGame
                             <Check size={48} />
                         </div>
                         <h3 className="text-3xl font-black text-white mb-2 tracking-tight">Game Published!</h3>
-                        <p className="text-slate-400 max-w-md">{gameType === 'crash' ? 'Your crash game is now live! Players can bet and ride the multiplier.' : gameType === 'scratch' ? 'Your scratch card is now live! Players can scratch and win prizes.' : gameType === 'wheel' ? 'Your wheel game is now live! Players can spin and test their luck.' : gameType === 'mines' ? 'Your mines game is now live! Players can reveal tiles and test their luck!' : 'Your slot game is now live in the Casino Lobby. Players can spin and you\'ll earn a cut!'}</p>
+                        <p className="text-slate-400 max-w-md">{
+                            gameType === 'crash' ? 'Your crash game is now live! Players can bet and ride the multiplier.' :
+                            gameType === 'scratch' ? 'Your scratch card is now live! Players can scratch and win prizes.' :
+                            gameType === 'wheel' ? 'Your wheel game is now live! Players can spin and test their luck.' :
+                            gameType === 'mines' ? 'Your mines game is now live! Players can reveal tiles and test their luck!' :
+                            gameType === 'case' ? 'Your case opening game is now live! Players can unbox and win items.' :
+                            gameType === 'hilo' ? 'Your Hi-Lo card game is now live! Players can guess higher or lower.' :
+                            gameType === 'blackjack' ? 'Your blackjack table is now live! Players can hit, stand, and win.' :
+                            'Your slot game is now live in the Casino Lobby. Players can spin and you\'ll earn a cut!'
+                        }</p>
                     </div>
                 ) : (
                     <div className="space-y-6">

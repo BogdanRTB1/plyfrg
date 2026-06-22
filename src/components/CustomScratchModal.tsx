@@ -7,6 +7,7 @@ import { DiamondIcon, ForgesCoinIcon } from './CurrencyIcons';
 import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from './MobileGameHudBar';
 import { resumeGameAudio } from '@/utils/gameAudioContext';
 import { playSynthSound } from '@/utils/playSynthSound';
+import { scaleDemoWin } from '@/utils/demoPlay';
 import GameLeaderboardTrigger from './GameLeaderboardTrigger';
 import GameLeaderboardModal from './GameLeaderboardModal';
 
@@ -31,6 +32,8 @@ export default function CustomScratchModal({
     const [currency, setCurrency] = useState<'diamonds' | 'forgesCoins'>('diamonds');
     const [lastWin, setLastWin] = useState<number | null>(null);
     const [totalProfit, setTotalProfit] = useState(0);
+    const [sessionWagered, setSessionWagered] = useState(0);
+    const [sessionPayout, setSessionPayout] = useState(0);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
     const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
@@ -53,6 +56,21 @@ export default function CustomScratchModal({
             setEngineReady(false);
             setIsPlaying(false);
             setLastWin(null);
+            if (sessionWagered > 0) {
+                window.dispatchEvent(new CustomEvent('game_session_complete', {
+                    detail: {
+                        gameName: gameData?.name || 'Scratch Card',
+                        gameImage: gameData?.coverImage || '/images/game-placeholder.png',
+                        wagered: sessionWagered,
+                        payout: sessionPayout,
+                        currency: currency === 'diamonds' ? 'GC' : 'FC',
+                        creatorId: gameData?.creatorId,
+                        gameId: gameData?.id,
+                    },
+                }));
+                setSessionWagered(0);
+                setSessionPayout(0);
+            }
             return;
         }
 
@@ -71,9 +89,10 @@ export default function CustomScratchModal({
             if (event.data.type === 'SCRATCH_RESULT') {
                 setIsPlaying(false);
                 if (event.data.win && event.data.multiplier > 0) {
-                    const winAmt = Math.round(bet * event.data.multiplier);
+                    const winAmt = scaleDemoWin(Math.round(bet * event.data.multiplier));
                     setLastWin(winAmt);
                     setTotalProfit(prev => prev + winAmt - bet);
+                    setSessionPayout(prev => prev + winAmt);
                     if (currency === 'diamonds') {
                         setDiamonds((prev: number) => prev + winAmt);
                     } else {
@@ -88,7 +107,13 @@ export default function CustomScratchModal({
 
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [isOpen, bet, currency, sendConfig, setDiamonds, setForgesCoins]);
+    }, [isOpen, bet, currency, sendConfig, setDiamonds, setForgesCoins, gameData, sessionWagered, sessionPayout]);
+
+    useEffect(() => {
+        if (isOpen && engineReady) {
+            sendConfig();
+        }
+    }, [isOpen, engineReady, sendConfig]);
 
     const handlePlay = () => {
         if (isPlaying || !engineReady) return;
@@ -107,6 +132,7 @@ export default function CustomScratchModal({
         resumeGameAudio();
         setIsPlaying(true);
         setLastWin(null);
+        setSessionWagered(prev => prev + bet);
 
         iframeRef.current?.contentWindow?.postMessage({
             type: 'START_GAME',
@@ -120,7 +146,7 @@ export default function CustomScratchModal({
         iframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
     };
 
-    if (!isOpen) return null;
+    if (!isOpen || !gameData) return null;
 
     const accent = gameData?.themeColor || gameData?.scratchConfig?.theme?.accentColor || '#f59e0b';
 

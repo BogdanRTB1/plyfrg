@@ -10,6 +10,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { loadPublishedGamesForCreator } from "@/utils/publishedGamesStorage";
 import { openGamePicker } from "@/utils/gameLaunch";
+import { getCreatorDisplayFollowers, fetchCreatorsForDisplay } from "@/utils/creatorFollowers";
 
 export default function CreatorProfilePage() {
     const params = useParams();
@@ -23,7 +24,9 @@ export default function CreatorProfilePage() {
     const [error, setError] = useState<string | null>(null);
 
     const [isFollowing, setIsFollowing] = useState(false);
-    const [globalFollowers, setGlobalFollowers] = useState(0);
+    const [organicFollowers, setOrganicFollowers] = useState(0);
+    const [fakeFollowers, setFakeFollowers] = useState(0);
+    const globalFollowers = getCreatorDisplayFollowers(organicFollowers, fakeFollowers);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [uniquePlayers, setUniquePlayers] = useState(0);
 
@@ -45,7 +48,8 @@ export default function CreatorProfilePage() {
                 }
 
                 setCreatorData(dbCreator);
-                setGlobalFollowers(dbCreator.followers_count || 0);
+                setOrganicFollowers(dbCreator.followers_count || 0);
+                setFakeFollowers(dbCreator.fake_followers || 0);
 
                 // Fetch the linked player profile to get the correct player username
                 const { data: p } = await supabase
@@ -105,6 +109,22 @@ export default function CreatorProfilePage() {
 
         fetchCreator();
     }, [username, supabase, router]);
+
+    useEffect(() => {
+        const refreshFollowers = async () => {
+            const { data: dbCreator } = await fetchCreatorsForDisplay(supabase, {
+                ilikeDisplayName: username,
+                single: true,
+                orderByFollowers: false,
+            });
+            if (dbCreator && !Array.isArray(dbCreator)) {
+                setOrganicFollowers(dbCreator.followers_count || 0);
+                setFakeFollowers(dbCreator.fake_followers || 0);
+            }
+        };
+        window.addEventListener('creator_stats_updated', refreshFollowers);
+        return () => window.removeEventListener('creator_stats_updated', refreshFollowers);
+    }, [username, supabase]);
 
     const getFollowersCountDisplay = () => {
         const total = globalFollowers;
@@ -208,16 +228,18 @@ export default function CreatorProfilePage() {
                                         }
                                         
                                         const isFollowingNow = !isFollowing;
-                                        const newCount = isFollowingNow ? globalFollowers + 1 : Math.max(0, globalFollowers - 1);
+                                        const newOrganic = isFollowingNow
+                                            ? organicFollowers + 1
+                                            : Math.max(0, organicFollowers - 1);
                                         
                                         // Optimistic UI
                                         setIsFollowing(isFollowingNow);
-                                        setGlobalFollowers(newCount);
+                                        setOrganicFollowers(newOrganic);
 
                                         try {
                                             const { error } = await supabase
                                                 .from('creators')
-                                                .update({ followers_count: newCount })
+                                                .update({ followers_count: newOrganic })
                                                 .eq('id', creatorData.id);
 
                                             if (error) throw error;
@@ -232,7 +254,7 @@ export default function CreatorProfilePage() {
                                         } catch (err) {
                                             console.error("Follow error:", err);
                                             setIsFollowing(!isFollowingNow);
-                                            setGlobalFollowers(isFollowingNow ? newCount - 1 : newCount + 1);
+                                            setOrganicFollowers(isFollowingNow ? newOrganic - 1 : newOrganic + 1);
                                         }
                                     }}
                                     className={`w-full py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all duration-300 shadow-[0_0_20px_rgba(0,185,240,0.3)] hover:shadow-[0_0_30px_rgba(0,185,240,0.5)] transform hover:-translate-y-1 ${isFollowing ? 'bg-[#152a3a] text-white border border-white/10' : 'bg-gradient-to-r from-[#00b9f0] to-[#0088b0] text-[#050B14]'}`}

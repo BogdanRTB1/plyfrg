@@ -5,6 +5,7 @@ import { Search, Edit, User, Globe, Trophy, Play, Star, ExternalLink, Twitch, Yo
 import { motion } from 'framer-motion';
 
 import Link from 'next/link';
+import { getCreatorDisplayFollowers, sortCreatorsByDisplayFollowers } from '@/utils/creatorFollowers';
 
 // Enhanced mock data to match the detailed card structure
 const defaultCreators: any[] = [];
@@ -36,12 +37,7 @@ export default function CreatorsPage() {
                 return;
             }
 
-            const allCreators = dbCreators || [];
-
-            const initialFollowing: Record<string, boolean> = {};
-            const gFollows: Record<string, number> = {};
-            
-            allCreators.forEach(c => {
+            const allCreators = sortCreatorsByDisplayFollowers(dbCreators || []).map((c) => {
                 // Compatibility mapping if DB fields differ from UI expectations
                 c.name = c.display_name;
                 c.profilePicture = c.profile_picture;
@@ -49,11 +45,17 @@ export default function CreatorsPage() {
                 c.description = c.bio;
                 c.skills = Array.isArray(c.skills) ? c.skills : ['Creator', 'Influencer'];
                 c.role = c.content_type || 'Elite Creator';
-                
+                return c;
+            });
+
+            const initialFollowing: Record<string, boolean> = {};
+            const gFollows: Record<string, number> = {};
+            
+            allCreators.forEach(c => {
                 if (localStorage.getItem(`following_${userId}_${c.name}`)) {
                     initialFollowing[c.name] = true;
                 }
-                gFollows[c.name] = c.followers_count || 0;
+                gFollows[c.name] = getCreatorDisplayFollowers(c.followers_count, c.fake_followers);
             });
             
             setCreators(allCreators);
@@ -61,7 +63,7 @@ export default function CreatorsPage() {
             setGlobalFollowers(gFollows);
         };
         fetchCreatorsAndFollowing();
-
+        window.addEventListener('creator_stats_updated', fetchCreatorsAndFollowing);
 
         // Sync auth state live
         const setupAuthListener = async () => {
@@ -75,6 +77,7 @@ export default function CreatorsPage() {
         const authSubscriptionPromise = setupAuthListener();
 
         return () => {
+            window.removeEventListener('creator_stats_updated', fetchCreatorsAndFollowing);
             authSubscriptionPromise.then(sub => sub.data.subscription?.unsubscribe());
         };
     }, []);
@@ -102,18 +105,25 @@ export default function CreatorsPage() {
         const supabase = createClient();
 
         const isFollowing = followingState[creatorName];
-        const currentGlobal = globalFollowers[creatorName] || 0;
-        const newCount = isFollowing ? Math.max(0, currentGlobal - 1) : currentGlobal + 1;
+        const creator = creators.find((c) => c.name === creatorName);
+        const fake = Number(creator?.fake_followers || 0);
+        const currentDisplay = globalFollowers[creatorName] || 0;
+        const currentOrganic = Math.max(0, currentDisplay - fake);
+        const newOrganic = isFollowing ? Math.max(0, currentOrganic - 1) : currentOrganic + 1;
+        const newDisplay = newOrganic + fake;
 
         // Optimistic UI update
         setFollowingState(prev => ({ ...prev, [creatorName]: !isFollowing }));
-        setGlobalFollowers(prev => ({ ...prev, [creatorName]: newCount }));
+        setGlobalFollowers(prev => ({ ...prev, [creatorName]: newDisplay }));
+        setCreators((prev) =>
+            prev.map((c) => (c.name === creatorName ? { ...c, followers_count: newOrganic } : c))
+        );
 
         try {
-            // Update Supabase followers_count
+            // Update Supabase followers_count (organic only; fake_followers unchanged)
             const { error } = await supabase
                 .from('creators')
-                .update({ followers_count: newCount })
+                .update({ followers_count: newOrganic })
                 .ilike('display_name', creatorName);
 
             if (error) throw error;
@@ -130,7 +140,10 @@ export default function CreatorsPage() {
             console.error("Follow error:", err);
             // Revert on error
             setFollowingState(prev => ({ ...prev, [creatorName]: isFollowing }));
-            setGlobalFollowers(prev => ({ ...prev, [creatorName]: currentGlobal }));
+            setGlobalFollowers(prev => ({ ...prev, [creatorName]: currentDisplay }));
+            setCreators((prev) =>
+                prev.map((c) => (c.name === creatorName ? { ...c, followers_count: currentOrganic } : c))
+            );
         }
     };
 

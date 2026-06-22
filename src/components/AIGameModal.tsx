@@ -13,6 +13,7 @@ import MobileGameHudBar, { MobileHudBetRow, MobileHudCurrencyToggle } from "./Mo
 import { recordGameSession } from "@/utils/gameBridge";
 import { resumeGameAudio } from "@/utils/gameAudioContext";
 import { playSynthSound } from "@/utils/playSynthSound";
+import { scaleDemoWin } from "@/utils/demoPlay";
 
 interface AIGameModalProps {
     isOpen: boolean;
@@ -58,7 +59,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
 
     // Send slot config to engine when ready
     const sendSlotConfig = useCallback(() => {
-        if (isSlotEngine && gameData?.slotConfig && iframeRef.current?.contentWindow && !configSentRef.current) {
+        if (isSlotEngine && gameData?.slotConfig && iframeRef.current?.contentWindow) {
             iframeRef.current.contentWindow.postMessage({
                 type: 'SLOT_CONFIG',
                 config: gameData.slotConfig
@@ -88,7 +89,7 @@ export default function AIGameModal({ isOpen, onClose, gameData, diamonds, setDi
                 let winAmount = 0;
                 if (data.win && data.multiplier > 0) {
                     const roundedMultiplier = Number(Number(data.multiplier).toFixed(1));
-                    winAmount = Number((betAmount * roundedMultiplier).toFixed(2));
+                    winAmount = scaleDemoWin(Number((betAmount * roundedMultiplier).toFixed(2)));
                     setLastWin({ amount: winAmount, currency: currencyType, multiplier: roundedMultiplier });
                     if (currencyType === 'GC') {
                         setDiamonds((prev: number) => prev + winAmount);

@@ -5,6 +5,7 @@ import GameCard from "@/components/GameCard";
 import { motion } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
 import { FEATURED_GAMES, getGameCoverImage } from "@/constants/featuredGames";
+import { DEFAULT_ORIGINAL_CARD_RTP } from "@/constants/originalsRtp";
 import { loadPublishedGames } from "@/utils/publishedGamesStorage";
 import { openGamePicker } from "@/utils/gameLaunch";
 
@@ -79,7 +80,7 @@ export default function CasinoPage() {
             key: `creator-${game.id || index}`,
             name: game.name,
             image: game.coverImage || "",
-            rtp: "88.0%",
+            rtp: DEFAULT_ORIGINAL_CARD_RTP,
             provider: game.creatorName ? `@${game.creatorName}` : "Creator",
             isCreator: true,
             payload: game,

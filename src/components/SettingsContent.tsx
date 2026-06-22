@@ -47,6 +47,8 @@ export default function SettingsContent() {
     const [referralCode, setReferralCode] = useState("");
     const [inviteLink, setInviteLink] = useState("");
     const [referralCount, setReferralCount] = useState(0);
+    const [referralEarningsFc, setReferralEarningsFc] = useState(0);
+    const [referralProfitSharePercent, setReferralProfitSharePercent] = useState(5);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const supabase = createClient();
@@ -86,6 +88,8 @@ export default function SettingsContent() {
                             setReferralCode(data.referralCode || "");
                             setInviteLink(data.inviteLink || "");
                             setReferralCount(Number(data.referralCount || 0));
+                            setReferralEarningsFc(Number(data.referralEarningsFc || 0));
+                            setReferralProfitSharePercent(Number(data.rewards?.referrerProfitSharePercent || 5));
                         }
                     } catch (err) {
                         console.error("Failed to load referral info:", err);
@@ -620,7 +624,9 @@ export default function SettingsContent() {
                                                     <Gift size={18} className="text-emerald-400" /> Invite Friends
                                                 </h3>
                                                 <p className="text-slate-400 text-sm mb-6">
-                                                    Share your link — you earn <span className="text-white font-bold">3 ForgeCoins</span> per signup, and friends get <span className="text-white font-bold">10,000 Diamonds</span>.
+                                                    Share your link — you earn <span className="text-white font-bold">3 ForgeCoins</span> per signup,{" "}
+                                                    <span className="text-white font-bold">{referralProfitSharePercent}%</span> of your invitees&apos; play profit (when they lose), and friends get{" "}
+                                                    <span className="text-white font-bold">10,000 Diamonds</span>.
                                                 </p>
 
                                                 {referralLoading ? (
@@ -660,6 +666,11 @@ export default function SettingsContent() {
                                                             {referralCount === 1
                                                                 ? "1 friend joined with your link."
                                                                 : `${referralCount} friends joined with your link.`}
+                                                            {referralEarningsFc > 0 && (
+                                                                <span className="block mt-1 text-emerald-400/90 font-semibold">
+                                                                    +{referralEarningsFc.toFixed(2)} FC earned from invitee play.
+                                                                </span>
+                                                            )}
                                                         </p>
                                                     </div>
                                                 )}

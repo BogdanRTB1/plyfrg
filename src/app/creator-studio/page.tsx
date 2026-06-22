@@ -856,6 +856,31 @@ export default function CreatorStudioPage() {
                                                     🎟️ SCRATCH
                                                 </div>
                                             )}
+                                            {game.type === 'wheel' && (
+                                                <div className="absolute top-2 left-2 bg-rose-500/20 text-rose-400 text-[10px] font-bold px-2 py-1 rounded-full border border-rose-500/30 backdrop-blur-sm z-10">
+                                                    🎡 WHEEL
+                                                </div>
+                                            )}
+                                            {game.type === 'mines' && (
+                                                <div className="absolute top-2 left-2 bg-orange-500/20 text-orange-400 text-[10px] font-bold px-2 py-1 rounded-full border border-orange-500/30 backdrop-blur-sm z-10">
+                                                    💣 MINES
+                                                </div>
+                                            )}
+                                            {game.type === 'case' && (
+                                                <div className="absolute top-2 left-2 bg-indigo-500/20 text-indigo-400 text-[10px] font-bold px-2 py-1 rounded-full border border-indigo-500/30 backdrop-blur-sm z-10">
+                                                    📦 CASE
+                                                </div>
+                                            )}
+                                            {game.type === 'hilo' && (
+                                                <div className="absolute top-2 left-2 bg-sky-500/20 text-sky-400 text-[10px] font-bold px-2 py-1 rounded-full border border-sky-500/30 backdrop-blur-sm z-10">
+                                                    🃏 HI-LO
+                                                </div>
+                                            )}
+                                            {game.type === 'blackjack' && (
+                                                <div className="absolute top-2 left-2 bg-teal-500/20 text-teal-400 text-[10px] font-bold px-2 py-1 rounded-full border border-teal-500/30 backdrop-blur-sm z-10">
+                                                    🂡 BJ
+                                                </div>
+                                            )}
                                             {(game.type === 'ai_generated' || game.type === 'manual_template') && (
                                                 <div className="absolute top-2 left-2 bg-cyan-500/20 text-cyan-400 text-[10px] font-bold px-2 py-1 rounded-full border border-cyan-500/30 backdrop-blur-sm z-10">
                                                     ✨ AI

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { REFERRED_DIAMONDS_REWARD, REFERRER_FC_REWARD } from "@/constants/referrals";
+import { REFERRED_DIAMONDS_REWARD, REFERRER_FC_REWARD, REFERRER_PROFIT_SHARE_PERCENT } from "@/constants/referrals";
 import { ensureUserReferralCode } from "@/utils/referralServer";
 import { buildAppUrl } from "@/utils/siteUrl";
 
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
         const inviteLink = `${buildAppUrl("/", req)}?ref=${encodeURIComponent(code)}`;
 
-        const [{ count: referralCount }, { data: profile }] = await Promise.all([
+        const [{ count: referralCount }, { data: profile }, earningsRes] = await Promise.all([
             admin
                 .from("referrals")
                 .select("id", { count: "exact", head: true })
@@ -44,16 +44,33 @@ export async function GET(req: NextRequest) {
                 .select("referred_by")
                 .eq("id", user.id)
                 .maybeSingle(),
+            admin
+                .from("referral_earnings")
+                .select("referrer_share, currency")
+                .eq("referrer_id", user.id),
         ]);
+
+        let referralEarningsFc = 0;
+        let referralEarningsDiamonds = 0;
+        if (!earningsRes.error) {
+            for (const row of earningsRes.data || []) {
+            const share = Number(row.referrer_share || 0);
+            if (row.currency === "GC") referralEarningsDiamonds += share;
+            else referralEarningsFc += share;
+            }
+        }
 
         return NextResponse.json({
             referralCode: code,
             inviteLink,
             referralCount: referralCount ?? 0,
             wasReferred: !!profile?.referred_by,
+            referralEarningsFc: Number(referralEarningsFc.toFixed(2)),
+            referralEarningsDiamonds: Math.floor(referralEarningsDiamonds),
             rewards: {
                 referrerForgesCoins: REFERRER_FC_REWARD,
                 referredDiamonds: REFERRED_DIAMONDS_REWARD,
+                referrerProfitSharePercent: REFERRER_PROFIT_SHARE_PERCENT,
             },
         });
     } catch (err) {

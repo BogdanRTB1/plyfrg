@@ -51,6 +51,11 @@ export const recordGameSession = async (report: GameReport) => {
         // Save to Supabase
         const { error } = await supabase.from('user_history').insert([historyEntry]);
         if (error) console.error("History Save Error:", error.message);
+
+        const playerLoss = report.wagered - report.payout;
+        if (playerLoss > 0) {
+            void recordReferrerSessionProfit(report, supabase);
+        }
     }
 
     // Always fire update event for UI
@@ -138,6 +143,32 @@ export const recordGameActivity = async (gameName: string) => {
         if (error) console.error("Activity Track Error:", error.message);
     } catch (e) {
         console.error("Activity Track Exception:", e);
+    }
+};
+
+const recordReferrerSessionProfit = async (
+    report: GameReport,
+    supabase: ReturnType<typeof createClient>
+) => {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+
+        await fetch("/api/referral/session-profit", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+                wagered: report.wagered,
+                payout: report.payout,
+                currency: report.currency,
+                gameName: report.gameName,
+            }),
+        });
+    } catch (e) {
+        console.error("[Referral] Session profit error:", e);
     }
 };
 

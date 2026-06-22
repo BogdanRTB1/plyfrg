@@ -125,6 +125,17 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
     const gridSizeKey = (config.gridSize ?? "5x5") as MinesGridSize;
     const mineCount = Math.min(GRID_DEFAULT_MINE_COUNT[gridSizeKey], maxMines);
 
+    const calcMultiplierForRevealed = useCallback((revealed: number) => {
+        if (revealed === 0) return 1;
+        const safeTiles = totalCells - mineCount;
+        let fairMult = 1;
+        for (let i = 0; i < revealed; i++) {
+            fairMult *= (totalCells - i) / (safeTiles - i);
+        }
+        const houseDiscount = 0.88 - (revealed * 0.009);
+        return Number((fairMult * Math.max(houseDiscount, 0.73)).toFixed(1));
+    }, [totalCells, mineCount]);
+
     const startGame = () => {
         if (!gameData || balance < betAmount || betAmount <= 0) return;
 
@@ -158,21 +169,8 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
     };
 
     const updateMultipliers = (revealedSafe: number) => {
-        const safeTiles = totalCells - mineCount;
-        // House-favored multiplier: fair odds * discount factor
-        // Progressive tax increases with depth so the house edge grows as risk decreases
-        const calcMult = (revealed: number) => {
-            if (revealed === 0) return 1;
-            let fairMult = 1;
-            for (let i = 0; i < revealed; i++) {
-                fairMult *= (totalCells - i) / (safeTiles - i);
-            }
-            // Stronger house cut + progressive tax per safe reveal (template favors site)
-            const houseDiscount = 0.88 - (revealed * 0.009);
-            return Number((fairMult * Math.max(houseDiscount, 0.73)).toFixed(1));
-        };
-        setMultiplier(calcMult(revealedSafe));
-        setNextMultiplier(calcMult(revealedSafe + 1));
+        setMultiplier(calcMultiplierForRevealed(revealedSafe));
+        setNextMultiplier(calcMultiplierForRevealed(revealedSafe + 1));
     };
 
     const triggerBustEffects = () => {
@@ -245,17 +243,17 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
 
             // Auto win if all safe cells revealed
             if (revealedCount === totalCells - mineCount) {
-                cashOut(curr => curr);
+                cashOut(calcMultiplierForRevealed(revealedCount));
             }
         }
     };
 
-    const cashOut = (calcMult = (m: number) => m) => {
+    const cashOut = (finalMult?: number) => {
         if (gameState !== 'PLAYING') return;
 
-        const finalMult = calcMult(multiplier);
+        const payoutMult = finalMult ?? multiplier;
         setGameState('WON');
-        const winAmount = scaleDemoWin(betAmount * finalMult);
+        const winAmount = scaleDemoWin(betAmount * payoutMult);
         setLastWin({ amount: winAmount, currency: currencyType });
 
         if (currencyType === 'GC') {
@@ -464,7 +462,7 @@ export default function CustomMinesModal({ isOpen, onClose, gameData, diamonds, 
                                 <span className="relative z-10">PLAY DANGER</span>
                             </button>
                         ) : (
-                            <button onClick={() => cashOut(m => m)} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white h-14 rounded-xl font-black text-lg uppercase shadow-[0_0_30px_rgba(34,197,94,0.5)] animate-pulse hover:scale-[1.02] flex flex-col items-center justify-center">
+                            <button onClick={() => cashOut()} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white h-14 rounded-xl font-black text-lg uppercase shadow-[0_0_30px_rgba(34,197,94,0.5)] animate-pulse hover:scale-[1.02] flex flex-col items-center justify-center">
                                 <span>CASHOUT</span>
                                 <span className="text-[10px] text-green-200 mt-[-2px]">Take {(betAmount * multiplier).toFixed(1)}</span>
                             </button>

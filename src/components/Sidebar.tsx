@@ -15,6 +15,7 @@ import {
     Users,
     CreditCard,
     Gift,
+    UserPlus,
     X,
 } from "lucide-react";
 import Image from "next/image";
@@ -104,6 +105,7 @@ export default function Sidebar() {
         ...(isAdmin ? [{ icon: <Users size={20} />, label: "Admin Users", href: "/admin/users" }] : []),
         ...(isAdmin ? [{ icon: <CreditCard size={20} />, label: "Admin Purchases", href: "/admin/transactions" }] : []),
         ...(isAdmin ? [{ icon: <Gift size={20} />, label: "Grant Package", href: "/admin/grant-bundle" }] : []),
+        ...(isAdmin ? [{ icon: <UserPlus size={20} />, label: "Fake Followers", href: "/admin/creator-followers" }] : []),
         ...(isAdmin ? [{ icon: <ShieldCheck size={20} />, label: "Admin Redeems", href: "/admin/redeems" }] : []),
         { icon: <History size={20} />, label: "History", href: "/history" },
         ...(user ? [{ icon: <Settings size={20} />, label: "Settings", href: "/settings" }] : []),

@@ -4,6 +4,7 @@ import {
     REFERRAL_NEW_ACCOUNT_MAX_AGE_MS,
     REFERRED_DIAMONDS_REWARD,
     REFERRER_FC_REWARD,
+    REFERRER_PROFIT_SHARE,
 } from "@/constants/referrals";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -217,7 +218,7 @@ export async function applyReferralForUser(
         admin.from("notifications").insert({
             user_id: referrerId,
             title: "Referral reward",
-            message: `Someone joined with your invite link. You earned ${referrerFc} ForgeCoins.`,
+            message: `Someone joined with your invite link. You earned ${referrerFc} ForgeCoins. You'll also earn ${Math.round(REFERRER_PROFIT_SHARE * 100)}% of their play profit when they lose.`,
             is_read: false,
         }),
     ]);
@@ -227,4 +228,85 @@ export async function applyReferralForUser(
         referrerFcAdded: referrerFc,
         referredDiamondsAdded: referredDiamonds,
     };
+}
+
+export type ReferrerSessionProfitResult = {
+    credited: boolean;
+    referrerId?: string;
+    share?: number;
+    currency?: "GC" | "FC";
+};
+
+/** Credit referrer with 5% of house profit when a referred user loses a game session. */
+export async function creditReferrerSessionProfit(
+    admin: SupabaseClient,
+    referredUserId: string,
+    params: {
+        wagered: number;
+        payout: number;
+        currency: "GC" | "FC";
+        gameName?: string;
+    }
+): Promise<ReferrerSessionProfitResult> {
+    const wagered = Number(params.wagered);
+    const payout = Number(params.payout);
+    if (!Number.isFinite(wagered) || !Number.isFinite(payout) || wagered <= payout) {
+        return { credited: false };
+    }
+
+    const houseProfit = Number((wagered - payout).toFixed(2));
+    if (houseProfit <= 0) {
+        return { credited: false };
+    }
+
+    const { data: profile, error: profileError } = await admin
+        .from("profiles")
+        .select("referred_by")
+        .eq("id", referredUserId)
+        .maybeSingle();
+
+    if (profileError) {
+        console.error("referral session profit profile:", profileError);
+        return { credited: false };
+    }
+
+    const referrerId = profile?.referred_by as string | undefined;
+    if (!referrerId || referrerId === referredUserId) {
+        return { credited: false };
+    }
+
+    const share = Number((houseProfit * REFERRER_PROFIT_SHARE).toFixed(2));
+    if (share <= 0) {
+        return { credited: false };
+    }
+
+    const fcDelta = params.currency === "FC" ? share : 0;
+    const diamondsDelta = params.currency === "GC" ? Math.floor(share) : 0;
+    if (fcDelta <= 0 && diamondsDelta <= 0) {
+        return { credited: false };
+    }
+
+    const credited = await creditBalance(admin, referrerId, diamondsDelta, fcDelta);
+    if (!credited) {
+        return { credited: false };
+    }
+
+    const { error: earningsError } = await admin.from("referral_earnings").insert({
+        referrer_id: referrerId,
+        referred_id: referredUserId,
+        game_name: params.gameName || null,
+        wagered,
+        payout,
+        house_profit: houseProfit,
+        referrer_share: share,
+        currency: params.currency,
+    });
+
+    if (earningsError) {
+        console.error("referral_earnings insert:", earningsError);
+        await creditBalance(admin, referrerId, -diamondsDelta, -fcDelta);
+        return { credited: false };
+    }
+
+    return { credited: true, referrerId, share, currency: params.currency };
 }

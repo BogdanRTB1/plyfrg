@@ -468,7 +468,7 @@ export default function CustomWheelModal({ isOpen, onClose, gameData, diamonds, 
             setNextMultiplierBonus(1);
             setRespinPending(false);
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout, currencyType, gameData]);
 
     // ─── Pointer Rendering ──────────────────────────────────────────────────
     const getPointerEmoji = () => {

@@ -344,7 +344,7 @@ export default function CustomCaseModal({ isOpen, onClose, gameData, diamonds, s
             setWinnerItem(null);
             setShowWinOverlay(false);
         }
-    }, [isOpen]);
+    }, [isOpen, sessionWagered, sessionPayout, currencyType, gameData]);
 
     if (!isOpen || !gameData) return null;
     if (typeof document === "undefined") return null;

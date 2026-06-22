@@ -653,8 +653,8 @@ export default function CustomHiloModal({ isOpen, onClose, gameConfig, gameName,
                         </motion.div>
                     </motion.div>
                 )}
-            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={gameName || gameConfig?.theme?.gameName || "Hi-Lo"} />
             </AnimatePresence>
+            <GameLeaderboardModal isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} gameName={gameName || gameConfig?.theme?.gameName || "Hi-Lo"} />
         </div>,
         document.body
     );
